@@ -1,0 +1,16 @@
+{
+  "name": "aethernet-agent-bridge",
+  "version": "1.0.0",
+  "description": "ÆTHERNET Agent Bridge — local orchestration layer connecting Claude and OpenAI with OURSELF approval gate",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": ">=0.20.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.0",
+    "openai": ">=4.0.0"
+  }
+}
