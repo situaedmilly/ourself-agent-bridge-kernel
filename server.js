@@ -12,6 +12,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 const LOG_PATH = join(__dirname, 'logs', 'transmissions.jsonl');
 
+// ── Pass 13 constants ───────────────────────────────────────────────────────
+// Maximum continuation rounds before the loop is hard-stopped.
+const MAX_CONTINUATION_DEPTH = 8;
+// Maximum characters of stdout or stderr sent back to an agent.
+// Payload beyond this limit is truncated and explicitly marked.
+const MAX_PROOF_PAYLOAD_CHARS = 4000;
+
 // Startup environment check — warn on missing keys, don't crash
 const missingEnv = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'].filter(k => !process.env[k]);
 if (missingEnv.length > 0) {
@@ -47,6 +54,168 @@ function printPendingAlert(cmd) {
   console.log(`   Reject:    POST http://localhost:${PORT}/reject/${cmd.id}`);
   console.log(`   Review:    http://localhost:${PORT}/pending`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+}
+
+// ── Pass 13: Bounded proof-return continuation ──────────────────────────────
+
+/**
+ * Safely truncate a proof payload string.
+ * Marks the truncation point explicitly so the agent knows it received partial output.
+ */
+function truncateProof(text, label) {
+  if (!text || text.length === 0) return '(empty)';
+  if (text.length <= MAX_PROOF_PAYLOAD_CHARS) return text;
+  return (
+    text.slice(0, MAX_PROOF_PAYLOAD_CHARS) +
+    `\n[TRUNCATED — ${label} exceeded ${MAX_PROOF_PAYLOAD_CHARS} chars]`
+  );
+}
+
+/**
+ * After an approved command executes (or fails), return a bounded proof message
+ * to the originating agent, log its continuation response, and — if it proposes
+ * a next command — queue that command for OURSELF approval without executing it.
+ *
+ * Invariants upheld:
+ *   • Never auto-approves or auto-executes any command.
+ *   • Stops at MAX_CONTINUATION_DEPTH.
+ *   • Every proposed next command enters the pending queue exactly as a fresh proposal.
+ *   • All continuation activity is persisted to the append-only log.
+ *
+ * @param {object} cmd - The completed (executed or failed) command entry from `pending`.
+ */
+async function continueAgentWithExecutionProof(cmd) {
+  const depth = cmd.continuationDepth ?? 0;
+
+  // Hard depth guard — stop before calling the agent
+  if (depth >= MAX_CONTINUATION_DEPTH) {
+    await log({
+      type: 'continuation_depth_limit',
+      cmdId: cmd.id,
+      txId: cmd.txId,
+      agent: cmd.to,
+      depth,
+      maxDepth: MAX_CONTINUATION_DEPTH,
+    });
+    console.log(
+      `\n⚠  CONTINUATION DEPTH LIMIT (${MAX_CONTINUATION_DEPTH}) reached for ${cmd.id} — no further relay.`
+    );
+    return;
+  }
+
+  const status = cmd.status;           // 'executed' | 'failed'
+  const result = cmd.result ?? {};
+  const errorMsg = cmd.error ?? null;
+
+  const stdout = truncateProof(result.stdout ?? '', 'stdout');
+  const stderr = truncateProof(result.stderr ?? errorMsg ?? '', 'stderr/error');
+  const executedAt = result.executedAt ?? cmd.approvedAt ?? new Date().toISOString();
+
+  const proofMessage = [
+    'EXECUTION PROOF — PASS 13 BOUNDED CONTINUATION',
+    '',
+    `Transmission ID  : ${cmd.txId}`,
+    `Command ID       : ${cmd.id}`,
+    `Originating agent: ${cmd.to}`,
+    `Action executed  : ${cmd.action}`,
+    `Working directory: ${cmd.workingDir}`,
+    `Execution status : ${status}`,
+    `Executed at      : ${executedAt}`,
+    '',
+    'STDOUT:',
+    stdout,
+    '',
+    'STDERR / ERROR:',
+    stderr,
+    '',
+    'CONTINUATION INSTRUCTIONS:',
+    'You may analyze this proof and propose at most ONE next command via propose_terminal_command.',
+    'No command may execute without OURSELF (Philosopher Milly) explicit approval.',
+    'If no further action is required, respond with your analysis only — no command proposal.',
+    `Continuation depth: ${depth + 1} of ${MAX_CONTINUATION_DEPTH} (hard limit).`,
+  ].join('\n');
+
+  // Call the originating agent with the proof
+  let agentResult;
+  try {
+    agentResult =
+      cmd.to === 'claude'
+        ? await callClaude(proofMessage, { continuationDepth: depth + 1 })
+        : await callOpenAI(proofMessage, { continuationDepth: depth + 1 });
+  } catch (err) {
+    await log({
+      type: 'continuation_error',
+      cmdId: cmd.id,
+      txId: cmd.txId,
+      agent: cmd.to,
+      error: err.message,
+    });
+    console.log(`\n✗ PROOF-RETURN ERROR for ${cmd.id}: ${err.message}`);
+    return;
+  }
+
+  const { response, commandProposal } = agentResult;
+
+  // Persist the continuation response as a distinct audit entry
+  const contLogId = generateId('cont');
+  await log({
+    id: contLogId,
+    type: 'agent_continuation',
+    cmdId: cmd.id,
+    txId: cmd.txId,
+    agent: cmd.to,
+    continuationDepth: depth + 1,
+    response,
+    command_proposed: commandProposal != null,
+    tokens: {
+      input: agentResult.inputTokens ?? agentResult.promptTokens,
+      output: agentResult.outputTokens ?? agentResult.completionTokens,
+    },
+  });
+
+  console.log(`\n📨 CONTINUATION RESPONSE received from ${cmd.to} (depth ${depth + 1}):`);
+  if (response && response !== '(no text response)') {
+    console.log(`   ${response.slice(0, 200)}${response.length > 200 ? '…' : ''}`);
+  }
+
+  if (!commandProposal) {
+    console.log(`   → No command proposed. Continuation complete.\n`);
+    return;
+  }
+
+  // Validate the proposed command structure before queuing
+  if (!commandProposal.action || !commandProposal.working_dir) {
+    await log({
+      type: 'continuation_invalid_proposal',
+      cmdId: cmd.id,
+      txId: cmd.txId,
+      agent: cmd.to,
+      proposal: commandProposal,
+      reason: 'Missing required field: action or working_dir',
+    });
+    console.log(`\n⚠  INVALID CONTINUATION PROPOSAL from ${cmd.to} — missing action or working_dir. Discarded.\n`);
+    return;
+  }
+
+  // Add the next proposed command to the pending queue — do NOT execute it.
+  // OURSELF must approve before any execution occurs.
+  const nextCmdId = generateId('cmd');
+  const nextCmd = {
+    id: nextCmdId,
+    txId: cmd.txId,
+    from: cmd.to,
+    to: cmd.to,
+    action: commandProposal.action,
+    workingDir: commandProposal.working_dir,
+    rationale: commandProposal.rationale || '(no rationale provided)',
+    proposedAt: new Date().toISOString(),
+    status: 'pending',
+    continuationDepth: depth + 1,
+    parentCmdId: cmd.id,
+  };
+  pending.set(nextCmdId, nextCmd);
+  printPendingAlert(nextCmd);
+  console.log(`   → Command queued as ${nextCmdId} — awaiting OURSELF approval.\n`);
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
@@ -89,6 +258,7 @@ app.post('/transmit', async (req, res) => {
       rationale: commandProposal.rationale || '(no rationale provided)',
       proposedAt: new Date().toISOString(),
       status: 'pending',
+      continuationDepth: 0,   // Pass 13: depth counter starts at 0 for every new transmission
     };
     pending.set(cmdId, pendingEntry);
     printPendingAlert(pendingEntry);
@@ -200,7 +370,18 @@ app.post('/approve/:id', async (req, res) => {
     status: cmd.status,
     result: cmd.result ?? null,
     error: cmd.error ?? null,
+    continuationDepth: cmd.continuationDepth ?? 0,
   });
+
+  // Pass 13 — return proof to the originating agent asynchronously.
+  // The HTTP response is sent immediately; proof relay and any new pending
+  // command appear in the background without blocking OURSELF's browser.
+  // Only commands originating from a named agent (not 'ourself' / test) are relayed.
+  if (cmd.to === 'claude' || cmd.to === 'openai') {
+    continueAgentWithExecutionProof(cmd).catch(err => {
+      console.error(`\n✗ continueAgentWithExecutionProof unhandled error: ${err.message}`);
+    });
+  }
 
   const wantHtml = (req.headers.accept || '').includes('text/html');
   if (wantHtml) return res.redirect('/pending');
