@@ -11,6 +11,8 @@ import { firstTestCommand } from './tools/git-proof.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 const LOG_PATH = join(__dirname, 'logs', 'transmissions.jsonl');
+const QUEUE_LOG_PATH = join(__dirname, 'logs', 'queue.jsonl');
+const QUEUE_EXPIRY_HOURS = Number(process.env.QUEUE_EXPIRY_HOURS ?? 24);
 
 // ── Pass 13 constants ───────────────────────────────────────────────────────
 // Maximum continuation rounds before the loop is hard-stopped.
@@ -41,6 +43,27 @@ function generateId(prefix) {
 async function log(entry) {
   const line = JSON.stringify({ ...entry, logged_at: new Date().toISOString() }) + '\n';
   await appendFile(LOG_PATH, line).catch(() => {});
+}
+
+async function logQueue(entry) {
+  const line = JSON.stringify({ ...entry, logged_at: new Date().toISOString() }) + '\n';
+  await appendFile(QUEUE_LOG_PATH, line).catch(() => {});
+}
+
+function logCommandProposed(cmd) {
+  return logQueue({
+    type: 'command_proposed',
+    id: cmd.id,
+    txId: cmd.txId,
+    from: cmd.from,
+    to: cmd.to,
+    action: cmd.action,
+    workingDir: cmd.workingDir,
+    rationale: cmd.rationale,
+    proposedAt: cmd.proposedAt,
+    continuationDepth: cmd.continuationDepth ?? 0,
+    parentCmdId: cmd.parentCmdId ?? null,
+  });
 }
 
 function printPendingAlert(cmd) {
@@ -214,6 +237,7 @@ async function continueAgentWithExecutionProof(cmd) {
     parentCmdId: cmd.id,
   };
   pending.set(nextCmdId, nextCmd);
+  logCommandProposed(nextCmd).catch(() => {});
   printPendingAlert(nextCmd);
   console.log(`   → Command queued as ${nextCmdId} — awaiting OURSELF approval.\n`);
 }
@@ -261,6 +285,7 @@ app.post('/transmit', async (req, res) => {
       continuationDepth: 0,   // Pass 13: depth counter starts at 0 for every new transmission
     };
     pending.set(cmdId, pendingEntry);
+    logCommandProposed(pendingEntry).catch(() => {});
     printPendingAlert(pendingEntry);
   }
 
@@ -411,6 +436,8 @@ app.post('/reject/:id', async (req, res) => {
     type: 'command_rejected',
     txId: cmd.txId,
     action: cmd.action,
+    workingDir: cmd.workingDir,
+    rationale: cmd.rationale,
     rejected_at: cmd.rejectedAt,
   });
 
@@ -434,7 +461,7 @@ app.get('/log', async (req, res) => {
 });
 
 // POST /test — submit the first safe test command into the approval queue
-app.post('/test', (req, res) => {
+app.post('/test', async (req, res) => {
   const testCmd = firstTestCommand();
   const cmdId = generateId('cmd');
   const pendingEntry = {
@@ -449,6 +476,7 @@ app.post('/test', (req, res) => {
     status: 'pending',
   };
   pending.set(cmdId, pendingEntry);
+  logCommandProposed(pendingEntry).catch(() => {});
   printPendingAlert(pendingEntry);
 
   res.json({
@@ -478,7 +506,111 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+// ── Startup rehydration ────────────────────────────────────────────────────
+
+async function rehydratePendingQueue() {
+  const EXPIRY_MS = QUEUE_EXPIRY_HOURS * 60 * 60 * 1000;
+  const now = Date.now();
+
+  const parseLines = (raw) =>
+    raw.trim().split('\n').filter(Boolean).flatMap(line => {
+      try { return [JSON.parse(line)]; } catch { return []; }
+    });
+
+  const [queueRaw, txRaw] = await Promise.all([
+    readFile(QUEUE_LOG_PATH, 'utf8').catch(() => ''),
+    readFile(LOG_PATH, 'utf8').catch(() => ''),
+  ]);
+
+  const queueEvents = parseLines(queueRaw);
+  const txEvents = parseLines(txRaw);
+
+  // Build cmdId → latest event type.
+  // Sort chronologically so terminal states (command_result, command_rejected)
+  // always overwrite earlier proposal entries for the same ID.
+  const allEvents = [...txEvents, ...queueEvents].sort((a, b) =>
+    (a.logged_at ?? '').localeCompare(b.logged_at ?? '')
+  );
+  const commandStates = new Map();
+  for (const event of allEvents) {
+    if (event.id && event.id.startsWith('cmd-') && event.type) {
+      commandStates.set(event.id, event.type);
+    }
+  }
+
+  // Build cmdId → full proposal entry (most recent command_proposed per id)
+  const proposals = new Map();
+  for (const event of queueEvents) {
+    if (event.type === 'command_proposed' && event.id) {
+      proposals.set(event.id, event);
+    }
+  }
+
+  // Terminal states — never rehydrate a command with one of these as its latest event
+  const TERMINAL_STATES = new Set(['command_result', 'command_rejected', 'command_expired']);
+  let restored = 0;
+  let expired = 0;
+
+  for (const [cmdId, latestType] of commandStates) {
+    if (TERMINAL_STATES.has(latestType)) continue;
+    // latestType is 'command_proposed' or 'command_rehydrated' — eligible
+
+    const proposal = proposals.get(cmdId);
+    if (!proposal) continue;
+
+    const proposedAt = new Date(proposal.proposedAt ?? proposal.logged_at).getTime();
+    const age = now - proposedAt;
+
+    if (age > EXPIRY_MS) {
+      await logQueue({
+        type: 'command_expired',
+        id: cmdId,
+        txId: proposal.txId,
+        proposedAt: proposal.proposedAt,
+        expiredAt: new Date().toISOString(),
+        reason: 'stale_rehydration',
+        expiryHours: QUEUE_EXPIRY_HOURS,
+      });
+      expired++;
+      continue;
+    }
+
+    const cmd = {
+      id: cmdId,
+      txId: proposal.txId,
+      from: proposal.from,
+      to: proposal.to,
+      action: proposal.action,
+      workingDir: proposal.workingDir,
+      rationale: proposal.rationale,
+      proposedAt: proposal.proposedAt,
+      status: 'pending',
+      continuationDepth: proposal.continuationDepth ?? 0,
+      parentCmdId: proposal.parentCmdId ?? null,
+      rehydratedAt: new Date().toISOString(),
+    };
+    pending.set(cmdId, cmd);
+
+    await logQueue({
+      type: 'command_rehydrated',
+      id: cmdId,
+      txId: proposal.txId,
+      rehydratedAt: cmd.rehydratedAt,
+      originalProposedAt: proposal.proposedAt,
+    });
+
+    printPendingAlert(cmd);
+    restored++;
+  }
+
+  if (restored > 0 || expired > 0) {
+    console.log(`\n⟳ REHYDRATION — ${restored} restored, ${expired} expired.\n`);
+  }
+}
+
 // ── Start ──────────────────────────────────────────────────────────────────
+
+await rehydratePendingQueue();
 
 app.listen(PORT, () => {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
