@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual, randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { appendFile, readFile } from 'fs/promises';
@@ -11,6 +11,10 @@ import { firstTestCommand } from './tools/git-proof.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
+// ── Pass 15: localhost-only binding ─────────────────────────────────────────
+// The operator chamber is never exposed to the public network. Bind to the
+// loopback interface unless an operator explicitly overrides BIND_HOST.
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 const LOG_PATH = join(__dirname, 'logs', 'transmissions.jsonl');
 const QUEUE_LOG_PATH = join(__dirname, 'logs', 'queue.jsonl');
 const QUEUE_EXPIRY_HOURS = Number(process.env.QUEUE_EXPIRY_HOURS ?? 24);
@@ -68,6 +72,17 @@ function requireToken(req, res, next) {
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// ── Pass 15: hardened local response headers ────────────────────────────────
+// Applied to every response. These do not weaken any Pass 18 authority gate;
+// they only reduce caching/embedding/leakage surface for the local chamber.
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Referrer-Policy', 'no-referrer');
+  next();
+});
 
 // In-memory pending command queue — keyed by command ID
 const pending = new Map();
@@ -565,6 +580,146 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ── Pass 15: OURSELF command chamber (read-only data + rendered shell) ───────
+// These routes are GATE-FREE because they are strictly read-only — identical in
+// kind to the existing gate-free /health, /log, and /pending routes. Every
+// state-changing action the chamber performs (/transmit, /approve, /reject)
+// still flows through the unchanged Pass 18 token gate; the operator's browser
+// supplies the x-ourself-token header from a session-only value it never
+// persists to disk and the server never embeds or reveals.
+
+const AXIOM_DIR = '/Users/millysituated/RUORA/projects/axiom-trial-engine-v1';
+const AXIOM_DEV_URL = 'http://localhost:5174/';
+
+function parseJsonl(raw) {
+  return raw.trim().split('\n').filter(Boolean).flatMap(line => {
+    try { return [JSON.parse(line)]; } catch { return []; }
+  });
+}
+
+// Probe the AXIOM dev server without claiming a state we cannot prove.
+async function probeAxiom() {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 1200);
+  try {
+    await fetch(AXIOM_DEV_URL, { signal: ctrl.signal });
+    return 'available';
+  } catch {
+    return 'unavailable';
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// GET /ourself/state — health snapshot for the chamber. Read-only. No secrets.
+app.get('/ourself/state', async (req, res) => {
+  const now = Date.now();
+  const expiryMs = QUEUE_EXPIRY_HOURS * 60 * 60 * 1000;
+
+  const pendingCmds = [...pending.values()]
+    .filter(c => c.status === 'pending')
+    .map(c => {
+      const proposedMs = new Date(c.proposedAt).getTime();
+      const ageMs = Number.isFinite(proposedMs) ? now - proposedMs : null;
+      return {
+        id: c.id,
+        txId: c.txId,
+        from: c.from,
+        to: c.to,
+        action: c.action,
+        workingDir: c.workingDir,
+        rationale: c.rationale,
+        proposedAt: c.proposedAt,
+        continuationDepth: c.continuationDepth ?? 0,
+        parentCmdId: c.parentCmdId ?? null,
+        rehydrated: Boolean(c.rehydratedAt),
+        rehydratedAt: c.rehydratedAt ?? null,
+        ageMs,
+        expiresInMs: ageMs == null ? null : expiryMs - ageMs,
+      };
+    });
+
+  // Derive last transmission / last execution time from the append-only log.
+  let lastTransmissionAt = null;
+  let lastExecutionAt = null;
+  const txRaw = await readFile(LOG_PATH, 'utf8').catch(() => '');
+  for (const e of parseJsonl(txRaw)) {
+    if (e.type === 'transmission') lastTransmissionAt = e.logged_at ?? lastTransmissionAt;
+    if (e.type === 'command_result') lastExecutionAt = e.logged_at ?? lastExecutionAt;
+  }
+
+  const axiom = await probeAxiom();
+
+  res.json({
+    bridge: 'alive',
+    name: 'ÆTHERNET Agent Bridge',
+    port: PORT,
+    bindHost: BIND_HOST,
+    pending: pendingCmds,
+    counts: {
+      pending: pendingCmds.length,
+      rehydrated: pendingCmds.filter(c => c.rehydrated).length,
+    },
+    lastTransmissionAt,
+    lastExecutionAt,
+    limits: {
+      continuationDepthLimit: MAX_CONTINUATION_DEPTH,
+      proofTruncationChars: MAX_PROOF_PAYLOAD_CHARS,
+      queueExpiryHours: QUEUE_EXPIRY_HOURS,
+    },
+    nodes: {
+      ourself: 'present',
+      bridge: 'available',
+      // Booleans only — raw key VALUES are never read or returned.
+      claude: process.env.ANTHROPIC_API_KEY ? 'available' : 'unavailable',
+      openai: process.env.OPENAI_API_KEY ? 'available' : 'unavailable',
+      terminal: 'available',
+      axiom,
+      proofMemory: txRaw.length > 0 ? 'available' : 'unknown',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// GET /ourself/ledger — merged, parsed append-only audit events. Read-only.
+// Returns structured JSON; the client renders every value via textContent.
+app.get('/ourself/ledger', async (req, res) => {
+  const [txRaw, queueRaw] = await Promise.all([
+    readFile(LOG_PATH, 'utf8').catch(() => ''),
+    readFile(QUEUE_LOG_PATH, 'utf8').catch(() => ''),
+  ]);
+  const events = [...parseJsonl(txRaw), ...parseJsonl(queueRaw)]
+    .sort((a, b) => (b.logged_at ?? '').localeCompare(a.logged_at ?? ''))
+    .slice(0, 200);
+  res.json({ count: events.length, events });
+});
+
+// GET /ourself/verify — authenticated liveness check (Pass 19). Token-gated,
+// read-only, returns NO secret. The chamber calls this to transition from
+// LOCKED to AUTHORIZED: a 200 proves the entered token matches the server gate;
+// a 401 tells the chamber to clear the token locally and stay locked.
+app.get('/ourself/verify', requireToken, (req, res) => {
+  res.json({ authorized: true, name: 'ÆTHERNET Agent Bridge', timestamp: new Date().toISOString() });
+});
+
+// GET /ourself — the SELF-governed command chamber (server-rendered shell).
+// A per-response nonce drives a strict CSP: only this page's own inline style
+// and script may run; no third-party JavaScript, no inline-without-nonce, no
+// remote connections beyond same-origin fetch.
+app.get('/ourself', (req, res) => {
+  const nonce = randomBytes(16).toString('base64');
+  res.set('Content-Security-Policy', [
+    "default-src 'none'",
+    `script-src 'nonce-${nonce}'`,
+    `style-src 'nonce-${nonce}'`,
+    "connect-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join('; '));
+  res.type('html').send(renderChamber(nonce));
+});
+
 // ── Utility ────────────────────────────────────────────────────────────────
 
 function escapeHtml(str) {
@@ -573,6 +728,499 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ── Pass 19: OURSELF local operator chamber shell ───────────────────────────
+// Server-rendered shell only. NO secret is ever interpolated. The page renders
+// in two states — LOCKED and AUTHORIZED. The operator token lives only in a JS
+// module variable for the lifetime of the open tab (tab-memory); refreshing or
+// closing the tab discards it. sessionStorage is used ONLY when the operator
+// explicitly opts in via an unchecked-by-default checkbox. The token is never
+// embedded in HTML/JS/URLs/cookies/localStorage/logs, never sent to any agent
+// or third party, and is cleared immediately on any 401/403. All dynamic data
+// is rendered via textContent (never innerHTML); a nonce-based CSP forbids any
+// inline-without-nonce or third-party script.
+function renderChamber(nonce) {
+  const cfg = JSON.stringify({ port: PORT, axiomUrl: AXIOM_DEV_URL, axiomDir: AXIOM_DIR });
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OURSELF COMMAND CHAMBER</title>
+<style nonce="${nonce}">
+  :root{
+    --bg:#0a0a0a; --panel:#0e0e0e; --panel2:#111; --line:#262626; --line2:#333;
+    --txt:#d8d8d8; --muted:#6a6a6a; --silver:#c9c9c9;
+    --cyan:#3fd0d8; --violet:#9a7fe0; --gold:#c9a84c; --red:#c05a5a; --green:#4a9960;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--bg);color:var(--txt);font-family:Georgia,'Times New Roman',serif;margin:0;padding:0 18px 80px;line-height:1.5;}
+  .wrap{max-width:860px;margin:0 auto;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  h1{font-family:ui-monospace,monospace;color:var(--gold);letter-spacing:.22em;font-size:18px;margin:34px 0 2px;}
+  .present{font-family:ui-monospace,monospace;letter-spacing:.18em;font-size:11px;}
+  body.locked .present{color:var(--gold);}
+  body.authorized .present{color:var(--cyan);}
+  .sub{font-family:ui-monospace,monospace;color:var(--muted);letter-spacing:.14em;font-size:10px;margin-bottom:18px;}
+  section{border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:16px 18px;margin:14px 0;}
+  .label{font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.16em;color:var(--silver);text-transform:uppercase;margin-bottom:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .metric{border:1px solid var(--line);background:var(--panel2);border-radius:4px;padding:9px 11px;}
+  .metric .k{font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;}
+  .metric .v{font-family:ui-monospace,monospace;font-size:13px;color:var(--txt);margin-top:3px;word-break:break-word;}
+  label.f{display:block;font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.1em;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;}
+  input,select,textarea{width:100%;background:#060606;border:1px solid var(--line2);color:var(--txt);
+    font-family:ui-monospace,monospace;font-size:13px;padding:9px 10px;border-radius:4px;}
+  textarea{min-height:84px;resize:vertical;line-height:1.45;}
+  button{font-family:ui-monospace,monospace;font-size:12px;letter-spacing:.08em;cursor:pointer;border-radius:4px;
+    border:1px solid var(--line2);background:#161616;color:var(--txt);padding:8px 16px;}
+  button:hover{border-color:#555;}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-go{border-color:#2f5a52;color:var(--cyan);background:#0a1413;}
+  .btn-auth{border-color:#5a4f2f;color:var(--gold);background:#14110a;}
+  .btn-approve{border-color:#2f5a3a;color:var(--green);background:#0a140d;}
+  .btn-reject{border-color:#5a2f2f;color:var(--red);background:#140a0a;}
+  .btn-ghost{background:transparent;color:var(--muted);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .note{font-size:12px;color:var(--muted);border-left:2px solid var(--gold);padding:6px 0 6px 12px;margin:10px 0;line-height:1.55;}
+  .card{border:1px solid var(--line2);border-left:3px solid var(--gold);background:var(--panel2);border-radius:4px;padding:13px 15px;margin-bottom:12px;}
+  .card.rehy{border-left-color:var(--violet);}
+  .cid{font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.1em;color:var(--muted);margin-bottom:5px;word-break:break-all;}
+  .act{font-family:ui-monospace,monospace;font-size:14px;color:#eee;margin:5px 0;word-break:break-all;}
+  .meta{font-size:11px;color:var(--muted);margin:2px 0;word-break:break-word;}
+  .badge{display:inline-block;font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.1em;
+    padding:2px 7px;border-radius:3px;border:1px solid var(--line2);color:var(--muted);margin-left:6px;}
+  .badge.rehy{color:var(--violet);border-color:#3a2f5a;}
+  .badge.cont{color:var(--gold);border-color:#5a4f2f;}
+  .nodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;}
+  .node{border:1px solid var(--line);background:var(--panel2);border-radius:4px;padding:8px 10px;font-family:ui-monospace,monospace;font-size:11px;}
+  .node .s{font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-top:3px;}
+  .ok{color:var(--cyan);} .no{color:var(--red);} .unk{color:var(--muted);} .self{color:var(--violet);}
+  .ev{border-bottom:1px solid var(--line);padding:8px 0;}
+  .ev summary{cursor:pointer;font-family:ui-monospace,monospace;font-size:11px;color:var(--txt);list-style:none;}
+  .ev summary::-webkit-details-marker{display:none;}
+  .ev .t{color:var(--muted);} .ev .ty{color:var(--cyan);}
+  .ev pre{background:#060606;border:1px solid var(--line);border-radius:4px;padding:8px;overflow:auto;
+    font-size:11px;color:#bdbdbd;margin:6px 0 0;max-height:280px;white-space:pre-wrap;word-break:break-word;}
+  #notice{position:sticky;top:0;z-index:5;}
+  .banner{font-family:ui-monospace,monospace;font-size:12px;padding:10px 14px;border-radius:4px;margin:10px 0;}
+  .banner.good{background:#0a140d;border:1px solid #2f5a3a;color:var(--green);}
+  .banner.warn{background:#140a0a;border:1px solid #5a2f2f;color:var(--red);}
+  .banner.info{background:#0a1413;border:1px solid #2f5a52;color:var(--cyan);}
+  a{color:var(--gold);}
+  .statebar{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.12em;padding:7px 12px;border-radius:4px;display:inline-block;}
+  body.locked .statebar{color:var(--gold);border:1px solid #5a4f2f;background:#14110a;}
+  body.authorized .statebar{color:var(--cyan);border:1px solid #2f5a52;background:#0a1413;}
+  .tok-set{color:var(--cyan);} .tok-unset{color:var(--red);}
+  .ckrow{display:flex;align-items:center;gap:8px;margin-top:10px;font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);}
+  .ckrow input{width:auto;}
+  .resfield{font-size:12px;margin:4px 0;}
+  .resfield b{font-family:ui-monospace,monospace;color:var(--muted);font-weight:normal;}
+  pre.resp{background:#060606;border:1px solid var(--line);border-radius:4px;padding:9px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:#cfcfcf;}
+  /* state-gated visibility */
+  body.locked .auth-only{display:none;}
+  body.authorized .locked-only{display:none;}
+  /* confirmation modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.80);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .overlay.show{display:flex;}
+  .modal{max-width:540px;width:100%;background:#0e0e0e;border:1px solid #3a3a3a;border-left:3px solid var(--gold);border-radius:6px;padding:20px;}
+  .modal h2{font-family:ui-monospace,monospace;font-size:13px;letter-spacing:.1em;margin:0 0 12px;}
+  .modal.approve h2{color:var(--green);} .modal.reject h2{color:var(--red);}
+  .modal .decl{font-size:13px;color:var(--txt);line-height:1.55;border-left:2px solid var(--gold);padding-left:12px;margin:12px 0;}
+  .modal .det{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);margin:3px 0;word-break:break-all;}
+  .modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+</style>
+</head>
+<body class="locked">
+<div class="wrap">
+  <div id="notice"></div>
+
+  <h1>OURSELF COMMAND CHAMBER</h1>
+  <div class="present" id="presence">LOCAL AUTHORITY LOCKED</div>
+  <div class="sub">ÆTHERNET AGENT BRIDGE · LOCAL · SOVEREIGN</div>
+
+  <section>
+    <div class="label">Local Authority</div>
+    <div class="statebar" id="statebar">LOCAL AUTHORITY LOCKED</div>
+    <div class="auth-only" style="margin-top:10px;">
+      <div class="row">
+        <span class="meta tok-set">● Chamber authorized for local operations.</span>
+        <button id="clearTok" class="btn-ghost">CLEAR TOKEN · LOCK</button>
+      </div>
+    </div>
+    <div class="locked-only">
+      <label class="f" for="tok">Enter OURSELF token (read from your gitignored .env)</label>
+      <div class="row">
+        <input id="tok" type="password" placeholder="OURSELF token — held in tab memory only" autocomplete="off" style="flex:1;min-width:200px;">
+        <button id="authBtn" class="btn-auth">AUTHORIZE CHAMBER</button>
+      </div>
+      <div class="ckrow">
+        <input type="checkbox" id="remember">
+        <label for="remember" style="margin:0;cursor:pointer;">Remember token until this browser tab closes</label>
+      </div>
+      <div id="tokStatus" class="meta tok-unset" style="margin-top:8px;"></div>
+      <div class="note">Default is tab-memory only: refreshing or closing the tab discards the token and re-locks the chamber. The token is never written to disk, never embedded in this page, and never sent to any agent. The bridge verifies it server-side and never reveals it.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">Presence &amp; Vitals</div>
+    <div id="metrics" class="grid"><div class="metric"><div class="v">loading…</div></div></div>
+  </section>
+
+  <section class="auth-only">
+    <div class="label">Transmission Chamber</div>
+    <label class="f" for="dest">Destination</label>
+    <select id="dest"><option value="claude">claude</option><option value="openai">openai</option></select>
+    <label class="f" for="mode">Mode</label>
+    <select id="mode">
+      <option value="inspection_only">inspection_only</option>
+      <option value="propose_only">propose_only</option>
+      <option value="standard_bounded">standard_bounded</option>
+    </select>
+    <label class="f" for="msg">Message</label>
+    <textarea id="msg" placeholder="Transmit intent to the cognition node…"></textarea>
+    <div class="note">The cognition node may respond or propose one command. No command executes without OURSELF approval.</div>
+    <div class="row"><button id="send" class="btn-go">TRANSMIT</button></div>
+    <div id="txResult"></div>
+  </section>
+
+  <section>
+    <div class="label">Pending Authority Gate · <span id="pendCount">0</span> awaiting OURSELF</div>
+    <div class="note locked-only">Chamber is locked — proposals are display-only. Authorize to approve or reject.</div>
+    <div id="pending"><div class="meta">loading…</div></div>
+  </section>
+
+  <section>
+    <div class="label">Node Status</div>
+    <div id="nodes" class="nodes"></div>
+  </section>
+
+  <section>
+    <div class="label">AXIOM Trial Vessel</div>
+    <div id="axiomBox" class="meta">checking…</div>
+  </section>
+
+  <section>
+    <div class="label">Proof Ledger · append-only · read-only</div>
+    <div class="row" style="margin-bottom:8px;"><button id="reloadLedger" class="btn-ghost">REFRESH LEDGER</button></div>
+    <div id="ledger"><div class="meta">loading…</div></div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <h2 id="modalTitle"></h2>
+    <div id="modalDetails"></div>
+    <div class="decl" id="modalDecl"></div>
+    <div class="acts">
+      <button id="modalCancel" class="btn-ghost">CANCEL</button>
+      <button id="modalConfirm" class="btn-go">CONFIRM</button>
+    </div>
+  </div>
+</div>
+
+<script nonce="${nonce}">
+"use strict";
+(function(){
+var CFG = ${cfg};
+
+// ── Token state: tab-memory ONLY by default ────────────────────────────────
+// chamberToken lives solely in this closure variable for the life of the tab.
+// sessionStorage is touched ONLY when the operator opts in via the checkbox.
+var chamberToken = null;
+var authorized = false;
+var SSKEY = "ourself_tabmem_token";   // used ONLY when "remember" is checked
+
+function $(id){return document.getElementById(id);}
+function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+function clear(node){while(node.firstChild)node.removeChild(node.firstChild);}
+
+function notice(msg,kind){
+  var n=$("notice"); clear(n);
+  var b=el("div","banner "+(kind||"info"),msg); n.appendChild(b);
+  if(kind!=="warn"){setTimeout(function(){if(b.parentNode)b.parentNode.removeChild(b);},6000);}
+}
+
+function setStateLocked(){
+  authorized=false;
+  document.body.className="locked";
+  $("presence").textContent="LOCAL AUTHORITY LOCKED";
+  $("statebar").textContent="LOCAL AUTHORITY LOCKED";
+  var s=$("tokStatus"); s.className="meta tok-unset";
+  s.textContent="○ No token set — transmit / approve / reject are disabled until you authorize.";
+  loadState();
+}
+function setStateAuthorized(){
+  authorized=true;
+  document.body.className="authorized";
+  $("presence").textContent="SELF IS PRESENT · AUTHORIZED FOR LOCAL OPERATIONS";
+  $("statebar").textContent="AUTHORIZED FOR LOCAL OPERATIONS";
+  loadState();
+}
+
+// Wipe the token from memory AND any opt-in sessionStorage, then lock.
+function clearToken(reason){
+  chamberToken=null;
+  try{sessionStorage.removeItem(SSKEY);}catch(e){}
+  var ck=$("remember"); if(ck)ck.checked=false;
+  setStateLocked();
+  if(reason)notice(reason,"warn");
+}
+
+// Authenticated fetch for state-changing routes. Attaches the token header,
+// performs NO automatic retry, and clears the token immediately on 401/403.
+function authed(url,method,body){
+  if(!chamberToken){notice("Authorize the chamber first.","warn");return Promise.reject(new Error("locked"));}
+  var h={"x-ourself-token":chamberToken};
+  var opts={method:method,headers:h};
+  if(body){h["Content-Type"]="application/json";opts.body=JSON.stringify(body);}
+  return fetch(url,opts).then(function(r){
+    if(r.status===401||r.status===403){clearToken("Authority revoked by server ("+r.status+"). Token cleared; chamber re-locked.");throw new Error("unauthorized");}
+    return r;
+  });
+}
+
+function authorize(){
+  var v=$("tok").value.trim();
+  if(!v){notice("Enter a token to authorize.","warn");return;}
+  var remember=$("remember").checked;
+  var btn=$("authBtn"); btn.disabled=true; btn.textContent="VERIFYING…";
+  // Verify the token against the server gate BEFORE declaring authority.
+  fetch("/ourself/verify",{method:"GET",headers:{"x-ourself-token":v}}).then(function(r){
+    btn.disabled=false; btn.textContent="AUTHORIZE CHAMBER";
+    if(r.ok){
+      chamberToken=v;
+      $("tok").value="";
+      if(remember){try{sessionStorage.setItem(SSKEY,v);}catch(e){}}
+      else{try{sessionStorage.removeItem(SSKEY);}catch(e){}}
+      setStateAuthorized();
+      notice("Chamber authorized for local operations.","good");
+    }else{
+      // Invalid/denied — never retain the token.
+      chamberToken=null;
+      try{sessionStorage.removeItem(SSKEY);}catch(e){}
+      notice("Authorization denied ("+r.status+"). Token discarded.","warn");
+    }
+  }).catch(function(e){
+    btn.disabled=false; btn.textContent="AUTHORIZE CHAMBER";
+    chamberToken=null;
+    notice("Verification failed: "+e.message,"warn");
+  });
+}
+
+function fmtTime(iso){if(!iso)return "—";var d=new Date(iso);return isNaN(d)?String(iso):d.toLocaleString();}
+function fmtAge(ms){if(ms==null)return "—";var s=Math.floor(ms/1000);if(s<60)return s+"s";var m=Math.floor(s/60);if(m<60)return m+"m";var h=Math.floor(m/60);return h+"h "+(m%60)+"m";}
+function metric(k,v){var m=el("div","metric");m.appendChild(el("div","k",k));m.appendChild(el("div","v",v==null?"—":String(v)));return m;}
+
+function renderMetrics(st){
+  var g=$("metrics"); clear(g);
+  var nodesUp=Object.keys(st.nodes).filter(function(k){return st.nodes[k]==="available"||st.nodes[k]==="present";}).length;
+  g.appendChild(metric("Bridge",st.bridge));
+  g.appendChild(metric("Bound",st.bindHost+":"+st.port));
+  g.appendChild(metric("Pending",st.counts.pending));
+  g.appendChild(metric("Rehydrated",st.counts.rehydrated));
+  g.appendChild(metric("Last Transmit",fmtTime(st.lastTransmissionAt)));
+  g.appendChild(metric("Last Execution",fmtTime(st.lastExecutionAt)));
+  g.appendChild(metric("Active Nodes",nodesUp));
+  g.appendChild(metric("Continuation Limit",st.limits.continuationDepthLimit));
+  g.appendChild(metric("Proof Truncation",st.limits.proofTruncationChars+" ch"));
+  g.appendChild(metric("Queue Expiry",st.limits.queueExpiryHours+" h"));
+  g.appendChild(metric("AXIOM Vessel",st.nodes.axiom));
+  $("pendCount").textContent=st.counts.pending;
+}
+
+function renderNodes(st){
+  var box=$("nodes"); clear(box);
+  var order=["ourself","bridge","claude","openai","terminal","axiom","proofMemory"];
+  var nameMap={ourself:"OURSELF",bridge:"ÆTHERNET",claude:"CLAUDE",openai:"OPENAI",terminal:"TERMINAL",axiom:"AXIOM VESSEL",proofMemory:"PROOF MEMORY"};
+  order.forEach(function(key){
+    var status=st.nodes[key]; var n=el("div","node");
+    n.appendChild(el("div",null,nameMap[key]));
+    var cls=status==="available"?"ok":status==="present"?"self":status==="unavailable"?"no":"unk";
+    n.appendChild(el("div","s "+cls,status)); box.appendChild(n);
+  });
+}
+
+function renderAxiom(st){
+  var box=$("axiomBox"); clear(box);
+  if(st.nodes.axiom==="available"){
+    var a=el("a",null,"OPEN AXIOM TRIAL ENGINE →"); a.href=CFG.axiomUrl; a.target="_blank"; a.rel="noopener noreferrer"; box.appendChild(a);
+  }else{
+    box.appendChild(el("div","meta","AXIOM vessel is not currently running."));
+    box.appendChild(el("pre","resp","cd ~/RUORA/projects/axiom-trial-engine-v1 && npm run dev"));
+  }
+}
+
+function renderPending(st){
+  var box=$("pending"); clear(box);
+  if(!st.pending.length){box.appendChild(el("div","meta","No commands pending approval."));return;}
+  st.pending.forEach(function(c){
+    var card=el("div","card"+(c.rehydrated?" rehy":""));
+    var cid=el("div","cid",c.id+" · tx "+c.txId);
+    if(c.rehydrated)cid.appendChild(el("span","badge rehy","REHYDRATED"));
+    if(c.continuationDepth>0)cid.appendChild(el("span","badge cont","CONT depth "+c.continuationDepth));
+    card.appendChild(cid);
+    card.appendChild(el("div","act","$ "+c.action));
+    card.appendChild(el("div","meta","origin: "+c.from+"  →  node: "+c.to));
+    card.appendChild(el("div","meta","dir: "+c.workingDir));
+    card.appendChild(el("div","meta","rationale: "+c.rationale));
+    card.appendChild(el("div","meta","proposed: "+fmtTime(c.proposedAt)+"  ·  age: "+fmtAge(c.ageMs)+"  ·  expires in: "+fmtAge(c.expiresInMs)));
+    if(c.parentCmdId)card.appendChild(el("div","meta","parent: "+c.parentCmdId));
+    if(authorized){
+      var row=el("div","row"); row.style.marginTop="10px";
+      var ap=el("button","btn-approve","APPROVE");
+      var rj=el("button","btn-reject","REJECT");
+      ap.onclick=function(){confirmAction("approve",c);};
+      rj.onclick=function(){confirmAction("reject",c);};
+      row.appendChild(ap); row.appendChild(rj); card.appendChild(row);
+    }else{
+      card.appendChild(el("div","meta","↳ display-only — authorize the chamber to act on this proposal."));
+    }
+    box.appendChild(card);
+  });
+}
+
+// ── Confirmation modal ──────────────────────────────────────────────────────
+var pendingConfirm=null;
+function confirmAction(kind,c){
+  var modal=$("modal"); modal.className="modal "+kind;
+  $("modalTitle").textContent=(kind==="approve"?"AUTHORIZE EXECUTION":"REJECT COMMAND");
+  var det=$("modalDetails"); clear(det);
+  det.appendChild(el("div","det","command: "+c.id));
+  det.appendChild(el("div","det","$ "+c.action));
+  det.appendChild(el("div","det","dir: "+c.workingDir));
+  $("modalDecl").textContent = kind==="approve"
+    ? "OURSELF authorizes this exact command to execute once inside the displayed working directory."
+    : "OURSELF rejects this command. It will not execute.";
+  $("modalConfirm").className = kind==="approve" ? "btn-approve" : "btn-reject";
+  $("modalConfirm").textContent = kind==="approve" ? "AUTHORIZE" : "REJECT";
+  pendingConfirm={kind:kind,c:c};
+  $("overlay").classList.add("show");
+}
+function closeModal(){$("overlay").classList.remove("show");pendingConfirm=null;}
+function runConfirm(){
+  if(!pendingConfirm)return;
+  var kind=pendingConfirm.kind, c=pendingConfirm.c; closeModal();
+  var url=(kind==="approve"?"/approve/":"/reject/")+encodeURIComponent(c.id);
+  authed(url,"POST",null)
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+      if(!res.ok){notice((kind==="approve"?"Approval":"Rejection")+" refused: "+(res.j.error||"unknown"),"warn");}
+      else if(kind==="approve"){notice("OURSELF authorized "+c.id+" — status: "+res.j.status,"good");}
+      else{notice("OURSELF rejected "+c.id+" — it will not execute.","good");}
+      loadState(); loadLedger();
+    })
+    .catch(function(e){if(e&&e.message!=="locked"&&e.message!=="unauthorized")notice("Action failed: "+e.message,"warn");});
+}
+
+function buildModeMessage(mode,msg){
+  var pre;
+  if(mode==="inspection_only")pre="[MODE: inspection_only] Respond with analysis only. Do NOT propose any terminal command.";
+  else if(mode==="propose_only")pre="[MODE: propose_only] You may propose at most ONE terminal command for OURSELF approval. Nothing executes this turn.";
+  else pre="[MODE: standard_bounded] Standard bounded protocol: propose at most one command; nothing executes without OURSELF approval.";
+  return pre+"\\n\\n"+msg;
+}
+
+function transmit(){
+  var msg=$("msg").value.trim();
+  if(!msg){notice("Message is empty.","warn");return;}
+  var dest=$("dest").value, mode=$("mode").value;
+  var btn=$("send"); btn.disabled=true; btn.textContent="TRANSMITTING…";
+  authed("/transmit","POST",{from:"ourself",to:dest,message:buildModeMessage(mode,msg)})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+      btn.disabled=false; btn.textContent="TRANSMIT";
+      var out=$("txResult"); clear(out);
+      if(!res.ok){notice("Transmission error: "+(res.j.error||"unknown"),"warn");return;}
+      var j=res.j; var cp=j.command_proposed;
+      function field(k,v){var d=el("div","resfield");d.appendChild(el("b",null,k+": "));d.appendChild(document.createTextNode(v==null?"—":String(v)));return d;}
+      var wrap=el("div","card");
+      wrap.appendChild(field("transmission id",j.transmission_id));
+      wrap.appendChild(field("destination",j.to));
+      wrap.appendChild(field("mode",mode));
+      wrap.appendChild(el("pre","resp",j.response||"(no text response)"));
+      wrap.appendChild(field("command proposed",cp?"YES":"no"));
+      if(cp){
+        wrap.appendChild(field("pending command id",cp.id));
+        wrap.appendChild(field("continuation depth",cp.continuationDepth!=null?cp.continuationDepth:0));
+      }
+      wrap.appendChild(field("timestamp",fmtTime(new Date().toISOString())));
+      out.appendChild(wrap);
+      notice("Transmission "+j.transmission_id+" complete"+(cp?" — a command is now PENDING in the gate.":"."),cp?"info":"good");
+      loadState(); loadLedger();
+    })
+    .catch(function(e){btn.disabled=false;btn.textContent="TRANSMIT";if(e&&e.message!=="locked"&&e.message!=="unauthorized")notice("Transmit failed: "+e.message,"warn");});
+}
+
+var LEDGER_FIELDS=["id","cmdId","txId","type","from","to","action","workingDir","status","continuationDepth","parentCmdId"];
+function renderLedger(data){
+  var box=$("ledger"); clear(box);
+  if(!data.events.length){box.appendChild(el("div","meta","No audit events yet."));return;}
+  data.events.forEach(function(e){
+    var d=el("details","ev");
+    var sum=el("summary");
+    sum.appendChild(el("span","t",fmtTime(e.logged_at)+"  "));
+    sum.appendChild(el("span","ty",e.type||"event"));
+    var idtxt=e.id||e.cmdId; if(idtxt)sum.appendChild(document.createTextNode("  "+idtxt));
+    if(e.action)sum.appendChild(document.createTextNode("  $ "+e.action));
+    d.appendChild(sum);
+    var pre=el("pre",null);
+    var lines=[];
+    LEDGER_FIELDS.forEach(function(f){if(e[f]!=null)lines.push(f+": "+e[f]);});
+    if(e.result){
+      if(e.result.stdout!=null)lines.push("stdout: "+String(e.result.stdout).slice(0,2000));
+      if(e.result.stderr!=null)lines.push("stderr: "+String(e.result.stderr).slice(0,2000));
+    }
+    if(e.error)lines.push("error: "+e.error);
+    if(e.response)lines.push("response: "+String(e.response).slice(0,2000));
+    pre.textContent=lines.join("\\n");
+    d.appendChild(pre);
+    box.appendChild(d);
+  });
+}
+
+function loadState(){
+  fetch("/ourself/state").then(function(r){return r.json();}).then(function(st){
+    renderMetrics(st); renderNodes(st); renderAxiom(st); renderPending(st);
+  }).catch(function(e){notice("State load failed: "+e.message,"warn");});
+}
+function loadLedger(){
+  fetch("/ourself/ledger").then(function(r){return r.json();}).then(renderLedger).catch(function(){});
+}
+
+// ── Wire up ─────────────────────────────────────────────────────────────────
+$("authBtn").onclick=authorize;
+$("tok").addEventListener("keydown",function(e){if(e.key==="Enter")authorize();});
+$("clearTok").onclick=function(){clearToken("Token cleared. Chamber re-locked.");};
+$("send").onclick=transmit;
+$("reloadLedger").onclick=loadLedger;
+$("modalCancel").onclick=closeModal;
+$("modalConfirm").onclick=runConfirm;
+$("overlay").addEventListener("click",function(e){if(e.target===$("overlay"))closeModal();});
+
+// On load: only auto-authorize if the operator previously opted into tab-memory.
+(function init(){
+  var saved=null; try{saved=sessionStorage.getItem(SSKEY);}catch(e){}
+  if(saved){
+    chamberToken=saved; $("remember").checked=true;
+    fetch("/ourself/verify",{method:"GET",headers:{"x-ourself-token":saved}}).then(function(r){
+      if(r.ok){setStateAuthorized();notice("Chamber re-authorized from tab memory.","good");}
+      else{clearToken("Stored token no longer valid. Re-enter to authorize.");}
+    }).catch(function(){setStateLocked();});
+  }else{
+    setStateLocked();
+  }
+  loadLedger();
+})();
+
+setInterval(loadState,5000);
+setInterval(loadLedger,9000);
+})();
+</script>
+</body>
+</html>`;
 }
 
 // ── Startup rehydration ────────────────────────────────────────────────────
@@ -681,9 +1329,11 @@ async function rehydratePendingQueue() {
 
 await rehydratePendingQueue();
 
-app.listen(PORT, () => {
+app.listen(PORT, BIND_HOST, () => {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE  (authenticated · Pass 18)');
+  console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE  (authenticated · Pass 18 · chamber Pass 15)');
+  console.log(`   Bound:     ${BIND_HOST}:${PORT}  (localhost-only unless BIND_HOST overridden)`);
+  console.log(`   OURSELF:   http://localhost:${PORT}/ourself          (command chamber)`);
   console.log(`   Transmit:  POST http://localhost:${PORT}/transmit   [x-ourself-token]`);
   console.log(`   Pending:   http://localhost:${PORT}/pending          (display-only)`);
   console.log(`   Test:      POST http://localhost:${PORT}/test       [x-ourself-token]`);
