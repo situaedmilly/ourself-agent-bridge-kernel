@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import { timingSafeEqual } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { appendFile, readFile } from 'fs/promises';
@@ -27,6 +28,41 @@ if (missingEnv.length > 0) {
   console.warn(`⚠  Missing environment variables: ${missingEnv.join(', ')}`);
   console.warn('   Copy .env.example to .env and fill in your API keys.');
   console.warn('   Calls to those agents will fail until keys are present.\n');
+}
+
+// ── Pass 18: Authenticated Realm Gate — fail closed on startup ───────────────
+// The bridge refuses to start without an authentication token. This is a hard
+// security boundary: an unauthenticated bridge exposes state-changing routes
+// (/transmit, /approve, /reject, /test) to anyone who can reach the port.
+// The token is read from the gitignored .env and is NEVER printed or embedded
+// in any HTTP response or HTML page.
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN;
+if (!BRIDGE_TOKEN || BRIDGE_TOKEN.trim().length === 0) {
+  console.error('\n✗ FATAL — BRIDGE_TOKEN is not set (fail-closed).');
+  console.error('  The ÆTHERNET Agent Bridge will not start without an auth token.');
+  console.error('  Generate one (its value is never printed) with:');
+  console.error('      npm run setup');
+  console.error('  The token is read from the gitignored .env file and sent by');
+  console.error('  callers in the  x-ourself-token  request header.\n');
+  process.exit(1);
+}
+
+/**
+ * Token middleware for state-changing routes.
+ * Accepts the token ONLY via the x-ourself-token header. Uses a constant-time
+ * comparison to avoid leaking length/equality timing. Fails closed with 401.
+ */
+function requireToken(req, res, next) {
+  const presented = req.headers['x-ourself-token'];
+  if (typeof presented !== 'string' || presented.length === 0) {
+    return res.status(401).json({ error: 'Unauthorized — missing x-ourself-token header.' });
+  }
+  const a = Buffer.from(presented);
+  const b = Buffer.from(BRIDGE_TOKEN);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: 'Unauthorized — invalid token.' });
+  }
+  return next();
 }
 
 const app = express();
@@ -73,9 +109,13 @@ function printPendingAlert(cmd) {
   console.log(`   Action:    ${cmd.action}`);
   console.log(`   Dir:       ${cmd.workingDir}`);
   console.log(`   Rationale: ${cmd.rationale}`);
-  console.log(`   Approve:   POST http://localhost:${PORT}/approve/${cmd.id}`);
-  console.log(`   Reject:    POST http://localhost:${PORT}/reject/${cmd.id}`);
-  console.log(`   Review:    http://localhost:${PORT}/pending`);
+  // Pass 18 — approval is now authenticated and terminal-only. Browser form
+  // POSTs cannot carry the x-ourself-token header, so the curl form below is
+  // the canonical approval path. $OURSELF_TOKEN is read from the operator's
+  // shell env; the real token value is never printed by the bridge.
+  console.log(`   Approve:   curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${cmd.id}`);
+  console.log(`   Reject:    curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/reject/${cmd.id}`);
+  console.log(`   Review:    http://localhost:${PORT}/pending  (display-only)`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
@@ -244,8 +284,8 @@ async function continueAgentWithExecutionProof(cmd) {
 
 // ── Routes ─────────────────────────────────────────────────────────────────
 
-// POST /transmit — send a message to an agent
-app.post('/transmit', async (req, res) => {
+// POST /transmit — send a message to an agent  (token-gated)
+app.post('/transmit', requireToken, async (req, res) => {
   const { from = 'user', to, message, context = {} } = req.body;
 
   if (!to || !message) {
@@ -315,20 +355,22 @@ app.post('/transmit', async (req, res) => {
 app.get('/pending', (req, res) => {
   const cmds = [...pending.values()].filter(c => c.status === 'pending');
 
+  // ── Pass 18: display-only approval gate ─────────────────────────────────────
+  // Browser <form> POSTs cannot attach the required x-ourself-token header, so
+  // the interactive APPROVE/REJECT buttons were removed. This page now DISPLAYS
+  // pending commands and the exact authenticated terminal command to act on each
+  // one. The real token is NEVER embedded here — callers substitute their own
+  // $OURSELF_TOKEN shell variable.
   const rows = cmds.length === 0
     ? '<p style="color:#555;font-style:italic;">No commands pending approval.</p>'
     : cmds.map(c => `
       <div style="border:1px solid #333;border-left:3px solid #c9a84c;padding:16px;margin-bottom:16px;border-radius:4px;background:#111;">
-        <div style="font-family:monospace;font-size:10px;color:#555;letter-spacing:.1em;margin-bottom:6px;">${c.id} · proposed ${c.proposedAt}</div>
+        <div style="font-family:monospace;font-size:10px;color:#555;letter-spacing:.1em;margin-bottom:6px;">${escapeHtml(c.id)} · proposed ${escapeHtml(c.proposedAt)}</div>
         <div style="font-family:monospace;font-size:15px;color:#e8e8e8;margin:6px 0;">$ ${escapeHtml(c.action)}</div>
         <div style="font-size:12px;color:#666;margin-bottom:3px;">Dir: ${escapeHtml(c.workingDir)}</div>
         <div style="font-size:13px;color:#999;margin-bottom:14px;line-height:1.5;">Rationale: ${escapeHtml(c.rationale)}</div>
-        <form method="POST" action="/approve/${c.id}" style="display:inline;">
-          <button type="submit" style="padding:9px 22px;background:#4a9960;border:none;color:#fff;font-family:monospace;font-size:11px;letter-spacing:.12em;cursor:pointer;border-radius:3px;margin-right:8px;">APPROVE</button>
-        </form>
-        <form method="POST" action="/reject/${c.id}" style="display:inline;">
-          <button type="submit" style="padding:9px 22px;background:#8b2020;border:none;color:#fff;font-family:monospace;font-size:11px;letter-spacing:.12em;cursor:pointer;border-radius:3px;">REJECT</button>
-        </form>
+        <div style="font-size:11px;color:#4a9960;font-family:monospace;background:#0c140f;border:1px solid #1d3326;padding:8px 10px;border-radius:3px;margin-bottom:6px;white-space:pre-wrap;word-break:break-all;">curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${escapeHtml(c.id)}</div>
+        <div style="font-size:11px;color:#b06060;font-family:monospace;background:#140c0c;border:1px solid #331d1d;padding:8px 10px;border-radius:3px;white-space:pre-wrap;word-break:break-all;">curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/reject/${escapeHtml(c.id)}</div>
       </div>
     `).join('');
 
@@ -348,7 +390,14 @@ app.get('/pending', (req, res) => {
 </head>
 <body>
   <h1>ÆTHERNET AGENT BRIDGE</h1>
-  <div class="sub">OURSELF APPROVAL GATE · Auto-refreshes every 5s · ${cmds.length} pending</div>
+  <div class="sub">OURSELF APPROVAL GATE · DISPLAY-ONLY · Auto-refreshes every 5s · ${cmds.length} pending</div>
+  <p style="font-size:12px;color:#777;line-height:1.6;border:1px solid #1a1a1a;background:#0c0c0c;padding:12px 14px;border-radius:4px;">
+    Approval is authenticated and terminal-only. Set your token once per shell with
+    <span style="font-family:monospace;color:#c9a84c;">export OURSELF_TOKEN=…</span>
+    (read from your gitignored <span style="font-family:monospace;">.env</span>), then run the
+    <span style="color:#4a9960;">approve</span> or <span style="color:#b06060;">reject</span>
+    command shown beneath each pending action. The token is never displayed on this page.
+  </p>
   ${rows}
   <p style="margin-top:40px;border-top:1px solid #1a1a1a;padding-top:16px;">
     <a href="/log">View transmission log →</a>
@@ -357,8 +406,8 @@ app.get('/pending', (req, res) => {
 </html>`);
 });
 
-// POST /approve/:id
-app.post('/approve/:id', async (req, res) => {
+// POST /approve/:id  (token-gated)
+app.post('/approve/:id', requireToken, async (req, res) => {
   const cmd = pending.get(req.params.id);
   if (!cmd) return res.status(404).json({ error: 'Command not found.' });
   if (cmd.status !== 'pending') return res.status(409).json({ error: `Command is already ${cmd.status}.` });
@@ -419,8 +468,8 @@ app.post('/approve/:id', async (req, res) => {
   });
 });
 
-// POST /reject/:id
-app.post('/reject/:id', async (req, res) => {
+// POST /reject/:id  (token-gated)
+app.post('/reject/:id', requireToken, async (req, res) => {
   const cmd = pending.get(req.params.id);
   if (!cmd) return res.status(404).json({ error: 'Command not found.' });
   if (cmd.status !== 'pending') return res.status(409).json({ error: `Command is already ${cmd.status}.` });
@@ -460,9 +509,27 @@ app.get('/log', async (req, res) => {
   }
 });
 
-// POST /test — submit the first safe test command into the approval queue
-app.post('/test', async (req, res) => {
-  const testCmd = firstTestCommand();
+// POST /test — submit a command into the approval queue  (token-gated)
+//
+// Default (no body): queues the canonical first safe read-only proof command.
+// Optional body { action, working_dir, rationale }: queues a caller-specified
+// command — used by the Pass 18 proof harness to exercise the firewall on a
+// denied command without needing a live agent transmission. Queuing is NOT
+// execution: every queued command still requires OURSELF approval AND must pass
+// the action-level firewall in tools/terminal.js before any shell runs.
+app.post('/test', requireToken, async (req, res) => {
+  const body = req.body || {};
+  const custom = typeof body.action === 'string' && typeof body.working_dir === 'string';
+  const testCmd = custom
+    ? {
+        action: body.action,
+        working_dir: body.working_dir,
+        rationale: typeof body.rationale === 'string'
+          ? body.rationale
+          : 'Caller-specified test command (Pass 18 proof harness).',
+      }
+    : firstTestCommand();
+
   const cmdId = generateId('cmd');
   const pendingEntry = {
     id: cmdId,
@@ -480,9 +547,11 @@ app.post('/test', async (req, res) => {
   printPendingAlert(pendingEntry);
 
   res.json({
-    message: 'First safe test command added to approval queue.',
+    message: custom
+      ? 'Caller-specified test command added to approval queue.'
+      : 'First safe test command added to approval queue.',
     command: pendingEntry,
-    next: `Approve at: POST http://localhost:${PORT}/approve/${cmdId}`,
+    next: `Approve at: curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${cmdId}`,
   });
 });
 
@@ -614,11 +683,13 @@ await rehydratePendingQueue();
 
 app.listen(PORT, () => {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE');
-  console.log(`   Transmit:  POST http://localhost:${PORT}/transmit`);
-  console.log(`   Pending:   http://localhost:${PORT}/pending`);
-  console.log(`   Test:      POST http://localhost:${PORT}/test`);
+  console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE  (authenticated · Pass 18)');
+  console.log(`   Transmit:  POST http://localhost:${PORT}/transmit   [x-ourself-token]`);
+  console.log(`   Pending:   http://localhost:${PORT}/pending          (display-only)`);
+  console.log(`   Test:      POST http://localhost:${PORT}/test       [x-ourself-token]`);
+  console.log(`   Approve:   POST http://localhost:${PORT}/approve/:id [x-ourself-token]`);
+  console.log(`   Reject:    POST http://localhost:${PORT}/reject/:id  [x-ourself-token]`);
   console.log(`   Log:       http://localhost:${PORT}/log`);
-  console.log(`   Health:    http://localhost:${PORT}/health`);
+  console.log(`   Health:    http://localhost:${PORT}/health           (gate-free)`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 });

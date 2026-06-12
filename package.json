@@ -4,6 +4,7 @@
   "description": "ÆTHERNET Agent Bridge — local orchestration layer connecting Claude and OpenAI with OURSELF approval gate",
   "type": "module",
   "scripts": {
+    "setup": "node tools/setup-secret.js",
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
