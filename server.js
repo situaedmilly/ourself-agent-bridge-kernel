@@ -1331,7 +1331,7 @@ await rehydratePendingQueue();
 
 app.listen(PORT, BIND_HOST, () => {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE  (authenticated · Pass 18 · chamber Pass 15)');
+  console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE  (authenticated · Pass 18 · chamber Pass 19)');
   console.log(`   Bound:     ${BIND_HOST}:${PORT}  (localhost-only unless BIND_HOST overridden)`);
   console.log(`   OURSELF:   http://localhost:${PORT}/ourself          (command chamber)`);
   console.log(`   Transmit:  POST http://localhost:${PORT}/transmit   [x-ourself-token]`);
