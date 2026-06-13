@@ -15,8 +15,12 @@ const PORT = process.env.PORT || 3001;
 // The operator chamber is never exposed to the public network. Bind to the
 // loopback interface unless an operator explicitly overrides BIND_HOST.
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
-const LOG_PATH = join(__dirname, 'logs', 'transmissions.jsonl');
-const QUEUE_LOG_PATH = join(__dirname, 'logs', 'queue.jsonl');
+// ── Pass 20: test-isolation seam ────────────────────────────────────────────
+// Log paths are env-overridable ONLY so the security regression harness can
+// redirect a disposable bridge to a temp directory. When these env vars are
+// unset (production), the defaults are byte-identical to before.
+const LOG_PATH = process.env.BRIDGE_LOG_PATH || join(__dirname, 'logs', 'transmissions.jsonl');
+const QUEUE_LOG_PATH = process.env.BRIDGE_QUEUE_PATH || join(__dirname, 'logs', 'queue.jsonl');
 const QUEUE_EXPIRY_HOURS = Number(process.env.QUEUE_EXPIRY_HOURS ?? 24);
 
 // ── Pass 13 constants ───────────────────────────────────────────────────────

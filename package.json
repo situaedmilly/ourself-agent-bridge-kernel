@@ -6,7 +6,8 @@
   "scripts": {
     "setup": "node tools/setup-secret.js",
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.20.0",
