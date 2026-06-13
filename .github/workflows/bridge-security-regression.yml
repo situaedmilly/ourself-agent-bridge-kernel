@@ -1,0 +1,42 @@
+name: Bridge Security Regression
+on:
+  pull_request:
+    paths:
+      - "server.js"
+      - "package.json"
+      - "package-lock.json"
+      - "tools/**"
+      - "agents/**"
+      - "test/**"
+      - ".github/workflows/bridge-security-regression.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server.js"
+      - "package.json"
+      - "package-lock.json"
+      - "tools/**"
+      - "agents/**"
+      - "test/**"
+      - ".github/workflows/bridge-security-regression.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security-regression:
+    name: Security Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Configure Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run security regression harness
+        run: npm test
