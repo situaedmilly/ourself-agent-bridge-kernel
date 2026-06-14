@@ -7,6 +7,7 @@ import { appendFile, readFile } from 'fs/promises';
 import { callClaude } from './agents/claude-agent.js';
 import { callOpenAI } from './agents/openai-agent.js';
 import { executeCommand } from './tools/terminal.js';
+import { classifyCommand, evaluateApproval } from './tools/execution-classes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -173,6 +174,10 @@ function logCommandProposed(cmd) {
     proposedAt: cmd.proposedAt,
     continuationDepth: cmd.continuationDepth ?? 0,
     parentCmdId: cmd.parentCmdId ?? null,
+    // Pass 20A — typed execution class + risk (shape only, never secrets).
+    executionClass: cmd.executionClass ?? null,
+    execution_class: cmd.executionClass ?? null,
+    risk: cmd.risk ?? null,
   });
 }
 
@@ -337,6 +342,7 @@ async function continueAgentWithExecutionProof(cmd) {
   // Add the next proposed command to the pending queue — do NOT execute it.
   // OURSELF must approve before any execution occurs.
   const nextCmdId = generateId('cmd');
+  const nextClass = classifyCommand(commandProposal.action);
   const nextCmd = {
     id: nextCmdId,
     txId: cmd.txId,
@@ -349,6 +355,10 @@ async function continueAgentWithExecutionProof(cmd) {
     status: 'pending',
     continuationDepth: depth + 1,
     parentCmdId: cmd.id,
+    // Pass 20A — classify at enqueue; enforced (re-classified) at /approve.
+    executionClass: nextClass.class,
+    risk: nextClass.risk,
+    classRationale: nextClass.reason,
   };
   pending.set(nextCmdId, nextCmd);
   logCommandProposed(nextCmd).catch(() => {});
@@ -386,6 +396,7 @@ app.post('/transmit', requireToken, async (req, res) => {
   let pendingEntry = null;
   if (commandProposal) {
     const cmdId = generateId('cmd');
+    const propClass = classifyCommand(commandProposal.action);
     pendingEntry = {
       id: cmdId,
       txId,
@@ -397,6 +408,10 @@ app.post('/transmit', requireToken, async (req, res) => {
       proposedAt: new Date().toISOString(),
       status: 'pending',
       continuationDepth: 0,   // Pass 13: depth counter starts at 0 for every new transmission
+      // Pass 20A — classify at enqueue; enforced (re-classified) at /approve.
+      executionClass: propClass.class,
+      risk: propClass.risk,
+      classRationale: propClass.reason,
     };
     pending.set(cmdId, pendingEntry);
     logCommandProposed(pendingEntry).catch(() => {});
@@ -492,12 +507,57 @@ app.post('/approve/:id', requireToken, async (req, res) => {
   console.log(`\n✓ APPROVED: ${cmd.id}`);
   console.log(`  $ ${cmd.action}`);
 
+  // ── Pass 20A: execution-class gate — re-classify BEFORE execution ──────────
+  // Even an OURSELF-approved command is refused if its stored class is missing,
+  // unknown, forbidden, non-terminal (e.g. reverse_engineer), or no longer
+  // matches a fresh live classification of the action. Fail closed: the command
+  // is recorded as `failed` and the executor (and its firewall) is never reached.
+  // The verdict logs the class/risk/code — never the secret-bearing internals.
+  const gate = evaluateApproval(cmd.executionClass, cmd.action);
+  if (!gate.ok) {
+    cmd.status = 'failed';
+    cmd.error = `Execution-class gate refused: ${gate.reason}`;
+    cmd.executionClassDenied = gate.code;
+    pending.set(cmd.id, cmd);
+
+    console.warn(
+      `⛔ EXECUTION-CLASS DENIED — code=${gate.code} stored=${cmd.executionClass ?? '(none)'} live=${gate.live.class}; not executed.`
+    );
+
+    await log({
+      id: cmd.id,
+      type: 'command_result',
+      txId: cmd.txId,
+      action: cmd.action,
+      workingDir: cmd.workingDir,
+      approved_by: 'ourself',
+      status: 'failed',
+      result: null,
+      error: cmd.error,
+      continuationDepth: cmd.continuationDepth ?? 0,
+      executionClass: cmd.executionClass ?? null,
+      execution_class: cmd.executionClass ?? null,
+      liveExecutionClass: gate.live.class,
+      risk: gate.live.risk,
+      executionClassDenied: gate.code,
+    });
+
+    const wantHtmlDenied = (req.headers.accept || '').includes('text/html');
+    if (wantHtmlDenied) return res.redirect('/pending');
+    return res.status(403).json({
+      id: cmd.id,
+      status: 'failed',
+      error: cmd.error,
+      executionClassDenied: gate.code,
+    });
+  }
+
   let result;
   try {
     result = await executeCommand(cmd.action, cmd.workingDir);
     cmd.status = 'executed';
     cmd.result = result;
-    console.log(`✓ EXECUTED: ${cmd.id}`);
+    console.log(`✓ EXECUTED: ${cmd.id}  [class=${cmd.executionClass} risk=${cmd.risk ?? gate.live.risk}]`);
     if (result.stdout) console.log(`  stdout:\n${result.stdout}`);
     if (result.stderr) console.log(`  stderr:\n${result.stderr}`);
   } catch (err) {
@@ -519,6 +579,9 @@ app.post('/approve/:id', requireToken, async (req, res) => {
     result: cmd.result ?? null,
     error: cmd.error ?? null,
     continuationDepth: cmd.continuationDepth ?? 0,
+    executionClass: cmd.executionClass ?? null,
+    execution_class: cmd.executionClass ?? null,
+    risk: cmd.risk ?? gate.live.risk,
   });
 
   // Pass 13 — return proof to the originating agent asynchronously.
@@ -606,6 +669,10 @@ const TEST_DIAGNOSTIC = Object.freeze({
 app.post('/test', requireToken, async (req, res) => {
   // Caller input is intentionally ignored — /test is a witness, not a portal.
   const cmdId = generateId('cmd');
+  // Pass 20A — classify the server-owned fixed diagnostic. `git status --short`
+  // resolves to git-read; classified the same way as any other command so the
+  // /approve gate enforces it identically.
+  const testClass = classifyCommand(TEST_DIAGNOSTIC.action);
   const pendingEntry = {
     id: cmdId,
     txId: 'test',
@@ -616,6 +683,9 @@ app.post('/test', requireToken, async (req, res) => {
     rationale: TEST_DIAGNOSTIC.rationale,
     proposedAt: new Date().toISOString(),
     status: 'pending',
+    executionClass: testClass.class,
+    risk: testClass.risk,
+    classRationale: testClass.reason,
   };
   pending.set(cmdId, pendingEntry);
   logCommandProposed(pendingEntry).catch(() => {});
@@ -692,6 +762,8 @@ app.get('/ourself/state', async (req, res) => {
         parentCmdId: c.parentCmdId ?? null,
         rehydrated: Boolean(c.rehydratedAt),
         rehydratedAt: c.rehydratedAt ?? null,
+        executionClass: c.executionClass ?? null,
+        risk: c.risk ?? null,
         ageMs,
         expiresInMs: ageMs == null ? null : expiryMs - ageMs,
       };
@@ -1350,6 +1422,13 @@ async function rehydratePendingQueue() {
       continue;
     }
 
+    // Pass 20A — carry the persisted execution class; reclassify if a pre-20A
+    // proposal lacks one (fail-closed: the /approve gate re-classifies anyway).
+    const storedClass = proposal.executionClass ?? proposal.execution_class ?? null;
+    const rehydratedClass = storedClass
+      ? { class: storedClass, risk: proposal.risk ?? null, reason: 'carried from queue log' }
+      : classifyCommand(proposal.action);
+
     const cmd = {
       id: cmdId,
       txId: proposal.txId,
@@ -1363,6 +1442,9 @@ async function rehydratePendingQueue() {
       continuationDepth: proposal.continuationDepth ?? 0,
       parentCmdId: proposal.parentCmdId ?? null,
       rehydratedAt: new Date().toISOString(),
+      executionClass: rehydratedClass.class,
+      risk: rehydratedClass.risk,
+      classRationale: rehydratedClass.reason,
     };
     pending.set(cmdId, cmd);
 
