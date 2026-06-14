@@ -7,7 +7,6 @@ import { appendFile, readFile } from 'fs/promises';
 import { callClaude } from './agents/claude-agent.js';
 import { callOpenAI } from './agents/openai-agent.js';
 import { executeCommand } from './tools/terminal.js';
-import { firstTestCommand } from './tools/git-proof.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -528,36 +527,37 @@ app.get('/log', async (req, res) => {
   }
 });
 
-// POST /test — submit a command into the approval queue  (token-gated)
-//
-// Default (no body): queues the canonical first safe read-only proof command.
-// Optional body { action, working_dir, rationale }: queues a caller-specified
-// command — used by the Pass 18 proof harness to exercise the firewall on a
-// denied command without needing a live agent transmission. Queuing is NOT
-// execution: every queued command still requires OURSELF approval AND must pass
-// the action-level firewall in tools/terminal.js before any shell runs.
-app.post('/test', requireToken, async (req, res) => {
-  const body = req.body || {};
-  const custom = typeof body.action === 'string' && typeof body.working_dir === 'string';
-  const testCmd = custom
-    ? {
-        action: body.action,
-        working_dir: body.working_dir,
-        rationale: typeof body.rationale === 'string'
-          ? body.rationale
-          : 'Caller-specified test command (Pass 18 proof harness).',
-      }
-    : firstTestCommand();
+// ── Pass 19B: deterministic diagnostic — a ritual of WITNESS, not command ────
+// The server owns exactly ONE fixed, read-only diagnostic. /test cannot be used
+// to inject a command: caller-provided action / working_dir / rationale are
+// IGNORED and never interpolated into the command, working directory, rationale,
+// source, or shell environment. /transmit remains the deliberate proposal gate.
+const TEST_DIAGNOSTIC = Object.freeze({
+  action: 'git status --short',
+  // Server-pinned to the bridge's own repository boundary (inside RUORA).
+  workingDir: __dirname,
+  rationale:
+    'Pass 19B fixed read-only bridge diagnostic — proves the ' +
+    'approve → firewall → execute → proof chain without mutation. Caller input is ignored.',
+});
 
+// POST /test — deterministic diagnostic endpoint  (token-gated)
+//
+// Queues the single server-owned read-only diagnostic above. Queuing is NOT
+// execution: the queued command still requires explicit OURSELF approval AND
+// must pass the action-level firewall in tools/terminal.js before any shell
+// runs. No request-body value influences what is queued.
+app.post('/test', requireToken, async (req, res) => {
+  // Caller input is intentionally ignored — /test is a witness, not a portal.
   const cmdId = generateId('cmd');
   const pendingEntry = {
     id: cmdId,
     txId: 'test',
     from: 'ourself',
     to: 'terminal',
-    action: testCmd.action,
-    workingDir: testCmd.working_dir,
-    rationale: testCmd.rationale,
+    action: TEST_DIAGNOSTIC.action,
+    workingDir: TEST_DIAGNOSTIC.workingDir,
+    rationale: TEST_DIAGNOSTIC.rationale,
     proposedAt: new Date().toISOString(),
     status: 'pending',
   };
@@ -566,9 +566,7 @@ app.post('/test', requireToken, async (req, res) => {
   printPendingAlert(pendingEntry);
 
   res.json({
-    message: custom
-      ? 'Caller-specified test command added to approval queue.'
-      : 'First safe test command added to approval queue.',
+    message: 'Fixed read-only diagnostic added to approval queue (caller input ignored).',
     command: pendingEntry,
     next: `Approve at: curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${cmdId}`,
   });

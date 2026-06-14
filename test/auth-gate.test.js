@@ -66,15 +66,30 @@ test('valid token + unknown /approve id → 404 (crossed auth, no execution)', a
   assert.equal(r.status, 404);
 });
 
-test('valid token + safe /test body → 200 queued (no provider, in-boundary)', async () => {
+test('valid token /test → 200 queues the FIXED diagnostic (Pass 19B)', async () => {
   const r = await fetch(bridge.baseUrl + '/test', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...tokenHeader(bridge.token) },
-    body: JSON.stringify({ action: 'pwd', working_dir: BRIDGE_DIR, rationale: 'pass20 auth probe' }),
+    method: 'POST', headers: tokenHeader(bridge.token),
   });
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.equal(j.command.status, 'pending');
+  assert.equal(j.command.action, 'git status --short', 'server-owned diagnostic');
+  assert.equal(j.command.workingDir, BRIDGE_DIR, 'working dir pinned to the bridge repo');
+});
+
+test('Pass 19B: malicious /test body cannot inject a command or working dir', async () => {
+  const r = await fetch(bridge.baseUrl + '/test', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...tokenHeader(bridge.token) },
+    body: JSON.stringify({ action: 'chmod 777 .env.example', working_dir: '/tmp', rationale: 'inject attempt' }),
+  });
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.command.action, 'git status --short', 'caller action must be ignored');
+  assert.equal(j.command.workingDir, BRIDGE_DIR, 'caller working_dir must be ignored');
+  assert.notEqual(j.command.workingDir, '/tmp');
+  assert.ok(!j.command.rationale.includes('inject'), 'caller rationale must not be reflected');
+  assert.equal(j.command.status, 'pending', 'still requires explicit approval');
 });
 
 const READ_ROUTES = ['/health', '/pending', '/log', '/ourself', '/ourself/state', '/ourself/ledger'];

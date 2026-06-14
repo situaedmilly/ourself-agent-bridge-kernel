@@ -1,26 +1,22 @@
 // test/queue-integrity.test.js
 // ── Bridge Pass 20 · Queue sovereignty against an isolated bridge ────────────
-// Replay protection, rehydration-as-pending across an isolated restart (no
-// auto-execution), firewall denial of an approved-but-dangerous command, and
-// proof that the throwaway token never lands in the disposable logs. All
-// executions are harmless read-only `pwd` inside the in-boundary bridge dir.
+// (Pass 19B) /test now queues a fixed server-owned read-only diagnostic
+// (`git status --short` in the bridge repo); callers can no longer inject a
+// command. Replay protection, rehydration-as-pending across an isolated restart
+// (no auto-execution), and token-never-in-logs are proven through that fixed
+// diagnostic. The firewall-at-execution guarantee is proven directly against
+// the executor (no command-injection surface required).
 
-import { test, before, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { startBridge, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
+import { executeCommand } from '../tools/terminal.js';
 
-const authJson = (token, body) => ({
-  method: 'POST',
-  headers: { 'content-type': 'application/json', ...tokenHeader(token) },
-  body: JSON.stringify(body),
-});
-
-async function queuePwd(bridge, rationale = 'pass20 queue proof') {
-  const r = await fetch(bridge.baseUrl + '/test', authJson(bridge.token, {
-    action: 'pwd', working_dir: BRIDGE_DIR, rationale,
-  }));
+// Queue the fixed server-owned diagnostic (no caller body is honored).
+async function queueDiagnostic(bridge) {
+  const r = await fetch(bridge.baseUrl + '/test', { method: 'POST', headers: tokenHeader(bridge.token) });
   assert.equal(r.status, 200);
   return (await r.json()).command.id;
 }
@@ -28,7 +24,7 @@ async function queuePwd(bridge, rationale = 'pass20 queue proof') {
 test('replay protection: first approval executes once, replay → 409', async () => {
   const bridge = await startBridge();
   try {
-    const id = await queuePwd(bridge);
+    const id = await queueDiagnostic(bridge);
     const first = await fetch(bridge.baseUrl + '/approve/' + id, { method: 'POST', headers: tokenHeader(bridge.token) });
     assert.equal(first.status, 200);
     assert.equal((await first.json()).status, 'executed');
@@ -47,7 +43,7 @@ test('rehydration: pending survives isolated restart as pending-only, then appro
   const { tempDir, token } = bridge;
   let id;
   try {
-    id = await queuePwd(bridge, 'pass20 rehydration proof');
+    id = await queueDiagnostic(bridge);
   } finally {
     await bridge.stop({ keepTempDir: true });
   }
@@ -70,28 +66,25 @@ test('rehydration: pending survives isolated restart as pending-only, then appro
   }
 });
 
-test('approved-but-dangerous command is firewall-denied before any shell', async () => {
-  const bridge = await startBridge();
-  try {
-    const r = await fetch(bridge.baseUrl + '/test', authJson(bridge.token, {
-      action: 'chmod 777 ./x', working_dir: BRIDGE_DIR, rationale: 'pass20 firewall-at-exec probe',
-    }));
-    const id = (await r.json()).command.id;
-    const approve = await fetch(bridge.baseUrl + '/approve/' + id, { method: 'POST', headers: tokenHeader(bridge.token) });
-    const j = await approve.json();
-    assert.equal(j.status, 'failed', 'firewall must block at execution time');
-    assert.match(j.error, /firewall/i, 'error names the firewall');
-    assert.match(j.error, /perm\.world_writable/, 'error carries the stable rule id');
-  } finally {
-    await bridge.stop();
-  }
+test('firewall blocks a dangerous command before any shell (executor-level)', async () => {
+  // Proven directly against the executor — stronger and independent of /test,
+  // which no longer accepts an arbitrary command (Pass 19B).
+  await assert.rejects(
+    () => executeCommand('chmod 777 ./x', BRIDGE_DIR),
+    (err) => {
+      assert.match(err.message, /firewall/i, 'error names the firewall');
+      assert.match(err.message, /perm\.world_writable/, 'error carries the stable rule id');
+      assert.equal(err.firewallDenied, true);
+      return true;
+    },
+  );
 });
 
 test('throwaway token never appears in the disposable logs', async () => {
   const bridge = await startBridge();
   try {
-    await queuePwd(bridge, 'pass20 log-scan');
-    const id = await queuePwd(bridge, 'pass20 log-scan-2');
+    await queueDiagnostic(bridge);
+    const id = await queueDiagnostic(bridge);
     await fetch(bridge.baseUrl + '/approve/' + id, { method: 'POST', headers: tokenHeader(bridge.token) });
 
     for (const f of ['transmissions.jsonl', 'queue.jsonl']) {
