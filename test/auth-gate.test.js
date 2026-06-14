@@ -16,7 +16,10 @@ test('fail-closed: missing BRIDGE_TOKEN → non-zero exit, never listens', async
 });
 
 let bridge;
-before(async () => { bridge = await startBridge(); });
+// Neutralize Pass 19C rate limiting for this suite: the 401 matrix issues many
+// failed attempts against one shared bridge; a high threshold keeps these tests
+// about authentication, not lockout (rate limiting is proven in rate-limit.test.js).
+before(async () => { bridge = await startBridge({ env: { REALM_GATE_MAX_FAILURES: '100000' } }); });
 after(async () => { await bridge?.stop(); });
 
 test('valid token → isolated bridge is alive on 127.0.0.1 and NOT port 3001', () => {

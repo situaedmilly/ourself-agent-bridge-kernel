@@ -91,6 +91,7 @@ export async function startWithoutToken() {
  * @param {object} opts
  * @param {string} [opts.tempDir]  reuse an existing temp dir (for restart tests)
  * @param {string} [opts.token]    reuse a token (for restart tests)
+ * @param {object} [opts.env]      extra env vars for the child (e.g. rate-limit tuning)
  * @returns {Promise<{baseUrl,port,token,tempDir,proc,stop}>}
  */
 export async function startBridge(opts = {}) {
@@ -101,7 +102,7 @@ export async function startBridge(opts = {}) {
 
   const proc = spawn(process.execPath, [SERVER], {
     cwd: BRIDGE_DIR,
-    env: childEnv({ tempDir, token, port }),
+    env: childEnv({ tempDir, token, port, extra: opts.env || {} }),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stderr = '';

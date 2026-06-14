@@ -54,22 +54,78 @@ if (!BRIDGE_TOKEN || BRIDGE_TOKEN.trim().length === 0) {
   process.exit(1);
 }
 
+// ── Pass 19C: Realm Gate failure rate limiting ──────────────────────────────
+// Defense-in-depth against brute-force guessing of the token. FAILED attempts
+// from a client are counted; once they reach the threshold within a window the
+// client is locked out (HTTP 429 + Retry-After) for a cooldown period. A VALID
+// token is NEVER rate-limited — it always passes and clears the client's
+// failure record, so the rightful operator can never be locked out by an
+// attacker spamming wrong tokens. Thresholds are env-overridable for tests;
+// production defaults are conservative. The presented (wrong) token value is
+// NEVER logged — only the client key and counts.
+const RL_MAX_FAILURES = Number(process.env.REALM_GATE_MAX_FAILURES ?? 10);
+const RL_WINDOW_MS = Number(process.env.REALM_GATE_WINDOW_MS ?? 60_000);
+const RL_LOCKOUT_MS = Number(process.env.REALM_GATE_LOCKOUT_MS ?? 300_000);
+const realmFailures = new Map(); // clientKey -> { count, windowStart, lockedUntil }
+
+function clientKey(req) {
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
 /**
  * Token middleware for state-changing routes.
  * Accepts the token ONLY via the x-ourself-token header. Uses a constant-time
- * comparison to avoid leaking length/equality timing. Fails closed with 401.
+ * comparison to avoid leaking length/equality timing. Fails closed with 401,
+ * and rate-limits repeated failures with 429 (Pass 19C). A valid token always
+ * passes and resets the client's failure record.
  */
 function requireToken(req, res, next) {
+  const key = clientKey(req);
+  const now = Date.now();
+
+  // Constant-time validity check (unchanged behavior for a valid token).
   const presented = req.headers['x-ourself-token'];
-  if (typeof presented !== 'string' || presented.length === 0) {
-    return res.status(401).json({ error: 'Unauthorized — missing x-ourself-token header.' });
+  const hasHeader = typeof presented === 'string' && presented.length > 0;
+  let valid = false;
+  if (hasHeader) {
+    const a = Buffer.from(presented);
+    const b = Buffer.from(BRIDGE_TOKEN);
+    valid = a.length === b.length && timingSafeEqual(a, b);
   }
-  const a = Buffer.from(presented);
-  const b = Buffer.from(BRIDGE_TOKEN);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    return res.status(401).json({ error: 'Unauthorized — invalid token.' });
+
+  if (valid) {
+    realmFailures.delete(key);   // success clears any accumulated failures
+    return next();
   }
-  return next();
+
+  // ── Failure path ──────────────────────────────────────────────────────────
+  let rec = realmFailures.get(key);
+
+  // Already locked out → 429 without further token work.
+  if (rec && rec.lockedUntil > now) {
+    res.set('Retry-After', String(Math.ceil((rec.lockedUntil - now) / 1000)));
+    return res.status(429).json({ error: 'Too many failed authentication attempts. Locked out.' });
+  }
+
+  // Start a fresh window if none or the previous one has elapsed.
+  if (!rec || now - rec.windowStart > RL_WINDOW_MS) {
+    rec = { count: 0, windowStart: now, lockedUntil: 0 };
+  }
+  rec.count += 1;
+
+  if (rec.count >= RL_MAX_FAILURES) {
+    rec.lockedUntil = now + RL_LOCKOUT_MS;
+    realmFailures.set(key, rec);
+    // Audit the lockout WITHOUT the presented token value.
+    console.warn(`⛔ REALM GATE LOCKOUT — key=${key} after ${rec.count} failed attempts; locked ${RL_LOCKOUT_MS}ms.`);
+    res.set('Retry-After', String(Math.ceil(RL_LOCKOUT_MS / 1000)));
+    return res.status(429).json({ error: 'Too many failed authentication attempts. Locked out.' });
+  }
+
+  realmFailures.set(key, rec);
+  return res.status(401).json({
+    error: hasHeader ? 'Unauthorized — invalid token.' : 'Unauthorized — missing x-ourself-token header.',
+  });
 }
 
 const app = express();
