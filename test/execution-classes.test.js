@@ -264,7 +264,7 @@ test('/approve executes a correctly-classified read-only command', async () => {
 test('static: /approve calls evaluateApproval before executeCommand', async () => {
   const src = await readFile(join(BRIDGE_DIR, 'server.js'), 'utf8');
   const gateIdx = src.indexOf('evaluateApproval(cmd.executionClass, cmd.action)');
-  const execIdx = src.indexOf('await executeCommand(cmd.action, cmd.workingDir)');
+  const execIdx = src.indexOf('await executeCommand(cmd.action, cmd.workingDir, cmd.executionClass)');
   assert.ok(gateIdx !== -1, 'evaluateApproval must be called in /approve');
   assert.ok(execIdx !== -1, 'executeCommand must still be the executor');
   assert.ok(gateIdx < execIdx, 'the class gate must run before the executor');

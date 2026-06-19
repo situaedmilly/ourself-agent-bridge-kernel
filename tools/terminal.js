@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { resolve } from 'path';
-import { inspectCommand } from './command-firewall.js';
+import { inspectCommand, enforceClassPolicy } from './command-firewall.js';
 
 const execAsync = promisify(exec);
 
@@ -16,13 +16,38 @@ function isWithinBoundary(workingDir) {
 // Execute an approved command.
 // Throws if working_dir is outside the RUORA boundary.
 // This function must ONLY be called after OURSELF approval — never autonomously.
-export async function executeCommand(action, workingDir) {
+export async function executeCommand(action, workingDir, executionClass = null) {
   if (!workingDir) throw new Error('Working directory is required.');
 
   if (!isWithinBoundary(workingDir)) {
     throw new Error(
       `Working directory must be within ${RUORA_BOUNDARY}.\nReceived: ${workingDir}`
     );
+  }
+
+  // ── Pass 20B: class-aware enforcement, before the generic denylist ─────────
+  // When an execution class is supplied (the /approve path always supplies one),
+  // the command SHAPE must be permitted for that class or it is refused before
+  // any shell is spawned. forbidden / reverse_engineer / unknown / missing
+  // classes never pass here. When no class is supplied (legacy direct callers,
+  // e.g. the boundary/firewall unit tests and git-proof helper), behavior is
+  // unchanged — the generic firewall below remains the sole guard. The denial is
+  // logged WITHOUT the raw command: only the class and the stable rule id.
+  if (executionClass != null) {
+    const classVerdict = enforceClassPolicy(action, executionClass);
+    if (!classVerdict.allowed) {
+      console.warn(
+        `⛔ CLASS POLICY DENIED — class=${executionClass} rule=${classVerdict.pattern} category=${classVerdict.category}; command blocked before execution.`
+      );
+      const err = new Error(
+        `Command blocked by class policy: ${classVerdict.reason} [class: ${executionClass}, rule: ${classVerdict.pattern}, category: ${classVerdict.category}]`
+      );
+      err.classPolicyDenied = true;
+      err.executionClass = executionClass;
+      err.classPattern = classVerdict.pattern;
+      err.classCategory = classVerdict.category;
+      throw err;
+    }
   }
 
   // ── Pass 18: action-level firewall, immediately before shell execution ─────

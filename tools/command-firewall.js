@@ -260,3 +260,226 @@ export function inspectCommand(action) {
 
 // Exposed for tests / introspection. The ids are stable and safe to log.
 export const FIREWALL_RULE_IDS = RULES.map((r) => r.id);
+
+// ── Pass 20B · Firewall-by-Class enforcement ────────────────────────────────
+//
+// PURPOSE
+//   Turn execution-class metadata into ACTIVE per-class enforcement at the point
+//   of execution. classifyCommand() (tools/execution-classes.js) ASSIGNS a class
+//   at enqueue/approve; enforceClassPolicy() independently re-verifies, at the
+//   terminal, that the command SHAPE is permitted for the class it claims. Both
+//   layers must agree or the command never reaches the shell.
+//
+// RELATION TO THE EXISTING DENYLIST
+//   This is enforced BEFORE inspectCommand() in tools/terminal.js, but the
+//   generic denylist still runs afterward as the always-on final fail-closed
+//   backstop. A class policy is never weaker than the denylist: anything the
+//   denylist forbids stays forbidden regardless of class.
+//
+// INDEPENDENCE (deliberate)
+//   The class-shape rules below are a SECOND, independent implementation of the
+//   command shapes — they do NOT import execution-classes.js. That keeps the
+//   module dependency a clean DAG (execution-classes → command-firewall) and
+//   gives defense-in-depth: a drift between classifier and policy surfaces as a
+//   refusal, never as a silent allow.
+//
+// CONTRACT
+//   enforceClassPolicy(action, executionClass) -> {allowed, pattern, category, reason}
+//   Returned fields describe the SHAPE only — safe to log, never a secret value.
+
+const RUORA_BOUNDARY = '/Users/millysituated/RUORA';
+
+// Classes that may reach the shell. forbidden + reverse_engineer (and any
+// unknown class string) are intentionally absent — they never execute.
+const CLASS_TERMINAL = new Set([
+  'inspect', 'test', 'build', 'git-read', 'git-write-local', 'project-mutation',
+]);
+
+// Network egress / remote transport (broader than NET_TOOL: adds scp/ssh/rsync).
+const CLASS_NET = /\b(curl|wget|nc|ncat|netcat|telnet|ftp|tftp|socat|scp|sftp|ssh|rsync)\b/;
+
+// Filesystem-mutating verbs.
+const MUTATE_VERB = /\b(rm|rmdir|mv|cp|tee|truncate|dd|shred|unlink|ln|chmod|chown|mkdir|touch)\b|\bsed\b[^|&;]*\s-i\b/;
+
+// Deploy / publish / remote-upload shapes (forbidden for test/build/inspect/projmut).
+const PUBLISH_RE =
+  /\b(deploy|publish|release)\b|\bnpm\b[^|&;]*\bpublish\b|\bgit\b[^|&;]*\bpush\b|\bgh\b|\b(vercel|netlify|surge|firebase|gh-pages)\b/;
+
+// Append-only audit logs.
+const LOG_TARGET = /(transmissions\.jsonl|queue\.jsonl|logs[/][\w.-]*\.jsonl)/i;
+
+// Test / verification runners.
+const TEST_RE =
+  /\b(npm|pnpm|yarn)\b\s+(run\s+)?(test|t)\b|\bnode\b[^|&;]*--(test|check)\b|\b(pytest|jest|vitest|mocha|ava|tap)\b/;
+
+// Build / dependency / compile.
+const BUILD_RE =
+  /\b(npm|pnpm|yarn)\b\s+(ci|install|i|build|start|run\b[^|&;]*)\b|\bmake\b|\btsc\b|\b(vite|webpack|rollup|esbuild|parcel|babel)\b/;
+
+// Read-only inspection (first token).
+const INSPECT_CMDS = new Set([
+  'ls', 'pwd', 'cat', 'bat', 'head', 'tail', 'wc', 'find', 'tree', 'stat',
+  'file', 'du', 'df', 'echo', 'which', 'type', 'whoami', 'date', 'realpath',
+  'dirname', 'basename', 'readlink', 'hostname', 'uname', 'less', 'more', 'nl',
+  'column', 'sort', 'uniq', 'cut', 'grep', 'egrep', 'fgrep', 'rg', 'jq', 'sleep',
+  'true', 'printf', 'diff', 'cmp', 'md5', 'shasum', 'sha256sum',
+]);
+
+// Git subcommand sets.
+const GIT_NETWORK = new Set(['push', 'pull', 'fetch', 'clone', 'remote', 'submodule']);
+const GIT_READ_SUBS = new Set([
+  'status', 'log', 'diff', 'show', 'rev-parse', 'ls-files', 'ls-tree', 'blame',
+  'describe', 'cat-file', 'shortlog', 'reflog', 'rev-list', 'for-each-ref',
+  'show-ref', 'whatchanged', 'name-rev', 'count-objects', 'verify-commit',
+  'version', 'grep',
+]);
+const GIT_WRITE_LOCAL_SUBS = new Set([
+  'add', 'commit', 'merge', 'reset', 'restore', 'checkout', 'switch', 'branch',
+  'tag', 'stash', 'rm', 'mv', 'cherry-pick', 'rebase', 'revert', 'clean',
+  'init', 'apply', 'am', 'gc', 'config', 'worktree',
+]);
+
+function deny(pattern, category, reason) {
+  return { allowed: false, pattern, category, reason };
+}
+const ALLOW = Object.freeze({ allowed: true, pattern: null, category: null, reason: null });
+
+function firstToken(lc) {
+  const m = lc.match(/^(?:[a-z_][a-z0-9_]*=[^\s]*\s+)*([^\s]+)/);
+  let tok = m ? m[1] : lc.split(' ')[0] || '';
+  if (tok.includes('/')) tok = tok.slice(tok.lastIndexOf('/') + 1);
+  return tok;
+}
+
+function gitSubcommand(lc) {
+  const after = lc.replace(/^.*?\bgit\b\s*/, '');
+  const tokens = after.split(' ').filter(Boolean);
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t === '-c' || t === '-C') { i++; continue; }
+    if (t.startsWith('-')) continue;
+    return t.replace(/[^a-z-]/g, '');
+  }
+  return null;
+}
+
+function hasWriteRedirection(s) {
+  return /(?:^|\s)\d?>{1,2}\s*[^&\s]/.test(s); // excludes 2>&1
+}
+
+function hasTraversalOrOutsideBoundary(s) {
+  if (/(^|[\s/="'`(])\.\.(\/|\s|$)/.test(s)) return true;
+  if (/(^|\s)~(\/|\s|$)/.test(s)) return true;
+  const matches = s.match(/(^|[\s="'`(:])(\/[^\s"'`):]*)/g) || [];
+  for (const raw of matches) {
+    const p = raw.replace(/^[\s="'`(:]+/, '');
+    if (!p.startsWith('/')) continue;
+    if (p === '/') return true;
+    if (!(p === RUORA_BOUNDARY || p.startsWith(RUORA_BOUNDARY + '/'))) return true;
+  }
+  return false;
+}
+
+const isGit = (lc) => /(^|[\s;&|(])git\b/.test(lc);
+
+/** True when a `git branch` invocation carries a non-flag arg (create/rename) or a mutating flag. */
+function branchHasMutation(lc) {
+  if (/-(d|D|m|M|c|C)\b|--(delete|move|copy|edit-description|set-upstream-to|unset-upstream|force)\b/.test(lc)) return true;
+  const after = lc.replace(/^.*\bbranch\b/, '').trim();
+  return after.split(' ').filter(Boolean).some((t) => !t.startsWith('-'));
+}
+
+/** Read-only git: explicit read family, plus listing forms of branch / worktree. */
+function gitReadAllowed(sub, lc) {
+  if (!sub) return false;
+  if (GIT_READ_SUBS.has(sub)) return true;
+  if (sub === 'branch') return !branchHasMutation(lc);
+  if (sub === 'worktree') return /\bworktree\b\s+list\b/.test(lc);
+  return false;
+}
+
+// ── Per-class shape policies ─────────────────────────────────────────────────
+function policyInspect(lc, c) {
+  if (hasWriteRedirection(c)) return deny('inspect.redirection', 'class_policy', 'inspect may not write output to a file');
+  if (MUTATE_VERB.test(lc)) return deny('inspect.mutation', 'class_policy', 'inspect may not run a mutating command');
+  if (CLASS_NET.test(lc)) return deny('inspect.network', 'class_policy', 'inspect may not use network tools');
+  if (isGit(lc)) return deny('inspect.git', 'class_policy', 'inspect may not run git (use git-read)');
+  if (PUBLISH_RE.test(lc)) return deny('inspect.publish', 'class_policy', 'inspect may not deploy/publish');
+  const first = firstToken(lc);
+  if (!INSPECT_CMDS.has(first)) return deny('inspect.not_readonly', 'class_policy', `'${first}' is not a recognized read-only command`);
+  return ALLOW;
+}
+
+function policyTest(lc, _c) {
+  if (CLASS_NET.test(lc)) return deny('test.network', 'class_policy', 'test may not use network tools');
+  if (/\|\s*(sh|bash|zsh|ksh|dash|node|python\d?|perl|ruby)\b/.test(lc)) return deny('test.shell_pipe', 'class_policy', 'test may not pipe into a shell interpreter');
+  if (PUBLISH_RE.test(lc)) return deny('test.publish', 'class_policy', 'test may not deploy/publish');
+  if (!TEST_RE.test(lc)) return deny('test.not_test', 'class_policy', 'test may run only test/check runners');
+  return ALLOW;
+}
+
+function policyBuild(lc, _c) {
+  if (CLASS_NET.test(lc)) return deny('build.network', 'class_policy', 'build may not use network egress tools');
+  if (PUBLISH_RE.test(lc)) return deny('build.publish', 'class_policy', 'build may not deploy/publish/upload');
+  if (!BUILD_RE.test(lc)) return deny('build.not_build', 'class_policy', 'build may run only local build/dependency commands');
+  return ALLOW;
+}
+
+function policyGitRead(lc, c) {
+  if (!isGit(lc)) return deny('gitread.not_git', 'class_policy', 'git-read requires a git command');
+  if (hasWriteRedirection(c)) return deny('gitread.redirection', 'class_policy', 'git-read may not redirect output to a file');
+  const sub = gitSubcommand(lc);
+  if (sub && GIT_NETWORK.has(sub)) return deny('gitread.network', 'class_policy', `git-read may not run network/remote git (${sub})`);
+  if (!gitReadAllowed(sub, lc)) return deny('gitread.not_read', 'class_policy', `git-read permits only read-only git (got '${sub ?? 'none'}')`);
+  return ALLOW;
+}
+
+function policyGitWriteLocal(lc, _c) {
+  if (!isGit(lc)) return deny('gitwrite.not_git', 'class_policy', 'git-write-local requires a local git command');
+  if (PUBLISH_RE.test(lc)) return deny('gitwrite.publish', 'class_policy', 'git-write-local may not push/publish/deploy');
+  const sub = gitSubcommand(lc);
+  if (!sub || GIT_NETWORK.has(sub)) return deny('gitwrite.network', 'class_policy', `git-write-local may not run remote/network git (${sub ?? 'none'})`);
+  if (!GIT_WRITE_LOCAL_SUBS.has(sub)) return deny('gitwrite.not_allowed', 'class_policy', `git subcommand '${sub}' is not a permitted local mutation`);
+  return ALLOW;
+}
+
+function policyProjectMutation(lc, c) {
+  if (SECRET_FILE.test(c)) return deny('projmut.secret', 'class_policy', 'project-mutation may not touch secret-bearing files (.env/*.pem/credentials/…)');
+  if (LOG_TARGET.test(lc)) return deny('projmut.logs', 'class_policy', 'project-mutation may not touch audit logs');
+  if (hasTraversalOrOutsideBoundary(c)) return deny('projmut.outside', 'class_policy', 'project-mutation may not target paths outside the RUORA boundary');
+  if (CLASS_NET.test(lc)) return deny('projmut.network', 'class_policy', 'project-mutation may not use network egress tools');
+  if (PUBLISH_RE.test(lc)) return deny('projmut.publish', 'class_policy', 'project-mutation may not publish/deploy');
+  if (isGit(lc)) return deny('projmut.git', 'class_policy', 'project-mutation may not run git (use git-read/git-write-local)');
+  return ALLOW;
+}
+
+/**
+ * Enforce the per-class command-shape policy. Fail-closed for missing, unknown,
+ * non-terminal (forbidden / reverse_engineer), and any command whose shape is
+ * not permitted for the claimed class.
+ * @param {string} action
+ * @param {string} executionClass
+ * @returns {{allowed:boolean, pattern:string|null, category:string|null, reason:string|null}}
+ */
+export function enforceClassPolicy(action, executionClass) {
+  const { collapsed, lc } = normalize(action);
+
+  if (!executionClass) return deny('class.missing', 'execution_class', 'no execution class supplied to the executor');
+  if (!CLASS_TERMINAL.has(executionClass)) {
+    return deny('class.non_terminal', 'execution_class', `class '${executionClass}' may never reach the shell`);
+  }
+  if (collapsed.length === 0) return deny('class.empty', 'malformed', 'empty command');
+
+  switch (executionClass) {
+    case 'inspect':          return policyInspect(lc, collapsed);
+    case 'test':             return policyTest(lc, collapsed);
+    case 'build':            return policyBuild(lc, collapsed);
+    case 'git-read':         return policyGitRead(lc, collapsed);
+    case 'git-write-local':  return policyGitWriteLocal(lc, collapsed);
+    case 'project-mutation': return policyProjectMutation(lc, collapsed);
+    default:                 return deny('class.unhandled', 'execution_class', `unhandled class '${executionClass}'`);
+  }
+}
+
+// Exposed for tests / introspection. Safe to log.
+export const CLASS_POLICY_TERMINAL_CLASSES = Object.freeze([...CLASS_TERMINAL]);

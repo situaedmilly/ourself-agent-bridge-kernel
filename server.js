@@ -554,7 +554,9 @@ app.post('/approve/:id', requireToken, async (req, res) => {
 
   let result;
   try {
-    result = await executeCommand(cmd.action, cmd.workingDir);
+    // Pass 20B — pass the validated execution class into the executor so the
+    // terminal enforces the per-class command-shape policy before any shell runs.
+    result = await executeCommand(cmd.action, cmd.workingDir, cmd.executionClass);
     cmd.status = 'executed';
     cmd.result = result;
     console.log(`✓ EXECUTED: ${cmd.id}  [class=${cmd.executionClass} risk=${cmd.risk ?? gate.live.risk}]`);
