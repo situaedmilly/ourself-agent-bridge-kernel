@@ -8,6 +8,7 @@ import { callClaude } from './agents/claude-agent.js';
 import { callOpenAI } from './agents/openai-agent.js';
 import { executeCommand } from './tools/terminal.js';
 import { classifyCommand, evaluateApproval } from './tools/execution-classes.js';
+import { createRealmGate } from './tools/realm-gate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -67,7 +68,14 @@ if (!BRIDGE_TOKEN || BRIDGE_TOKEN.trim().length === 0) {
 const RL_MAX_FAILURES = Number(process.env.REALM_GATE_MAX_FAILURES ?? 10);
 const RL_WINDOW_MS = Number(process.env.REALM_GATE_WINDOW_MS ?? 60_000);
 const RL_LOCKOUT_MS = Number(process.env.REALM_GATE_LOCKOUT_MS ?? 300_000);
-const realmFailures = new Map(); // clientKey -> { count, windowStart, lockedUntil }
+// Pass 20B.1 — the failure state machine lives in a pure, time-injected unit
+// (tools/realm-gate.js). Production feeds it real time via Date.now(); the
+// behavior is identical to Pass 19C and is unit-tested deterministically.
+const realmGate = createRealmGate({
+  maxFailures: RL_MAX_FAILURES,
+  windowMs: RL_WINDOW_MS,
+  lockoutMs: RL_LOCKOUT_MS,
+});
 
 function clientKey(req) {
   return req.ip || req.socket?.remoteAddress || 'unknown';
@@ -82,7 +90,6 @@ function clientKey(req) {
  */
 function requireToken(req, res, next) {
   const key = clientKey(req);
-  const now = Date.now();
 
   // Constant-time validity check (unchanged behavior for a valid token).
   const presented = req.headers['x-ourself-token'];
@@ -94,36 +101,22 @@ function requireToken(req, res, next) {
     valid = a.length === b.length && timingSafeEqual(a, b);
   }
 
-  if (valid) {
-    realmFailures.delete(key);   // success clears any accumulated failures
-    return next();
-  }
+  // ── Pass 20B.1: failure rate limiting via the pure, time-injected gate ──────
+  // Production feeds real time; the limiter never sees the presented token value.
+  const verdict = realmGate.evaluate(key, valid, Date.now());
 
-  // ── Failure path ──────────────────────────────────────────────────────────
-  let rec = realmFailures.get(key);
+  if (verdict.outcome === 'pass') return next();
 
-  // Already locked out → 429 without further token work.
-  if (rec && rec.lockedUntil > now) {
-    res.set('Retry-After', String(Math.ceil((rec.lockedUntil - now) / 1000)));
+  if (verdict.outcome === 'locked') {
+    if (verdict.justLocked) {
+      // Audit the lockout WITHOUT the presented token value.
+      console.warn(`⛔ REALM GATE LOCKOUT — key=${key} after ${verdict.count} failed attempts; locked ${RL_LOCKOUT_MS}ms.`);
+    }
+    res.set('Retry-After', String(verdict.retryAfter));
     return res.status(429).json({ error: 'Too many failed authentication attempts. Locked out.' });
   }
 
-  // Start a fresh window if none or the previous one has elapsed.
-  if (!rec || now - rec.windowStart > RL_WINDOW_MS) {
-    rec = { count: 0, windowStart: now, lockedUntil: 0 };
-  }
-  rec.count += 1;
-
-  if (rec.count >= RL_MAX_FAILURES) {
-    rec.lockedUntil = now + RL_LOCKOUT_MS;
-    realmFailures.set(key, rec);
-    // Audit the lockout WITHOUT the presented token value.
-    console.warn(`⛔ REALM GATE LOCKOUT — key=${key} after ${rec.count} failed attempts; locked ${RL_LOCKOUT_MS}ms.`);
-    res.set('Retry-After', String(Math.ceil(RL_LOCKOUT_MS / 1000)));
-    return res.status(429).json({ error: 'Too many failed authentication attempts. Locked out.' });
-  }
-
-  realmFailures.set(key, rec);
+  // outcome === 'unauthorized'
   return res.status(401).json({
     error: hasHeader ? 'Unauthorized — invalid token.' : 'Unauthorized — missing x-ourself-token header.',
   });

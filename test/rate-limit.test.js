@@ -15,10 +15,13 @@ import { startBridge, tokenHeader } from './helpers/bridge-process.js';
 const GATED = '/ourself/verify';   // token-gated GET, no side effects
 const WRONG = 'definitely-not-the-token';
 
-// Tuned low so the lockout is deterministic and fast.
+// Pass 20B.1 — a long lockout so these integration assertions never depend on a
+// sub-second lockout EXPIRING under scheduler jitter (the prior 700ms value was
+// the source of a rare flake). Lockout EXPIRY is now proven deterministically in
+// test/realm-gate.test.js against the pure, time-injected limiter.
 let bridge;
 before(async () => {
-  bridge = await startBridge({ env: { REALM_GATE_MAX_FAILURES: '3', REALM_GATE_LOCKOUT_MS: '700' } });
+  bridge = await startBridge({ env: { REALM_GATE_MAX_FAILURES: '3', REALM_GATE_LOCKOUT_MS: '300000' } });
 });
 after(async () => { await bridge?.stop(); });
 
@@ -49,7 +52,7 @@ test('VALID token is never rate-limited: passes during lockout and clears it', a
 
 test('a missing token also counts toward the lockout', async () => {
   // Fresh bridge for an independent counter.
-  const b = await startBridge({ env: { REALM_GATE_MAX_FAILURES: '2', REALM_GATE_LOCKOUT_MS: '500' } });
+  const b = await startBridge({ env: { REALM_GATE_MAX_FAILURES: '2', REALM_GATE_LOCKOUT_MS: '300000' } });
   try {
     assert.equal((await fetch(b.baseUrl + GATED)).status, 401);            // 1 missing
     const r = await fetch(b.baseUrl + GATED);                              // 2 missing → lock
