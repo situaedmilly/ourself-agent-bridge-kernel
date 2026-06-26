@@ -7,8 +7,9 @@ import { appendFile, readFile } from 'fs/promises';
 import { callClaude } from './agents/claude-agent.js';
 import { callOpenAI } from './agents/openai-agent.js';
 import { executeCommand } from './tools/terminal.js';
-import { classifyCommand, evaluateApproval } from './tools/execution-classes.js';
+import { classifyCommand, evaluateApproval, EXECUTION_CLASSES } from './tools/execution-classes.js';
 import { createRealmGate } from './tools/realm-gate.js';
+import { analyzeTarget, resolveTargetWithinBoundary } from './tools/reverse-engineer.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -500,6 +501,53 @@ app.post('/approve/:id', requireToken, async (req, res) => {
   console.log(`\n✓ APPROVED: ${cmd.id}`);
   console.log(`  $ ${cmd.action}`);
 
+  // ── Pass 20C: reverse_engineer structured analysis — NON-TERMINAL dispatch ──
+  // Analysis requests (minted ONLY by POST /reverse-engineer, kind:'analysis',
+  // class:reverse_engineer) are handled here and RETURN before the shell path.
+  // They never reach evaluateApproval/executeCommand/the terminal — analysis is
+  // an in-process, read-only filesystem inspection that produces a JSON artifact.
+  // A shell command can never enter this branch: classifyCommand never emits
+  // reverse_engineer, and no shell proposal sets kind:'analysis'. Any shell
+  // command claiming reverse_engineer falls through to the Pass 20A gate below
+  // and fails closed (non_terminal_class) exactly as before.
+  if (cmd.kind === 'analysis' && cmd.executionClass === 'reverse_engineer') {
+    try {
+      cmd.result = analyzeTarget(cmd.targetPath, cmd.id);
+      cmd.status = 'analyzed';
+      console.log(`✓ ANALYZED (reverse_engineer): ${cmd.id} — non-terminal, no shell, no mutation`);
+    } catch (err) {
+      cmd.status = 'failed';
+      cmd.error = err.message;
+      cmd.analysisDenied = err.code ?? 'analysis_error';
+      console.warn(`⛔ REVERSE-ENGINEER REFUSED — code=${cmd.analysisDenied}`);
+    }
+    pending.set(cmd.id, cmd);
+
+    await log({
+      id: cmd.id,
+      type: 'analysis_result',
+      txId: cmd.txId,
+      target: cmd.targetPath,
+      approved_by: 'ourself',
+      status: cmd.status,
+      executionClass: 'reverse_engineer',
+      execution_class: 'reverse_engineer',
+      analysisOnly: true,
+      error: cmd.error ?? null,
+      analysisDenied: cmd.analysisDenied ?? null,
+    });
+
+    const wantHtmlAnalysis = (req.headers.accept || '').includes('text/html');
+    if (wantHtmlAnalysis) return res.redirect('/pending');
+    return res.status(cmd.status === 'analyzed' ? 200 : 422).json({
+      id: cmd.id,
+      status: cmd.status,
+      artifact: cmd.result ?? null,
+      error: cmd.error ?? null,
+      analysisDenied: cmd.analysisDenied ?? null,
+    });
+  }
+
   // ── Pass 20A: execution-class gate — re-classify BEFORE execution ──────────
   // Even an OURSELF-approved command is refused if its stored class is missing,
   // unknown, forbidden, non-terminal (e.g. reverse_engineer), or no longer
@@ -689,6 +737,58 @@ app.post('/test', requireToken, async (req, res) => {
   res.json({
     message: 'Fixed read-only diagnostic added to approval queue (caller input ignored).',
     command: pendingEntry,
+    next: `Approve at: curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${cmdId}`,
+  });
+});
+
+// ── Pass 20C: POST /reverse-engineer — structured analysis request (token-gated)
+//
+// Queues a NON-TERMINAL reverse_engineer analysis request. Queuing is NOT
+// analysis: the request still requires explicit OURSELF approval (POST /approve),
+// at which point an in-process, read-only filesystem inspection runs and returns
+// a strict JSON artifact. This route NEVER proposes or executes a shell command,
+// NEVER writes, and NEVER contacts a remote. The target is boundary- and
+// secret-gated here at enqueue, and re-gated again inside analyzeTarget.
+app.post('/reverse-engineer', requireToken, async (req, res) => {
+  const { target_path, rationale } = req.body || {};
+
+  // Boundary + secret gate BEFORE anything is queued — fail closed with a code.
+  let resolved;
+  try {
+    resolved = resolveTargetWithinBoundary(target_path);
+  } catch (err) {
+    return res.status(400).json({ error: err.message, code: err.code ?? 'invalid_target' });
+  }
+
+  const cmdId = generateId('re');
+  const re = EXECUTION_CLASSES.reverse_engineer;
+  const pendingEntry = {
+    id: cmdId,
+    txId: 're',
+    from: 'ourself',
+    to: 'analysis',
+    kind: 'analysis',                 // marks the NON-TERMINAL analysis dispatch
+    // Descriptive only — NEVER executed as a shell command (no shell path exists
+    // for this entry; /approve dispatches it to analyzeTarget and returns).
+    action: 'reverse_engineer (structured analysis — non-terminal, read-only)',
+    targetRequested: resolved.requestedPath,
+    targetPath: resolved.resolvedPath,
+    workingDir: resolved.resolvedPath,
+    rationale: rationale || 'reverse_engineer structured analysis (read-only, non-terminal)',
+    proposedAt: new Date().toISOString(),
+    status: 'pending',
+    executionClass: re.class,         // 'reverse_engineer'
+    risk: re.risk,
+    analysisOnly: true,
+    classRationale: 'Pass 20C reverse_engineer analysis-only route (terminal:false, mutation:false)',
+  };
+  pending.set(cmdId, pendingEntry);
+  logCommandProposed(pendingEntry).catch(() => {});
+  printPendingAlert(pendingEntry);
+
+  res.json({
+    message: 'reverse_engineer structured analysis queued — OURSELF approval required (non-terminal, read-only).',
+    request: pendingEntry,
     next: `Approve at: curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${cmdId}`,
   });
 });

@@ -102,7 +102,9 @@ function verdict(klass, reason) {
 
 // ── Pattern fragments (shapes, never secret values) ──────────────────────────
 // A secret-bearing file/path fragment — mirrors the firewall's SECRET_FILE.
-const SECRET_PATH =
+// Exported (Pass 20C) so the read-only reverse_engineer analysis route refuses
+// secret-bearing target paths from the SAME source of truth, never its own copy.
+export const SECRET_PATH =
   /(^|[\s/="'`@:,])(\.env(\.[a-z0-9_-]+)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|[\w.-]+\.pem|[\w.-]+\.key|[\w.-]+\.p12|[\w.-]+\.pfx|\.ssh\/|\.aws\/credentials|\.netrc|\.npmrc|credentials(\.json)?|secrets?\.(json|ya?ml|env|txt))(\b|$)/i;
 
 // Append-only audit logs — mutation/deletion of these is forbidden.
