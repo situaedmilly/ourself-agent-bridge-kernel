@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OURSELF Æ Packet to Kernel Envelope — v1.0",
+  "description": "Versioned contract for translating OURSELF route-plan output and Æ packets into kernel proposals. Both the control plane (ourself-agent-bridge) and kernel (agent-bridge) must use byte-identical copies of this schema.",
+  "type": "object",
+  "required": [
+    "protocol",
+    "packet",
+    "route_plan",
+    "origin",
+    "authority",
+    "requested_execution",
+    "expected_evidence",
+    "semantic_checksum"
+  ],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "enum": ["ourself.ae-kernel.v1"],
+      "description": "Protocol version. Must exactly match 'ourself.ae-kernel.v1'."
+    },
+    "packet": {
+      "type": "object",
+      "description": "The deterministic Æ packet from the control plane. Preserves all OURSELF route-plane fields without renaming or mutation.",
+      "required": [
+        "packet_id",
+        "created",
+        "route",
+        "execution_class",
+        "status"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string",
+          "description": "Deterministic packet identifier, prefixed 'ae-' by the generator."
+        },
+        "created": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the packet was created (injected deterministically, not from Date.now())."
+        },
+        "route": {
+          "type": "string",
+          "description": "The classified route: e.g., 'blueprint', 'reverse_engineer', 'discard', etc. Comes directly from route-classifier."
+        },
+        "execution_class": {
+          "type": "string",
+          "description": "The execution class assigned by the control plane. Must be recognized by the kernel's EXECUTION_CLASSES registry."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "discarded"],
+          "description": "Planning status. 'planned' = eligible for kernel review; 'discarded' = unsafe, kernel must reject."
+        },
+        "node": {
+          "type": "string",
+          "description": "The OURSELF node that originated the command: Jaxk, Kay, Nae, Milly, or OURSELF."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the command: 'terminal', 'slack', 'notion', etc."
+        },
+        "raw_text": {
+          "type": "string",
+          "description": "The unparsed user-provided text that generated this packet."
+        },
+        "target": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "description": "Optional target path or identifier for the operation."
+        },
+        "risk": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Risk level assigned by the control plane."
+        },
+        "parent_aecho": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "description": "Optional parent AECHO identifier for command chaining."
+        }
+      },
+      "additionalProperties": true
+    },
+    "route_plan": {
+      "type": "object",
+      "description": "The route plan from the control plane. Preserves all fields produced by route-classifier and plan-endpoint.",
+      "required": [
+        "route",
+        "execution_class",
+        "requires_approval",
+        "reason"
+      ],
+      "properties": {
+        "route": {
+          "type": "string",
+          "description": "The classified route, mirrored from packet.route."
+        },
+        "sia": {
+          "type": "string",
+          "description": "Semantic Integrity Assurance node assigned by the control plane."
+        },
+        "execution_class": {
+          "type": "string",
+          "description": "The execution class, mirrored from packet.execution_class."
+        },
+        "mutation": {
+          "type": "boolean",
+          "description": "Whether the operation mutates state."
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "description": "Whether the kernel must require HUMAN-TURN approval before execution."
+        },
+        "proof_required": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Evidence/proof artifacts required for this operation."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason for the classification."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status from the planning phase."
+        }
+      },
+      "additionalProperties": true
+    },
+    "origin": {
+      "type": "object",
+      "description": "Metadata about where the envelope came from.",
+      "required": ["self", "source"],
+      "properties": {
+        "self": {
+          "type": "string",
+          "enum": ["ourself-agent-bridge"],
+          "description": "The repository identifier of the control plane."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source within the control plane: 'cli-mouth', 'command-mouth', 'router', etc."
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "description": "Authority state and governance rules for kernel acceptance.",
+      "required": ["state", "human_turn_required"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["PENDING_HUMAN_TURN"],
+          "description": "Must be PENDING_HUMAN_TURN. Any other state is rejected by the kernel."
+        },
+        "human_turn_required": {
+          "type": "boolean",
+          "enum": [true],
+          "description": "Must be true. The kernel always requires HUMAN-TURN for acceptance or rejection."
+        }
+      }
+    },
+    "requested_execution": {
+      "type": "object",
+      "description": "What the control plane is requesting the kernel to do.",
+      "required": ["class", "mutation_requested"],
+      "properties": {
+        "class": {
+          "type": "string",
+          "description": "The execution class requested. Must be recognized by the kernel's EXECUTION_CLASSES registry. Kernel MUST NOT accept unknown classes."
+        },
+        "mutation_requested": {
+          "type": "boolean",
+          "description": "Whether the requested operation performs mutation."
+        }
+      }
+    },
+    "expected_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9:_+-]{0,63}$",
+        "description": "Safe token (matches SAFE_TOKEN regex from control plane). Must not contain paths, secrets, or unsafe characters."
+      },
+      "description": "Array of evidence artifacts or identifiers expected to accompany this proposal."
+    },
+    "semantic_checksum": {
+      "type": "string",
+      "description": "Deterministic checksum computed from canonicalized semantic input (packet + route_plan + requested_execution). Must be reproducible given the same semantic inputs, independent of key insertion order, timestamps, or environment."
+    }
+  },
+  "additionalProperties": false
+}
