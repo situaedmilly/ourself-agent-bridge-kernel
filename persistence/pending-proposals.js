@@ -80,7 +80,9 @@ function proposalsDir(storageRoot) {
   return join(storageRoot, 'proposals');
 }
 
-function eventsLedgerPath(storageRoot) {
+// Exported so T-031 (persistence/human-turn-decisions.js) can append decision
+// events to the SAME store-wide ledger rather than inventing a second one.
+export function eventsLedgerPath(storageRoot) {
   return join(storageRoot, 'events.jsonl');
 }
 
@@ -88,7 +90,7 @@ function eventsLedgerPath(storageRoot) {
  * Resolve and validate the on-disk path for a proposal ID, staying strictly
  * inside <storageRoot>/proposals. Rejects unsafe IDs before any filesystem call.
  */
-function resolveProposalPath(storageRoot, proposalId) {
+export function resolveProposalPath(storageRoot, proposalId) {
   if (typeof proposalId !== 'string' || !SAFE_PROPOSAL_ID.test(proposalId)) {
     return { ok: false };
   }
@@ -101,7 +103,7 @@ function resolveProposalPath(storageRoot, proposalId) {
 }
 
 /** Reject a path if it exists and is a symlink — never follow it. */
-async function assertNotSymlink(path) {
+export async function assertNotSymlink(path) {
   try {
     const st = await lstat(path);
     if (st.isSymbolicLink()) return false;
@@ -111,7 +113,10 @@ async function assertNotSymlink(path) {
   return true;
 }
 
-async function atomicWriteJson(path, data) {
+// Exported (with the three helpers above) so T-031 can extend the SAME
+// per-proposal record and store-wide event ledger — see the module header:
+// "Prefer... same authoritative event ledger" rather than a second storage root.
+export async function atomicWriteJson(path, data) {
   const dir = path.slice(0, path.lastIndexOf(sep));
   await mkdir(dir, { recursive: true });
   const tmp = join(dir, `.tmp-${randomBytes(8).toString('hex')}`);
@@ -126,7 +131,7 @@ async function atomicWriteJson(path, data) {
 }
 
 /** Append one hash-chained line to the store-wide event ledger. Returns the event's hash. */
-async function appendGlobalEvent(storageRoot, eventWithoutHash) {
+export async function appendGlobalEvent(storageRoot, eventWithoutHash) {
   const ledgerPath = eventsLedgerPath(storageRoot);
   await mkdir(storageRoot, { recursive: true });
   const raw = await readFile(ledgerPath, 'utf8').catch(() => '');
@@ -177,7 +182,8 @@ function computeIdentityBindingHash({ protocol, semanticChecksum, packet, origin
   });
 }
 
-function computeRecordHash(record) {
+/** Exported so T-031 can recompute an updated record's hash identically after a decision is applied. */
+export function computeRecordHash(record) {
   const { integrity, ...rest } = record;
   const { record_hash, ...restIntegrity } = integrity;
   return canonicalHash({ ...rest, integrity: restIntegrity });
