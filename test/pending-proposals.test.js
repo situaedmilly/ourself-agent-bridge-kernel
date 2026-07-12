@@ -18,6 +18,7 @@ import {
   verifyEventLedger,
   PENDING_PROPOSAL_ERRORS,
 } from '../persistence/pending-proposals.js';
+import { computeSemanticChecksum } from '../adapters/ourself-intake.js';
 
 async function withTempStore(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'ourself-pending-proposals-'));
@@ -407,6 +408,103 @@ test('28-29. the module source never imports child_process or performs network c
   const src = await readFile(new URL('../persistence/pending-proposals.js', import.meta.url), 'utf8');
   assert.equal(/child_process|execSync|spawn\(/.test(src), false);
   assert.equal(/\bfetch\(|node:http|node:https/.test(src), false);
+});
+
+// ── Command-route / route-plan agreement (35-39) ────────────────────────────
+// route_plan.route is a COMMAND-CATEGORY field (e.g. "git-read"), fixed at
+// intake — a different semantic domain than the pipeline/queue route BridgeSELF
+// derives later from record.state. adapters/ourself-intake.js already enforces
+// packet.route === route_plan.route before translating an envelope into a
+// kernel proposal, but persistPendingProposal accepts a reviewResult directly
+// and must not assume that path was taken.
+
+test('35. matching route_plan.route and packet.route persists exactly as before (no behavior change for valid records)', async () => {
+  await withTempStore(async (dir) => {
+    const review = buildReviewResult({ route: 'git-read', executionClass: 'git-read' });
+    const result = await persistPendingProposal(dir, review);
+    assert.equal(result.ok, true, result.message || '');
+    assert.equal(result.record.route_plan.route, result.record.packet.route);
+    assert.equal(result.record.state, 'PERSISTED_PENDING');
+  });
+});
+
+test('36. mismatched route_plan.route and packet.route fails closed as ROUTE_PLAN_PACKET_MISMATCH with zero side effects', async () => {
+  await withTempStore(async (dir) => {
+    const packetId = uniqueId();
+    const proposal = buildProposal({ packetId, executionClass: 'git-read', route: 'git-read' });
+    proposal.data.routePlan.route = 'build'; // otherwise fully valid, single-field disagreement
+    const review = buildReviewResult({ packetId, proposal });
+
+    const result = await persistPendingProposal(dir, review);
+    assert.equal(result.ok, false);
+    assert.equal(result.error, PENDING_PROPOSAL_ERRORS.ROUTE_PLAN_PACKET_MISMATCH);
+
+    // No record was written, no ledger event was appended, no queue exists yet
+    // at this layer — the guard fails before any persistence side effect.
+    const lookup = await getPendingProposal(dir, packetId);
+    assert.equal(lookup.ok, false);
+    assert.equal(lookup.error, PENDING_PROPOSAL_ERRORS.PROPOSAL_NOT_FOUND);
+    const ledger = await verifyEventLedger(dir);
+    assert.equal(ledger.eventCount, 0, 'a rejected mismatch must never append PROPOSAL_PERSISTED');
+  });
+});
+
+test('37. a hand-built reviewResult bypassing adapters/ourself-intake.js validation is independently rejected at persistence', async () => {
+  // Every test in this file constructs reviewResult directly, never through
+  // validateOurselfEnvelope/translateToKernelProposal — this suite already
+  // represents the "no intake" path structurally. This test makes that
+  // explicit: a record intake would have rejected with ROUTE_PLAN_PACKET_MISMATCH
+  // (adapters/ourself-intake.js:107-109) reaches persistPendingProposal directly
+  // and is independently rejected here, proving persistence does not trust an
+  // upstream check it cannot verify was ever run.
+  await withTempStore(async (dir) => {
+    const packetId = uniqueId();
+    const proposal = buildProposal({ packetId, executionClass: 'inspect', route: 'inspect' });
+    proposal.data.routePlan.route = 'git-read';
+    const review = buildReviewResult({ packetId, proposal });
+    const result = await persistPendingProposal(dir, review);
+    assert.equal(result.ok, false);
+    assert.equal(result.error, PENDING_PROPOSAL_ERRORS.ROUTE_PLAN_PACKET_MISMATCH);
+  });
+});
+
+test('38. adversarial: a mismatched packet with a freshly recomputed, internally valid semantic checksum is still rejected — checksum validity does not imply route agreement', async () => {
+  await withTempStore(async (dir) => {
+    const packetId = uniqueId();
+    const proposal = buildProposal({ packetId, executionClass: 'git-read', route: 'git-read' });
+    proposal.data.routePlan.route = 'build'; // introduce the mismatch first
+    // Recompute the checksum AFTER the mismatch, exactly as the real adapter
+    // would for whatever fields it was given — cryptographically self-consistent,
+    // not tampered, not stale.
+    const freshChecksum = computeSemanticChecksum(
+      proposal.data.packet,
+      proposal.data.routePlan,
+      proposal.data.requestedExecution,
+    );
+    const review = buildReviewResult({ packetId, proposal });
+    const result = await persistPendingProposal(dir, review, { semanticChecksum: freshChecksum });
+    assert.equal(result.ok, false);
+    assert.notEqual(result.error, PENDING_PROPOSAL_ERRORS.INVALID_SEMANTIC_CHECKSUM, 'must not be misreported as a checksum failure');
+    assert.equal(result.error, PENDING_PROPOSAL_ERRORS.ROUTE_PLAN_PACKET_MISMATCH);
+  });
+});
+
+test('39. malformed route_plan.route (missing, null, or non-string) fails closed as ROUTE_PLAN_PACKET_MISMATCH, not a fallback', async () => {
+  await withTempStore(async (dir) => {
+    for (const malformed of [undefined, null, 42, '']) {
+      const packetId = uniqueId();
+      const proposal = buildProposal({ packetId, executionClass: 'inspect', route: 'inspect' });
+      if (malformed === undefined) {
+        delete proposal.data.routePlan.route;
+      } else {
+        proposal.data.routePlan.route = malformed;
+      }
+      const review = buildReviewResult({ packetId, proposal });
+      const result = await persistPendingProposal(dir, review);
+      assert.equal(result.ok, false);
+      assert.equal(result.error, PENDING_PROPOSAL_ERRORS.ROUTE_PLAN_PACKET_MISMATCH, `case ${JSON.stringify(malformed)} must fail closed`);
+    }
+  });
 });
 
 // ── Recovery and reads (30-34) ───────────────────────────────────────────────

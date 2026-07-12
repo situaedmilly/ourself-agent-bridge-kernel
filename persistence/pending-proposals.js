@@ -33,7 +33,8 @@
 //   UNKNOWN_EXECUTION_CLASS · PROPOSAL_IDENTITY_INCOMPLETE · PROPOSAL_ALREADY_PERSISTED ·
 //   PROPOSAL_IDENTITY_CONFLICT · PERSISTENCE_BOUNDARY_VIOLATION ·
 //   PERSISTENCE_WRITE_FAILED · PERSISTED_RECORD_INVALID ·
-//   PERSISTED_RECORD_INTEGRITY_FAILURE · PROPOSAL_NOT_FOUND
+//   PERSISTED_RECORD_INTEGRITY_FAILURE · PROPOSAL_NOT_FOUND ·
+//   ROUTE_PLAN_PACKET_MISMATCH
 
 'use strict';
 
@@ -63,6 +64,7 @@ export const PENDING_PROPOSAL_ERRORS = Object.freeze({
   PERSISTED_RECORD_INVALID: 'PERSISTED_RECORD_INVALID',
   PERSISTED_RECORD_INTEGRITY_FAILURE: 'PERSISTED_RECORD_INTEGRITY_FAILURE',
   PROPOSAL_NOT_FOUND: 'PROPOSAL_NOT_FOUND',
+  ROUTE_PLAN_PACKET_MISMATCH: 'ROUTE_PLAN_PACKET_MISMATCH',
 });
 
 const EXPECTED_PROTOCOL = 'ourself.ae-kernel.v1';
@@ -232,6 +234,17 @@ export async function persistPendingProposal(storageRoot, reviewResult, options 
     return fail(PENDING_PROPOSAL_ERRORS.PROPOSAL_IDENTITY_INCOMPLETE);
   }
   const { packet, routePlan, requestedExecution, origin } = identity;
+
+  // Defense-in-depth: the control plane (adapters/ourself-intake.js) already
+  // enforces packet.route === route_plan.route before translation to a kernel
+  // proposal. This module never assumes that path was taken — a hand-built
+  // reviewResult could bypass intake entirely — so the same command-route
+  // agreement is reproven here, before any record is constructed or written.
+  // This is NOT the pipeline/queue route BridgeSELF derives later; it is the
+  // fixed command-category the packet and its route plan must already agree on.
+  if (packet.route !== routePlan.route) {
+    return fail(PENDING_PROPOSAL_ERRORS.ROUTE_PLAN_PACKET_MISMATCH, 'packet and route plan disagree on command route');
+  }
 
   const execClass = EXECUTION_CLASSES[proposal.executionClass];
   if (!proposal.executionClass || !EXECUTION_CLASS_NAMES.includes(proposal.executionClass) || !execClass || !execClass.terminal) {
