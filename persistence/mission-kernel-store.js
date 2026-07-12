@@ -70,7 +70,7 @@ import {
   eventsLedgerPath,
 } from './pending-proposals.js';
 import { canonicalHash } from './canonical-json.js';
-import { PROMOTION_BOUNDARY } from 'self-protocol-suite';
+import { MISSION_STATES, PROMOTION_BOUNDARY } from 'self-protocol-suite';
 
 export const MISSION_KERNEL_VERSION = 'ourself.mission-kernel.v0';
 export const MISSION_EVENT_VERSION = 'ourself.mission-kernel-event.v0';
@@ -83,16 +83,11 @@ export const SPECIFICATION_BINDING = Object.freeze({
   implementation_claim: 'CONFORMS_TO_THIS_EXACT_DRAFT_ONLY',
 });
 
-export const MISSION_STATES = Object.freeze([
-  'INITIALIZED',
-  'ORIENTED',
-  'EXECUTING',
-  'PAUSED',
-  'INTERRUPTED',
-  'COMPLETED',
-  'FAILED',
-  'SEALED',
-]);
+// Mission-state vocabulary — canonical noun catalog owned by SELF Protocol
+// Core (see self-protocol-suite/src/state-machine.js). The kernel imports
+// the names but specializes its own transition law below; the protocol
+// core's narrower TRANSITIONS table is not consulted here.
+export { MISSION_STATES };
 
 // Legal transition table — spec §3. Any pair not listed here is illegal.
 export const LEGAL_TRANSITIONS = Object.freeze({
