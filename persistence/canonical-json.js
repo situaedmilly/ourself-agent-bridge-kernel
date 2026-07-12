@@ -1,51 +1,25 @@
 // persistence/canonical-json.js
-// ── Deterministic canonicalization and hashing for durable OURSELF records ──
+// ── Deterministic canonicalization and hashing via SELF Protocol Core ──
 //
-// PURPOSE
-//   Produce a stable JSON string for any plain-data object regardless of key
-//   insertion order, so hashes computed over the same logical content are
-//   always identical. Used by persistence/pending-proposals.js to bind
-//   identity and detect tampering.
+// This adapter delegates canonical serialization and hashing to the SELF
+// Protocol Core (self-protocol-suite), which owns the canonical algorithm.
+// The kernel preserves its historical export names (canonicalize, canonicalHash)
+// while adopting the protocol's implementation, reversing the dependency at
+// one choke point: this single file.
+//
+// Sealed kernel consumers import from this module unchanged.
+// Their behavior is preserved; their implementation is delegated.
 
-'use strict';
+import { canonicalSerialize, computeIntegrityDigest } from 'self-protocol-suite';
 
-import { createHash } from 'node:crypto';
-
-/**
- * Recursively sort object keys so JSON.stringify output is order-independent.
- * Arrays preserve their existing order (order is semantically meaningful).
- * @param {*} value
- * @returns {*}
- */
-function sortForCanonicalization(value) {
-  if (Array.isArray(value)) {
-    return value.map(sortForCanonicalization);
-  }
-  if (value && typeof value === 'object') {
-    const sorted = {};
-    for (const key of Object.keys(value).sort()) {
-      sorted[key] = sortForCanonicalization(value[key]);
-    }
-    return sorted;
-  }
-  return value;
-}
-
-/**
- * Canonical JSON string for the given value — same logical content always
- * produces the same string, independent of key insertion order.
- * @param {*} value
- * @returns {string}
- */
+// Preserve kernel's historical export: canonical JSON serialization.
+// Input: any value; Output: canonical JSON string (order-independent).
 export function canonicalize(value) {
-  return JSON.stringify(sortForCanonicalization(value));
+  return canonicalSerialize(value);
 }
 
-/**
- * SHA-256 hex digest of the canonical JSON form of a value.
- * @param {*} value
- * @returns {string} 64-char hex digest
- */
+// Preserve kernel's historical export: SHA-256 hex digest of canonical form.
+// Input: any value; Output: 64-char lowercase hex digest string.
 export function canonicalHash(value) {
-  return createHash('sha256').update(canonicalize(value)).digest('hex');
+  return computeIntegrityDigest(value);
 }
