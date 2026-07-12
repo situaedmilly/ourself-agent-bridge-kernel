@@ -320,6 +320,84 @@ test('no exported method name or return value ever asserts a promoted/approved s
   }
 });
 
+// ── Mission-state vocabulary — canonical noun set, kernel-owned transitions ──
+
+test('kernel MISSION_STATES recognizes exactly the eight canonical protocol states, no more, no fewer', () => {
+  assert.deepEqual(MISSION_STATES, [
+    'INITIALIZED',
+    'ORIENTED',
+    'EXECUTING',
+    'PAUSED',
+    'INTERRUPTED',
+    'COMPLETED',
+    'FAILED',
+    'SEALED',
+  ]);
+  assert.equal(MISSION_STATES.length, 8);
+});
+
+test('kernel MISSION_STATES is the same array sourced from self-protocol-suite, not a re-declared duplicate', async () => {
+  const { MISSION_STATES: protocolStates } = await import('self-protocol-suite');
+  assert.equal(MISSION_STATES, protocolStates); // reference identity, not just value equality
+});
+
+test('kernel specialization survives: transitions the protocol core would reject remain legal in the kernel', async () => {
+  await withTempStore(async (store) => {
+    await store.create(baseKernel('m-vocab-a'));
+    await store.transition('m-vocab-a', 'ORIENTED');
+    await store.transition('m-vocab-a', 'EXECUTING');
+    await store.transition('m-vocab-a', 'PAUSED');
+    const resumed = await store.transition('m-vocab-a', 'EXECUTING'); // PAUSED -> EXECUTING
+    assert.equal(resumed.state, 'EXECUTING');
+
+    await store.create(baseKernel('m-vocab-b'));
+    await store.transition('m-vocab-b', 'ORIENTED');
+    await store.transition('m-vocab-b', 'EXECUTING');
+    await store.transition('m-vocab-b', 'INTERRUPTED');
+    const reoriented = await store.transition('m-vocab-b', 'ORIENTED'); // INTERRUPTED -> ORIENTED
+    assert.equal(reoriented.state, 'ORIENTED');
+
+    await store.create(baseKernel('m-vocab-c'));
+    const failed = await store.transition('m-vocab-c', 'FAILED'); // INITIALIZED -> FAILED
+    assert.equal(failed.state, 'FAILED');
+  });
+});
+
+test('illegal transition remains illegal after vocabulary adoption: SEALED -> EXECUTING still fails closed', async () => {
+  await withTempStore(async (store) => {
+    await store.create(baseKernel('m-vocab-d'));
+    await store.transition('m-vocab-d', 'ORIENTED');
+    await store.transition('m-vocab-d', 'EXECUTING');
+    await store.transition('m-vocab-d', 'COMPLETED');
+    await store.transition('m-vocab-d', 'SEALED');
+    await assert.rejects(
+      () => store.transition('m-vocab-d', 'EXECUTING'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.ILLEGAL_TRANSITION
+    );
+    const record = await store.get('m-vocab-d');
+    assert.equal(record.state, 'SEALED'); // unchanged by the rejected attempt
+  });
+});
+
+test('MISSION_STATES is frozen and a mutation attempt does not alter later kernel transition behavior', async () => {
+  assert.equal(Object.isFrozen(MISSION_STATES), true);
+  assert.throws(() => {
+    'use strict';
+    MISSION_STATES.push('PROMOTED');
+  });
+  assert.equal(MISSION_STATES.length, 8);
+
+  await withTempStore(async (store) => {
+    await store.create(baseKernel('m-vocab-e'));
+    const updated = await store.transition('m-vocab-e', 'ORIENTED');
+    assert.equal(updated.state, 'ORIENTED');
+    await assert.rejects(
+      () => store.transition('m-vocab-e', 'PROMOTED'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.ILLEGAL_TRANSITION
+    );
+  });
+});
+
 // ── integrity ─────────────────────────────────────────────────────────────────
 
 test('verifyIntegrity() confirms record_hash matches stored content', async () => {
