@@ -280,6 +280,35 @@ test('getPromotionBoundaryStatus() always reports NOT_CROSSED with validator_aut
   });
 });
 
+test('getPromotionBoundaryStatus() public output shape is unchanged after adopting the canonical PROMOTION_BOUNDARY constant', async () => {
+  await withTempStore(async (store) => {
+    await store.create(baseKernel('m-016b'));
+    const status = await store.getPromotionBoundaryStatus('m-016b');
+    assert.deepEqual(status, {
+      status: 'NOT_CROSSED',
+      validator_authority: 'NONE',
+      evidence_state: 'UNREPORTED',
+      reason: 'Explicit human authorization is required for promotion.',
+    });
+    assert.deepEqual(Object.keys(status).sort(), [
+      'evidence_state',
+      'reason',
+      'status',
+      'validator_authority',
+    ]);
+  });
+});
+
+test('getPromotionBoundaryStatus() reuses the same canonical PROMOTION_BOUNDARY constant the protocol core exports', async () => {
+  const { PROMOTION_BOUNDARY } = await import('self-protocol-suite');
+  await withTempStore(async (store) => {
+    await store.create(baseKernel('m-016c'));
+    const status = await store.getPromotionBoundaryStatus('m-016c');
+    assert.equal(status.status, PROMOTION_BOUNDARY.status);
+    assert.equal(status.validator_authority, PROMOTION_BOUNDARY.validator_authority);
+  });
+});
+
 test('no exported method name or return value ever asserts a promoted/approved state', async () => {
   const mod = await import('../persistence/mission-kernel-store.js');
   const exportNames = Object.keys(mod);
