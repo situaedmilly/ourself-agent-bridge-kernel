@@ -52,6 +52,11 @@
 //   older than staleLeaseMs is reported as MISSION_KERNEL_LEASE_STALE and is
 //   NEVER auto-reclaimed; only an explicit breakStaleLease() call — which
 //   re-verifies staleness immediately before deleting — may clear it.
+//   (Correction 2 / F5) The lease path receives the SAME assertNotSymlink()
+//   guard as the mission record path: both acquireLease()'s EEXIST-branch
+//   read and breakStaleLease() refuse a symlinked lease path outright
+//   (typed SYMLINK_REJECTED) rather than following it and letting untrusted
+//   content drive a staleness decision.
 
 'use strict';
 
@@ -277,6 +282,9 @@ export function createMissionKernelStore(options) {
       return { lockPath: resolved.lock, holderId };
     } catch (err) {
       if (err && err.code === 'EEXIST') {
+        if (!(await assertNotSymlink(resolved.lock))) {
+          throw fail(MISSION_KERNEL_ERRORS.SYMLINK_REJECTED, `lease path for mission ${missionId} is a symlink — refusing to read or trust it`);
+        }
         const raw = await readFile(resolved.lock, 'utf8').catch(() => null);
         let existing = null;
         try {
@@ -313,6 +321,9 @@ export function createMissionKernelStore(options) {
   async function breakStaleLease(missionId) {
     const resolved = resolveMissionPath(storageRoot, missionId);
     if (!resolved.ok) throw fail(MISSION_KERNEL_ERRORS.INVALID_MISSION_ID);
+    if (!(await assertNotSymlink(resolved.lock))) {
+      throw fail(MISSION_KERNEL_ERRORS.SYMLINK_REJECTED, `lease path for mission ${missionId} is a symlink — refusing to read, trust, or clear it`);
+    }
     const raw = await readFile(resolved.lock, 'utf8').catch(() => null);
     if (raw === null) return { ok: true, cleared: false, reason: 'no_lease_present' };
     let existing = null;

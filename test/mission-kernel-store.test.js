@@ -699,3 +699,128 @@ test('F4.12 Promotion Boundary remains NOT_CROSSED after every correction path (
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// ── CORRECTION-2 / F5 — lease path symlink protection ───────────────────────
+
+test('F5.1 a symlinked lock path is rejected outright (acquireLease EEXIST branch never follows it)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-symlock-'));
+  const outsideDir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-outside-'));
+  try {
+    const { symlink, writeFile: wf } = await import('node:fs/promises');
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-symlock'));
+
+    const outsideFile = join(outsideDir, 'fake-lease.json');
+    await wf(outsideFile, JSON.stringify({ mission_id: 'm-symlock', holder_id: 'attacker', acquired_at: Date.now() - 999_999 }), 'utf8');
+    const lockPath = join(dir, 'missions', 'm-symlock.lock');
+    await symlink(outsideFile, lockPath);
+
+    await assert.rejects(
+      () => store.appendHistory('m-symlock', { type: 'X' }),
+      (err) => err.code === MISSION_KERNEL_ERRORS.SYMLINK_REJECTED
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await rm(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test('F5.2 a staleness decision never uses content reached through a symlinked lock path', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-nostale-'));
+  const outsideDir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-outside2-'));
+  try {
+    const { symlink, writeFile: wf } = await import('node:fs/promises');
+    const store = createMissionKernelStore({ storageRoot: dir, staleLeaseMs: 50 });
+    await store.create(baseKernel('m-nostale'));
+
+    // Attacker-controlled content claims an ancient acquired_at, which would
+    // normally read as LEASE_STALE — but it must never be trusted, because
+    // it is reached only through a symlink.
+    const outsideFile = join(outsideDir, 'fake-lease.json');
+    await wf(outsideFile, JSON.stringify({ mission_id: 'm-nostale', holder_id: 'attacker', acquired_at: Date.now() - 999_999 }), 'utf8');
+    const lockPath = join(dir, 'missions', 'm-nostale.lock');
+    await symlink(outsideFile, lockPath);
+
+    await assert.rejects(
+      () => store.appendHistory('m-nostale', { type: 'X' }),
+      (err) => err.code === MISSION_KERNEL_ERRORS.SYMLINK_REJECTED // NOT LEASE_STALE
+    );
+
+    // The outside file must be untouched — the module never wrote to or
+    // deleted content it does not own via the symlink.
+    const outsideStill = await readFile(outsideFile, 'utf8').catch(() => null);
+    assert.notEqual(outsideStill, null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await rm(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test('F5.3 breakStaleLease() refuses a symlinked lock path outright, without reading or clearing it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-break-'));
+  const outsideDir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-outside3-'));
+  try {
+    const { symlink, writeFile: wf, lstat } = await import('node:fs/promises');
+    const store = createMissionKernelStore({ storageRoot: dir, staleLeaseMs: 50 });
+    await store.create(baseKernel('m-breaksym'));
+
+    const outsideFile = join(outsideDir, 'fake-lease.json');
+    await wf(outsideFile, JSON.stringify({ mission_id: 'm-breaksym', holder_id: 'attacker', acquired_at: Date.now() - 999_999 }), 'utf8');
+    const lockPath = join(dir, 'missions', 'm-breaksym.lock');
+    await symlink(outsideFile, lockPath);
+
+    await assert.rejects(
+      () => store.breakStaleLease('m-breaksym'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.SYMLINK_REJECTED
+    );
+
+    // The symlink itself must still be present — refusal means untouched,
+    // not silently cleared as a side effect of rejecting it.
+    const stillSymlink = await lstat(lockPath).catch(() => null);
+    assert.notEqual(stillSymlink, null);
+    assert.equal(stillSymlink.isSymbolicLink(), true);
+
+    const outsideStill = await readFile(outsideFile, 'utf8').catch(() => null);
+    assert.notEqual(outsideStill, null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await rm(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test('F5.4 normal (non-symlinked) leases are unaffected by the symlink guard: acquire, conflict, stale, and break all still work', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-f5-normal-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir, staleLeaseMs: 50 });
+    await store.create(baseKernel('m-normal'));
+
+    // Normal concurrent conflict still governed correctly.
+    const results = await Promise.allSettled([
+      store.appendHistory('m-normal', { type: 'A' }),
+      store.appendHistory('m-normal', { type: 'B' }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === 'fulfilled').length;
+    const rejected = results.filter((r) => r.status === 'rejected').length;
+    assert.equal(fulfilled, 1);
+    assert.equal(rejected, 1);
+    assert.equal(results.find((r) => r.status === 'rejected').reason.code, MISSION_KERNEL_ERRORS.LEASE_HELD);
+
+    // Normal stale-lease detection and explicit break still work.
+    const { writeFile: wf } = await import('node:fs/promises');
+    const lockPath = join(dir, 'missions', 'm-normal.lock');
+    await wf(lockPath, JSON.stringify({ mission_id: 'm-normal', holder_id: 'dead-holder', acquired_at: Date.now() - 1000 }), { flag: 'wx' });
+
+    await assert.rejects(
+      () => store.appendHistory('m-normal', { type: 'C' }),
+      (err) => err.code === MISSION_KERNEL_ERRORS.LEASE_STALE
+    );
+
+    const broken = await store.breakStaleLease('m-normal');
+    assert.equal(broken.cleared, true);
+
+    const record = await store.appendHistory('m-normal', { type: 'D' });
+    assert.equal(record.history.length, 2); // A (or B) + D
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
