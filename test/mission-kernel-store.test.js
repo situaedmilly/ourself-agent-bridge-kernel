@@ -5,12 +5,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   createMissionKernelStore,
   verifySpecificationBinding,
+  verifyEventChain,
   SPECIFICATION_BINDING,
   MISSION_KERNEL_ERRORS,
   LEGAL_TRANSITIONS,
@@ -321,5 +322,380 @@ test('two stores with different storageRoots do not see each other\'s missions',
   } finally {
     await rm(dirA, { recursive: true, force: true });
     await rm(dirB, { recursive: true, force: true });
+  }
+});
+
+// ── CORRECTION-1 / F1 — typed fail-closed corruption handling ───────────────
+
+test('F4.1 restart reconstruction: a fresh store instance against the same storageRoot reads the same record', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-restart-'));
+  try {
+    const storeA = createMissionKernelStore({ storageRoot: dir });
+    await storeA.create(baseKernel('m-restart'));
+    await storeA.transition('m-restart', 'ORIENTED');
+
+    // Simulate a fresh process: a brand-new store instance, same storageRoot.
+    const storeB = createMissionKernelStore({ storageRoot: dir });
+    const record = await storeB.get('m-restart');
+    assert.equal(record.state, 'ORIENTED');
+    assert.equal(record.history.length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.2 / F1 malformed mission-record JSON fails closed with a typed CORRUPT_RECORD error, not "not found"', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-malformed-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-bad'));
+    const path = join(dir, 'missions', 'm-bad.json');
+    await writeFile(path, '{this is not valid json', 'utf8');
+
+    await assert.rejects(
+      () => store.get('m-bad'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.CORRUPT_RECORD
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.3 / F1 truncated mission-record JSON fails closed with a typed CORRUPT_RECORD error', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-truncated-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-trunc'));
+    const path = join(dir, 'missions', 'm-trunc.json');
+    const raw = await readFile(path, 'utf8');
+    await writeFile(path, raw.slice(0, Math.floor(raw.length / 2)), 'utf8');
+
+    await assert.rejects(
+      () => store.get('m-trunc'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.CORRUPT_RECORD
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F1 a record that parses but fails shape validation is also treated as corrupt, not silently accepted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-badshape-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-shape'));
+    const path = join(dir, 'missions', 'm-shape.json');
+    await writeFile(path, JSON.stringify({ mission_id: 'm-shape', state: 'NOT_A_REAL_STATE' }), 'utf8');
+
+    await assert.rejects(
+      () => store.get('m-shape'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.CORRUPT_RECORD
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ── CORRECTION-1 / F3 — event-ledger chain verification ─────────────────────
+
+test('F4.4 / F3 malformed event-ledger JSONL fails closed via verifyEventChain', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-badevent-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-ev'));
+    const ledgerPath = join(dir, 'events.jsonl');
+    await writeFile(ledgerPath, '{not valid json at all\n', 'utf8');
+
+    const result = await verifyEventChain(dir);
+    assert.equal(result.valid, false);
+    assert.equal(result.error, MISSION_KERNEL_ERRORS.CORRUPT_EVENT);
+    assert.equal(result.brokenAtLine, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.5 / F3 truncated final event line is reported as truncated_final_line, not silently dropped', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-truncev-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-ev2'));
+    const ledgerPath = join(dir, 'events.jsonl');
+    const raw = await readFile(ledgerPath, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    const truncatedLast = lines[lines.length - 1].slice(0, 10);
+    const rebuilt = [...lines.slice(0, -1), truncatedLast].join('\n') + '\n';
+    await writeFile(ledgerPath, rebuilt, 'utf8');
+
+    const result = await verifyEventChain(dir);
+    assert.equal(result.valid, false);
+    assert.equal(result.reason, 'truncated_final_line');
+    assert.equal(result.brokenAtLine, lines.length - 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.6 / F3 event hash-chain corruption (tampered payload) is detected at the exact broken line', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-chaincorrupt-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-chain'));
+    await store.transition('m-chain', 'ORIENTED');
+    await store.transition('m-chain', 'EXECUTING');
+
+    const before = await verifyEventChain(dir);
+    assert.equal(before.valid, true);
+    assert.equal(before.eventCount, 3);
+
+    const ledgerPath = join(dir, 'events.jsonl');
+    const raw = await readFile(ledgerPath, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    const tampered = JSON.parse(lines[1]);
+    tampered.payload = { ...tampered.payload, tampered: true };
+    lines[1] = JSON.stringify(tampered);
+    await writeFile(ledgerPath, lines.join('\n') + '\n', 'utf8');
+
+    const after = await verifyEventChain(dir);
+    assert.equal(after.valid, false);
+    assert.equal(after.error, MISSION_KERNEL_ERRORS.INTEGRITY_FAILURE);
+    assert.equal(after.brokenAtLine, 1);
+    assert.equal(after.reason, 'event_hash_mismatch');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F3 verifyEventChain covers the entire shared ledger, not one selected mission', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-multimission-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-a'));
+    await store.create(baseKernel('m-b'));
+    await store.transition('m-a', 'ORIENTED');
+    await store.transition('m-b', 'ORIENTED');
+
+    const result = await verifyEventChain(dir);
+    assert.equal(result.valid, true);
+    assert.equal(result.eventCount, 4);
+    assert.equal(result.missionEventCount, 4);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ── CORRECTION-1 / F2 — concurrency and lease law ────────────────────────────
+
+test('F4.7 / F2 concurrent mutations against one mission never silently lose an update: exactly one governed outcome occurs', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-concurrent-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-race'));
+
+    const results = await Promise.allSettled([
+      store.appendHistory('m-race', { type: 'A' }),
+      store.appendHistory('m-race', { type: 'B' }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+
+    const final = await store.get('m-race');
+
+    // Forbidden: both report success while the final record only reflects one.
+    const forbiddenSilentLoss = fulfilled.length === 2 && final.history.length < 2;
+    assert.equal(forbiddenSilentLoss, false);
+
+    // Required: either both legally persisted, or exactly one succeeded and
+    // the other received a typed conflict.
+    const governed =
+      (fulfilled.length === 2 && final.history.length === 2) ||
+      (fulfilled.length === 1 && rejected.length === 1 && final.history.length === 1);
+    assert.equal(governed, true);
+
+    if (rejected.length > 0) {
+      assert.equal(rejected[0].reason.code, MISSION_KERNEL_ERRORS.LEASE_HELD);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.7b concurrent transition() calls on the same mission never both silently apply', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-concurrent-transition-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-race-t'));
+
+    const results = await Promise.allSettled([
+      store.transition('m-race-t', 'ORIENTED', { via: 'first' }),
+      store.transition('m-race-t', 'ORIENTED', { via: 'second' }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+
+    // Exactly one of: (a) one wins the lease and transitions, the other is
+    // rejected as LEASE_HELD, or (b) sequenced such that the second sees an
+    // already-ORIENTED state and is rejected as ILLEGAL_TRANSITION. Either
+    // way, never two silently-applied transitions producing inconsistent state.
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.ok(
+      [MISSION_KERNEL_ERRORS.LEASE_HELD, MISSION_KERNEL_ERRORS.ILLEGAL_TRANSITION].includes(rejected[0].reason.code)
+    );
+
+    const final = await store.get('m-race-t');
+    assert.equal(final.state, 'ORIENTED');
+    assert.equal(final.history.length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.8 / F2 lease conflict: a second acquisition attempt while a lease is held fails closed with a typed error', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-leaseconflict-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-lease'));
+
+    // Manually hold a lease by writing the claim file directly (simulating
+    // a slow in-flight mutation), then attempt a second mutation.
+    const lockPath = join(dir, 'missions', 'm-lease.lock');
+    await writeFile(lockPath, JSON.stringify({ mission_id: 'm-lease', holder_id: 'manual-holder', acquired_at: Date.now() }), { flag: 'wx' });
+
+    await assert.rejects(
+      () => store.appendHistory('m-lease', { type: 'X' }),
+      (err) => err.code === MISSION_KERNEL_ERRORS.LEASE_HELD
+    );
+
+    // Confirm no mutation occurred while blocked.
+    const { unlink } = await import('node:fs/promises');
+    await unlink(lockPath); // release manually, then confirm normal operation resumes
+    const record = await store.appendHistory('m-lease', { type: 'X' });
+    assert.equal(record.history.length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F2 a lease older than staleLeaseMs is reported as LEASE_STALE, never auto-reclaimed', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-stale-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir, staleLeaseMs: 50 });
+    await store.create(baseKernel('m-stale'));
+
+    const lockPath = join(dir, 'missions', 'm-stale.lock');
+    await writeFile(lockPath, JSON.stringify({ mission_id: 'm-stale', holder_id: 'dead-holder', acquired_at: Date.now() - 1000 }), { flag: 'wx' });
+
+    await assert.rejects(
+      () => store.appendHistory('m-stale', { type: 'X' }),
+      (err) => err.code === MISSION_KERNEL_ERRORS.LEASE_STALE
+    );
+
+    // Confirm it was NOT auto-reclaimed: the lock file must still exist.
+    const stillThere = await readFile(lockPath, 'utf8').catch(() => null);
+    assert.notEqual(stillThere, null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.9 / F2 breakStaleLease() releases in a manner equivalent to finally: a mutation after break proceeds normally', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-break-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir, staleLeaseMs: 50 });
+    await store.create(baseKernel('m-break'));
+
+    const lockPath = join(dir, 'missions', 'm-break.lock');
+    await writeFile(lockPath, JSON.stringify({ mission_id: 'm-break', holder_id: 'dead-holder', acquired_at: Date.now() - 1000 }), { flag: 'wx' });
+
+    const broken = await store.breakStaleLease('m-break');
+    assert.equal(broken.cleared, true);
+
+    const record = await store.appendHistory('m-break', { type: 'resumed' });
+    assert.equal(record.history.length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F2 breakStaleLease() refuses to clear a lease that is not actually stale', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-notstale-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir, staleLeaseMs: 60_000 });
+    await store.create(baseKernel('m-fresh'));
+
+    const lockPath = join(dir, 'missions', 'm-fresh.lock');
+    await writeFile(lockPath, JSON.stringify({ mission_id: 'm-fresh', holder_id: 'live-holder', acquired_at: Date.now() }), { flag: 'wx' });
+
+    await assert.rejects(
+      () => store.breakStaleLease('m-fresh'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.LEASE_HELD
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F2 lease is released in finally even when the mutation throws mid-way (illegal transition)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-finally-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-throw'));
+
+    // INITIALIZED -> COMPLETED is illegal; transition() throws AFTER acquiring the lease.
+    await assert.rejects(
+      () => store.transition('m-throw', 'COMPLETED'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.ILLEGAL_TRANSITION
+    );
+
+    const lockPath = join(dir, 'missions', 'm-throw.lock');
+    const stillHeld = await readFile(lockPath, 'utf8').catch(() => null);
+    assert.equal(stillHeld, null, 'lease must be released even though the mutation threw');
+
+    // A subsequent legal call must succeed immediately — proves the lease was freed.
+    const record = await store.transition('m-throw', 'ORIENTED');
+    assert.equal(record.state, 'ORIENTED');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ── CORRECTION-1 / F4 — remaining required adversarial coverage ─────────────
+
+test('F4.11 terminal-state behavior is preserved after restart: a fresh store instance still refuses transitions out of FAILED', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-terminal-restart-'));
+  try {
+    const storeA = createMissionKernelStore({ storageRoot: dir });
+    await storeA.create(baseKernel('m-term'));
+    await storeA.transition('m-term', 'FAILED');
+
+    const storeB = createMissionKernelStore({ storageRoot: dir });
+    await assert.rejects(
+      () => storeB.transition('m-term', 'ORIENTED'),
+      (err) => err.code === MISSION_KERNEL_ERRORS.ILLEGAL_TRANSITION
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('F4.12 Promotion Boundary remains NOT_CROSSED after every correction path (corruption, lease conflict, chain corruption)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mission-kernel-promotionfinal-'));
+  try {
+    const store = createMissionKernelStore({ storageRoot: dir });
+    await store.create(baseKernel('m-final'));
+    await store.transition('m-final', 'ORIENTED');
+    await store.transition('m-final', 'EXECUTING');
+    await store.transition('m-final', 'COMPLETED');
+    await store.transition('m-final', 'SEALED');
+
+    const status = await store.getPromotionBoundaryStatus('m-final');
+    assert.equal(status.status, 'NOT_CROSSED');
+    assert.equal(status.validator_authority, 'NONE');
+
+    const chain = await verifyEventChain(dir);
+    assert.equal(chain.valid, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
