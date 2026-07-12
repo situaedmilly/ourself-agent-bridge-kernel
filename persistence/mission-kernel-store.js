@@ -70,6 +70,7 @@ import {
   eventsLedgerPath,
 } from './pending-proposals.js';
 import { canonicalHash } from './canonical-json.js';
+import { PROMOTION_BOUNDARY } from 'self-protocol-suite';
 
 export const MISSION_KERNEL_VERSION = 'ourself.mission-kernel.v0';
 export const MISSION_EVENT_VERSION = 'ourself.mission-kernel-event.v0';
@@ -629,8 +630,7 @@ export function createMissionKernelStore(options) {
     const current = await get(missionId);
     if (current === null) throw fail(MISSION_KERNEL_ERRORS.MISSION_NOT_FOUND);
     return {
-      status: 'NOT_CROSSED',
-      validator_authority: 'NONE',
+      ...PROMOTION_BOUNDARY,
       evidence_state: current.promotion_boundary?.evidence_state ?? 'UNREPORTED',
       reason: 'Explicit human authorization is required for promotion.',
     };
