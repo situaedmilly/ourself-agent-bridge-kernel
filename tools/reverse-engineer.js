@@ -266,16 +266,17 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
 
   // ── Derived summary ─────────────────────────────────────────────────────────
   const fileSet = new Set(files);
-  const has = (name) => fileSet.has(name);
+  const rootIdentitySet = new Set(rootIdentity);
+  const has = (name) => rootIdentitySet.has(name) || fileSet.has(name);
 
   let project_type = 'unknown';
-  if (has('package.json')) project_type = 'node';
-  else if (has('go.mod')) project_type = 'go';
-  else if (has('Cargo.toml')) project_type = 'rust';
-  else if (has('pyproject.toml') || has('requirements.txt') || has('setup.py')) project_type = 'python';
-  else if (has('pom.xml') || has('build.gradle')) project_type = 'java';
-  else if (has('Gemfile')) project_type = 'ruby';
-  else if (has('composer.json')) project_type = 'php';
+  if (rootIdentitySet.has('package.json')) project_type = 'node';
+  else if (rootIdentitySet.has('go.mod')) project_type = 'go';
+  else if (rootIdentitySet.has('Cargo.toml')) project_type = 'rust';
+  else if (rootIdentitySet.has('pyproject.toml') || rootIdentitySet.has('requirements.txt') || rootIdentitySet.has('setup.py')) project_type = 'python';
+  else if (rootIdentitySet.has('pom.xml') || rootIdentitySet.has('build.gradle')) project_type = 'java';
+  else if (rootIdentitySet.has('Gemfile')) project_type = 'ruby';
+  else if (rootIdentitySet.has('composer.json')) project_type = 'php';
 
   const primary_languages = [...langCount.entries()]
     .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l]) => l);

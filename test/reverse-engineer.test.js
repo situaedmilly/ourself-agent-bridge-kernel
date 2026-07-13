@@ -13,6 +13,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 
 import { startBridge, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from '../tools/reverse-engineer.js';
@@ -128,27 +131,60 @@ test('analyzeTarget never reads secret file contents — secret files surface as
   assert.ok(!a.structure.files.some(f => /(^|\/)\.env(\.|$)/.test(f)), '.env must not be listed');
 });
 
-test('canonical observation is invariant under ignored scratch artifacts', () => {
-  // Analyze agent-bridge twice: once baseline, once simulated with ignored extras.
-  // (This would need a separate fixture with ignored noise; for now test that the
-  // git codepath is deterministic by running the same analysis twice.)
-  const a1 = analyzeTarget(BRIDGE_DIR, 're-inv-1');
-  const a2 = analyzeTarget(BRIDGE_DIR, 're-inv-2');
+test('canonical observation is invariant under ignored scratch artifacts', async () => {
+  // Create a temporary Git repository INSIDE RUORA boundary with package.json and source files
+  await mkdir(join(BRIDGE_DIR, '.claude'), { recursive: true });
+  const tempDir = await mkdtemp(join(BRIDGE_DIR, '.claude', 'canonical-test-'));
+  try {
+    // Initialize Git repo and create .gitignore
+    execSync('git init', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'pipe' });
+    await writeFile(join(tempDir, '.gitignore'), '.claude/\n.cache/\n', 'utf8');
 
-  // Canonical projections must be identical
-  assert.equal(a1.summary.project_type, a2.summary.project_type);
-  assert.deepEqual(
-    a1.summary.primary_languages.sort(),
-    a2.summary.primary_languages.sort()
-  );
-  assert.deepEqual(
-    [...a1.signals.dependencies].sort(),
-    [...a2.signals.dependencies].sort()
-  );
-  assert.deepEqual(
-    [...a1.signals.routes].sort(),
-    [...a2.signals.routes].sort()
-  );
+    // Create package.json and a source file
+    await writeFile(join(tempDir, 'package.json'), JSON.stringify({
+      name: 'test-pkg',
+      version: '1.0.0',
+      dependencies: { express: '^4.0.0' }
+    }), 'utf8');
+    await writeFile(join(tempDir, 'index.js'), 'const express = require("express");\nconst app = express();', 'utf8');
+
+    // Commit tracked files
+    execSync('git add .gitignore package.json index.js', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+
+    // Analyze BEFORE injecting ignored files
+    const before = analyzeTarget(tempDir, 'inv-before');
+
+    // Inject a large ignored directory (exceeding MAX_ENTRIES) that sorts before package.json
+    const claudeDir = join(tempDir, '.claude');
+    await mkdir(claudeDir, { recursive: true });
+    for (let i = 0; i < 4500; i++) {
+      await writeFile(join(claudeDir, `ignored-${String(i).padStart(5, '0')}.txt`), 'x', 'utf8');
+    }
+
+    // Analyze AFTER injecting ignored files (same canonical state, different filesystem)
+    const after = analyzeTarget(tempDir, 'inv-after');
+
+    // Canonical projections must be identical
+    assert.equal(before.summary.project_type, after.summary.project_type, 'project_type must be preserved');
+    assert.equal(before.summary.project_type, 'node', 'project_type must be node (from package.json)');
+    assert.ok(before.signals.dependencies.includes('express'), 'dependencies must be detected');
+    assert.deepEqual(before.signals.dependencies, after.signals.dependencies, 'dependencies must be identical');
+
+    // Ignored files must not appear in either analysis
+    const hasIgnoredFiles = (a) => a.structure.files.some(f => f.includes('.claude'));
+    assert.ok(!hasIgnoredFiles(before), '.claude files must not appear before injection');
+    assert.ok(!hasIgnoredFiles(after), '.claude files must not appear after injection');
+
+    // package.json must appear in both (root identity preserved even under truncation)
+    assert.ok(before.structure.files.includes('package.json'), 'package.json must be in before');
+    assert.ok(after.structure.files.includes('package.json'), 'package.json must be in after');
+  } finally {
+    // Cleanup
+    execSync('rm -rf "' + tempDir + '"', { stdio: 'pipe' });
+  }
 });
 
 // ── HTTP route behavior on an isolated bridge (items 7-12) ────────────────────
