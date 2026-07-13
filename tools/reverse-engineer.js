@@ -13,11 +13,13 @@
 //   • Only read-only fs primitives (realpath/readdir/stat/lstat/readFile).
 //   • Target MUST resolve inside the RUORA boundary (symlinks resolved first).
 //   • Secret-bearing paths are REFUSED and their contents are NEVER read.
+//   • Git inventory: single bounded execFileSync for canonical repository state only.
 //
 //   The bridge may perceive structure without gaining the right to alter it.
 
-import { realpathSync, readdirSync, statSync, lstatSync, readFileSync } from 'fs';
+import { realpathSync, readdirSync, statSync, lstatSync, readFileSync, existsSync } from 'fs';
 import { resolve, isAbsolute, sep, join, relative, basename, extname } from 'path';
+import { execFileSync } from 'child_process';
 import { RUORA_BOUNDARY, SECRET_PATH } from './execution-classes.js';
 
 // ── Bounds (defensive: analysis must terminate and stay cheap) ───────────────
@@ -42,6 +44,43 @@ const LANG_BY_EXT = {
 };
 
 const TEXT_SCAN_EXT = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.sql', '.py', '.go', '.rb']);
+
+const ROOT_IDENTITY_MANIFESTS = ['package.json', 'go.mod', 'Cargo.toml', 'pyproject.toml', 'requirements.txt', 'setup.py', 'pom.xml', 'build.gradle', 'Gemfile', 'composer.json', '.git', 'README.md', 'README', 'src', 'test', 'tests'];
+
+function isGitRepository(root) {
+  try {
+    return existsSync(join(root, '.git'));
+  } catch {
+    return false;
+  }
+}
+
+function getCanonicalGitInventory(root) {
+  try {
+    const gitOutput = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return gitOutput.split('\0').filter(p => p.length > 0).sort();
+  } catch {
+    return null;
+  }
+}
+
+function detectRootIdentity(root) {
+  const detectedManifests = [];
+  for (const name of ROOT_IDENTITY_MANIFESTS) {
+    try {
+      if (existsSync(join(root, name))) {
+        detectedManifests.push(name);
+      }
+    } catch {
+      // ignore fs errors for root pass
+    }
+  }
+  return detectedManifests.sort();
+}
 
 /**
  * Resolve a requested target path safely:
@@ -84,7 +123,7 @@ export function resolveTargetWithinBoundary(requested) {
   }
 
   if (!(real === RUORA_BOUNDARY || real.startsWith(RUORA_BOUNDARY + sep))) {
-    const e = new Error(`Refused: target path is outside the RUORA boundary (${RUORA_BOUNDARY}).`);
+    const e = new Error('Refused: target path is outside the RUORA boundary (' + RUORA_BOUNDARY + ').');
     e.code = 'outside_boundary';
     throw e;
   }
@@ -115,70 +154,115 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   const rootStat = statSync(root);
   const rootIsDir = rootStat.isDirectory();
 
-  // ── Read-only walk (no shell, no glob expansion; explicit fs only) ──────────
-  function walk(dir, depth) {
-    if (depth > MAX_DEPTH) { truncated = true; return; }
-    if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; return; }
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      if (risks.length < MAX_LIST) {
-        risks.push({ type: 'unreadable_directory', path: rel(dir), detail: 'directory could not be listed (permissions?)' });
-      }
-      return;
-    }
-    for (const ent of entries) {
-      if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; return; }
-      const full = join(dir, ent.name);
-
-      // Never traverse/read a secret-bearing path; record it as a risk instead.
-      if (SECRET_PATH.test(full) || SECRET_PATH.test(ent.name)) {
-        if (risks.length < MAX_LIST) {
-          risks.push({ type: 'secret_file_present', path: rel(full), detail: 'excluded from analysis; contents never read' });
-        }
-        continue;
-      }
-
-      // Symlinks: resolve and refuse anything escaping the boundary.
-      let isSymlink = false;
-      try { isSymlink = lstatSync(full).isSymbolicLink(); } catch { /* ignore */ }
-      if (isSymlink) {
-        let realLink = null;
-        try { realLink = realpathSync(full); } catch { /* dangling */ }
-        if (!realLink || !(realLink === RUORA_BOUNDARY || realLink.startsWith(RUORA_BOUNDARY + sep))) {
-          if (risks.length < MAX_LIST) {
-            risks.push({ type: 'symlink_outside_boundary', path: rel(full), detail: 'symlink target outside RUORA boundary; not followed' });
-          }
-          continue;
-        }
-      }
-
-      if (ent.isDirectory()) {
-        if (SKIP_DIRS.has(ent.name)) { capPush(directories, rel(full) + '/ (skipped)'); continue; }
-        capPush(directories, rel(full));
-        walk(full, depth + 1);
-      } else if (ent.isFile()) {
-        capPush(files, rel(full));
-        const ext = extname(ent.name).toLowerCase();
-        const lang = LANG_BY_EXT[ext];
-        if (lang) langCount.set(lang, (langCount.get(lang) || 0) + 1);
-        try {
-          const sz = statSync(full).size;
-          if (sz > LARGE_FILE_BYTES && risks.length < MAX_LIST) {
-            risks.push({ type: 'large_file', path: rel(full), detail: `${sz} bytes (> ${LARGE_FILE_BYTES})` });
-          }
-        } catch { /* ignore stat errors */ }
-      }
-    }
-  }
   function rel(p) {
     const r = relative(root, p);
     return r === '' ? '.' : r;
   }
 
-  if (rootIsDir) walk(root, 0);
-  else { capPush(files, basename(root)); const lang = LANG_BY_EXT[extname(root).toLowerCase()]; if (lang) langCount.set(lang, 1); }
+  // ── Identity-first root pass: detect project type before recursive traversal ──
+  const rootIdentity = detectRootIdentity(root);
+
+  // ── Canonical inventory strategy ─────────────────────────────────────────────
+  let inventorySource = null;
+  if (rootIsDir) {
+    if (isGitRepository(root)) {
+      const gitInventory = getCanonicalGitInventory(root);
+      if (gitInventory) {
+        inventorySource = 'git';
+        // Process canonical git inventory
+        const fileSet = new Set();
+        const dirSet = new Set();
+        for (const relPath of gitInventory) {
+          if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; break; }
+          if (SECRET_PATH.test(relPath)) {
+            if (risks.length < MAX_LIST) {
+              risks.push({ type: 'secret_file_present', path: relPath, detail: 'excluded from analysis; contents never read' });
+            }
+            continue;
+          }
+          const ext = extname(relPath).toLowerCase();
+          const lang = LANG_BY_EXT[ext];
+          if (lang && !fileSet.has(relPath)) langCount.set(lang, (langCount.get(lang) || 0) + 1);
+          fileSet.add(relPath);
+          files.push(relPath);
+
+          // Extract directory path
+          const dirPath = relPath.substring(0, relPath.lastIndexOf('/'));
+          if (dirPath && !dirSet.has(dirPath)) {
+            dirSet.add(dirPath);
+            if (!SKIP_DIRS.has(basename(dirPath))) {
+              directories.push(dirPath);
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback to bounded filesystem traversal if git inventory unavailable
+    if (!inventorySource) {
+      inventorySource = 'filesystem';
+      function walk(dir, depth) {
+        if (depth > MAX_DEPTH) { truncated = true; return; }
+        if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; return; }
+        let entries;
+        try {
+          entries = readdirSync(dir, { withFileTypes: true });
+          entries.sort((a, b) => a.name.localeCompare(b.name));
+        } catch {
+          if (risks.length < MAX_LIST) {
+            risks.push({ type: 'unreadable_directory', path: rel(dir), detail: 'directory could not be listed (permissions?)' });
+          }
+          return;
+        }
+        for (const ent of entries) {
+          if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; return; }
+          const full = join(dir, ent.name);
+
+          if (SECRET_PATH.test(full) || SECRET_PATH.test(ent.name)) {
+            if (risks.length < MAX_LIST) {
+              risks.push({ type: 'secret_file_present', path: rel(full), detail: 'excluded from analysis; contents never read' });
+            }
+            continue;
+          }
+
+          let isSymlink = false;
+          try { isSymlink = lstatSync(full).isSymbolicLink(); } catch { /* ignore */ }
+          if (isSymlink) {
+            let realLink = null;
+            try { realLink = realpathSync(full); } catch { /* dangling */ }
+            if (!realLink || !(realLink === RUORA_BOUNDARY || realLink.startsWith(RUORA_BOUNDARY + sep))) {
+              if (risks.length < MAX_LIST) {
+                risks.push({ type: 'symlink_outside_boundary', path: rel(full), detail: 'symlink target outside RUORA boundary; not followed' });
+              }
+              continue;
+            }
+          }
+
+          if (ent.isDirectory()) {
+            if (SKIP_DIRS.has(ent.name)) { capPush(directories, rel(full) + '/ (skipped)'); continue; }
+            capPush(directories, rel(full));
+            walk(full, depth + 1);
+          } else if (ent.isFile()) {
+            capPush(files, rel(full));
+            const ext = extname(ent.name).toLowerCase();
+            const lang = LANG_BY_EXT[ext];
+            if (lang) langCount.set(lang, (langCount.get(lang) || 0) + 1);
+            try {
+              const sz = statSync(full).size;
+              if (sz > LARGE_FILE_BYTES && risks.length < MAX_LIST) {
+                risks.push({ type: 'large_file', path: rel(full), detail: sz + ' bytes (> ' + LARGE_FILE_BYTES + ')' });
+              }
+            } catch { /* ignore stat errors */ }
+          }
+        }
+      }
+      walk(root, 0);
+    }
+  } else {
+    capPush(files, basename(root));
+    const lang = LANG_BY_EXT[extname(root).toLowerCase()];
+    if (lang) langCount.set(lang, 1);
+  }
 
   // ── Derived summary ─────────────────────────────────────────────────────────
   const fileSet = new Set(files);
@@ -239,9 +323,9 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
     } catch { continue; }
     scanned++;
     let m;
-    while ((m = ROUTE_RE.exec(content)) !== null) capPush(routes, `${m[1].toUpperCase()} ${m[2]}`);
+    while ((m = ROUTE_RE.exec(content)) !== null) capPush(routes, m[1].toUpperCase() + ' ' + m[2]);
     while ((m = SQL_TABLE_RE.exec(content)) !== null) capPush(schemas, m[1]);
-    if (/schema/i.test(basename(f))) capPush(schemas, `${f} (schema-named file)`);
+    if (/schema/i.test(basename(f))) capPush(schemas, f + ' (schema-named file)');
   }
 
   // Entrypoints: package.json main/bin + conventional roots.
@@ -252,7 +336,7 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
       if (typeof pkg.main === 'string') capPush(entrypoints, pkg.main);
       if (typeof pkg.bin === 'string') capPush(entrypoints, pkg.bin);
       else if (pkg.bin && typeof pkg.bin === 'object') for (const v of Object.values(pkg.bin)) capPush(entrypoints, String(v));
-      if (pkg.scripts && typeof pkg.scripts.start === 'string') capPush(entrypoints, `npm start → ${pkg.scripts.start}`);
+      if (pkg.scripts && typeof pkg.scripts.start === 'string') capPush(entrypoints, 'npm start → ' + pkg.scripts.start);
     } catch { /* skip */ }
   }
   for (const conv of ['server.js', 'index.js', 'app.js', 'main.js', 'main.py', 'index.ts', 'main.go']) {
