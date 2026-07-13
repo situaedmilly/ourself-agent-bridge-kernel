@@ -131,58 +131,94 @@ test('analyzeTarget never reads secret file contents — secret files surface as
   assert.ok(!a.structure.files.some(f => /(^|\/)\.env(\.|$)/.test(f)), '.env must not be listed');
 });
 
-test('canonical observation is invariant under ignored scratch artifacts', async () => {
-  // Create a temporary Git repository INSIDE RUORA boundary with package.json and source files
+test('canonical observation is invariant under ignored scratch artifacts (Git mode)', async () => {
+  // Test Git inventory: ignored files never consumed observation budget
   await mkdir(join(BRIDGE_DIR, '.claude'), { recursive: true });
-  const tempDir = await mkdtemp(join(BRIDGE_DIR, '.claude', 'canonical-test-'));
+  const tempDir = await mkdtemp(join(BRIDGE_DIR, '.claude', 'canonical-git-'));
   try {
-    // Initialize Git repo and create .gitignore
     execSync('git init', { cwd: tempDir, stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'pipe' });
-    execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'pipe' });
-    await writeFile(join(tempDir, '.gitignore'), '.claude/\n.cache/\n', 'utf8');
+    execSync('git config user.email "t@t.com"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.name "T"', { cwd: tempDir, stdio: 'pipe' });
 
-    // Create package.json and a source file
+    // Create tracked files
+    await writeFile(join(tempDir, '.gitignore'), '.cache/\n.claude/\n', 'utf8');
     await writeFile(join(tempDir, 'package.json'), JSON.stringify({
-      name: 'test-pkg',
-      version: '1.0.0',
-      dependencies: { express: '^4.0.0' }
+      name: 'test', version: '1.0.0', dependencies: { express: '1' }
     }), 'utf8');
-    await writeFile(join(tempDir, 'index.js'), 'const express = require("express");\nconst app = express();', 'utf8');
+    await writeFile(join(tempDir, 'index.js'), 'app.get("/", () => {})', 'utf8');
+    execSync('git add . && git commit -m "i"', { cwd: tempDir, stdio: 'pipe' });
 
-    // Commit tracked files
-    execSync('git add .gitignore package.json index.js', { cwd: tempDir, stdio: 'pipe' });
-    execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' });
+    const before = analyzeTarget(tempDir, 'inv-git-before');
 
-    // Analyze BEFORE injecting ignored files
-    const before = analyzeTarget(tempDir, 'inv-before');
-
-    // Inject a large ignored directory (exceeding MAX_ENTRIES) that sorts before package.json
-    const claudeDir = join(tempDir, '.claude');
-    await mkdir(claudeDir, { recursive: true });
-    for (let i = 0; i < 4500; i++) {
-      await writeFile(join(claudeDir, `ignored-${String(i).padStart(5, '0')}.txt`), 'x', 'utf8');
+    // Inject ignored files that sort before package.json and exceed MAX_ENTRIES
+    const cacheDir = join(tempDir, '.cache');
+    await mkdir(cacheDir, { recursive: true });
+    for (let i = 0; i < 5000; i++) {
+      await writeFile(join(cacheDir, `file-${String(i).padStart(5, '0')}.txt`), 'x', 'utf8');
     }
 
-    // Analyze AFTER injecting ignored files (same canonical state, different filesystem)
-    const after = analyzeTarget(tempDir, 'inv-after');
+    const after = analyzeTarget(tempDir, 'inv-git-after');
 
-    // Canonical projections must be identical
-    assert.equal(before.summary.project_type, after.summary.project_type, 'project_type must be preserved');
-    assert.equal(before.summary.project_type, 'node', 'project_type must be node (from package.json)');
-    assert.ok(before.signals.dependencies.includes('express'), 'dependencies must be detected');
-    assert.deepEqual(before.signals.dependencies, after.signals.dependencies, 'dependencies must be identical');
+    // All 7 canonical projections must be identical
+    assert.equal(before.summary.project_type, 'node', 'project type detected');
+    assert.deepEqual(before.summary.project_type, after.summary.project_type, 'project_type');
+    assert.deepEqual(before.summary.primary_languages.sort(), after.summary.primary_languages.sort(), 'primary_languages');
+    assert.deepEqual(before.signals.dependencies.sort(), after.signals.dependencies.sort(), 'dependencies');
+    assert.deepEqual(before.signals.routes.sort(), after.signals.routes.sort(), 'routes');
+    assert.deepEqual(before.signals.schemas.sort(), after.signals.schemas.sort(), 'schemas');
+    assert.deepEqual(before.signals.workflows.sort(), after.signals.workflows.sort(), 'workflows');
+    assert.deepEqual(before.summary.entrypoints.sort(), after.summary.entrypoints.sort(), 'entrypoints');
 
-    // Ignored files must not appear in either analysis
-    const hasIgnoredFiles = (a) => a.structure.files.some(f => f.includes('.claude'));
-    assert.ok(!hasIgnoredFiles(before), '.claude files must not appear before injection');
-    assert.ok(!hasIgnoredFiles(after), '.claude files must not appear after injection');
+    // Ignored content never appears (files or directories)
+    const hasIgnored = (a) => a.structure.files.some(f => f.includes('.cache')) || a.structure.directories.some(d => d.includes('.cache'));
+    assert.ok(!hasIgnored(before), 'ignored before');
+    assert.ok(!hasIgnored(after), 'ignored after');
 
-    // package.json must appear in both (root identity preserved even under truncation)
-    assert.ok(before.structure.files.includes('package.json'), 'package.json must be in before');
-    assert.ok(after.structure.files.includes('package.json'), 'package.json must be in after');
+    // Sorted normalization check
+    assert.deepEqual(after.structure.files, [...after.structure.files].sort(), 'files are sorted');
+    assert.deepEqual(after.signals.dependencies, [...after.signals.dependencies].sort(), 'dependencies are sorted');
   } finally {
-    // Cleanup
+    execSync('rm -rf "' + tempDir + '"', { stdio: 'pipe' });
+  }
+});
+
+test('canonical observation with meaningful tracked changes (Git mode)', async () => {
+  // Test that meaningful changes to tracked files are detected
+  await mkdir(join(BRIDGE_DIR, '.claude'), { recursive: true });
+  const tempDir = await mkdtemp(join(BRIDGE_DIR, '.claude', 'canonical-tracked-'));
+  try {
+    execSync('git init', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.email "t@t.com"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.name "T"', { cwd: tempDir, stdio: 'pipe' });
+
+    // Create initial tracked files
+    await writeFile(join(tempDir, '.gitignore'), '.cache/\n', 'utf8');
+    await writeFile(join(tempDir, 'package.json'), JSON.stringify({
+      name: 'test', version: '1.0.0', dependencies: { axios: '1' }
+    }), 'utf8');
+    await writeFile(join(tempDir, 'index.js'), 'const app = require("express")();', 'utf8');
+    execSync('git add . && git commit -m "i"', { cwd: tempDir, stdio: 'pipe' });
+
+    const baseline = analyzeTarget(tempDir, 'tracked-baseline');
+    assert.equal(baseline.summary.project_type, 'node', 'detects project type');
+    assert.ok(baseline.signals.dependencies.includes('axios'), 'tracks dependencies');
+
+    // Make a meaningful tracked change: modify package.json
+    const pkg = JSON.parse(readFileSync(join(tempDir, 'package.json'), 'utf8'));
+    pkg.dependencies.lodash = '1';
+    await writeFile(join(tempDir, 'package.json'), JSON.stringify(pkg), 'utf8');
+    execSync('git add package.json && git commit -m "add lodash"', { cwd: tempDir, stdio: 'pipe' });
+
+    const updated = analyzeTarget(tempDir, 'tracked-updated');
+
+    // Updated analysis must reflect the tracked change
+    assert.ok(updated.signals.dependencies.includes('lodash'), 'new dependency detected');
+    assert.ok(!baseline.signals.dependencies.includes('lodash'), 'baseline lacked new dependency');
+    assert.ok(updated.signals.dependencies.includes('axios'), 'original dependency preserved');
+
+    // Sort order maintained
+    assert.deepEqual(updated.signals.dependencies, [...updated.signals.dependencies].sort(), 'dependencies sorted');
+  } finally {
     execSync('rm -rf "' + tempDir + '"', { stdio: 'pipe' });
   }
 });

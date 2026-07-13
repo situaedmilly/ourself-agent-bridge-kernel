@@ -159,9 +159,6 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
     return r === '' ? '.' : r;
   }
 
-  // ── Identity-first root pass: detect project type before recursive traversal ──
-  const rootIdentity = detectRootIdentity(root);
-
   // ── Canonical inventory strategy ─────────────────────────────────────────────
   let inventorySource = null;
   if (rootIsDir) {
@@ -180,6 +177,23 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
             }
             continue;
           }
+
+          // Validate path stays within boundary (check for symlinks escaping)
+          const fullPath = join(root, relPath);
+          let realPath = fullPath;
+          try {
+            const stat = lstatSync(fullPath);
+            if (stat.isSymbolicLink()) {
+              realPath = realpathSync(fullPath);
+              if (!(realPath === RUORA_BOUNDARY || realPath.startsWith(RUORA_BOUNDARY + sep))) {
+                if (risks.length < MAX_LIST) {
+                  risks.push({ type: 'symlink_outside_boundary', path: relPath, detail: 'symlink target outside RUORA boundary; not followed' });
+                }
+                continue;
+              }
+            }
+          } catch { /* ignore stat/realpath errors; continue */ }
+
           const ext = extname(relPath).toLowerCase();
           const lang = LANG_BY_EXT[ext];
           if (lang && !fileSet.has(relPath)) langCount.set(lang, (langCount.get(lang) || 0) + 1);
@@ -266,20 +280,19 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
 
   // ── Derived summary ─────────────────────────────────────────────────────────
   const fileSet = new Set(files);
-  const rootIdentitySet = new Set(rootIdentity);
-  const has = (name) => rootIdentitySet.has(name) || fileSet.has(name);
+  const has = (name) => fileSet.has(name);
 
   let project_type = 'unknown';
-  if (rootIdentitySet.has('package.json')) project_type = 'node';
-  else if (rootIdentitySet.has('go.mod')) project_type = 'go';
-  else if (rootIdentitySet.has('Cargo.toml')) project_type = 'rust';
-  else if (rootIdentitySet.has('pyproject.toml') || rootIdentitySet.has('requirements.txt') || rootIdentitySet.has('setup.py')) project_type = 'python';
-  else if (rootIdentitySet.has('pom.xml') || rootIdentitySet.has('build.gradle')) project_type = 'java';
-  else if (rootIdentitySet.has('Gemfile')) project_type = 'ruby';
-  else if (rootIdentitySet.has('composer.json')) project_type = 'php';
+  if (has('package.json')) project_type = 'node';
+  else if (has('go.mod')) project_type = 'go';
+  else if (has('Cargo.toml')) project_type = 'rust';
+  else if (has('pyproject.toml') || has('requirements.txt') || has('setup.py')) project_type = 'python';
+  else if (has('pom.xml') || has('build.gradle')) project_type = 'java';
+  else if (has('Gemfile')) project_type = 'ruby';
+  else if (has('composer.json')) project_type = 'php';
 
   const primary_languages = [...langCount.entries()]
-    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l]) => l);
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([l]) => l);
 
   const test_files = files.filter(f =>
     /(^|\/)(test|tests|__tests__)\//.test(f) || /\.(test|spec)\.[a-z]+$/.test(f)
@@ -362,19 +375,19 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
     summary: {
       project_type,
       primary_languages,
-      entrypoints: entrypoints.slice(0, MAX_LIST),
+      entrypoints: entrypoints.slice(0, MAX_LIST).sort(),
       test_files,
       config_files,
     },
     structure: {
-      directories: directories.slice(0, MAX_ENTRIES),
-      files: files.slice(0, MAX_ENTRIES),
+      directories: directories.slice(0, MAX_ENTRIES).sort(),
+      files: files.slice(0, MAX_ENTRIES).sort(),
     },
     signals: {
-      routes: routes.slice(0, MAX_LIST),
-      schemas: schemas.slice(0, MAX_LIST),
-      workflows: workflows.slice(0, MAX_LIST),
-      dependencies: dependencies.slice(0, MAX_LIST),
+      routes: routes.slice(0, MAX_LIST).sort(),
+      schemas: schemas.slice(0, MAX_LIST).sort(),
+      workflows: workflows.slice(0, MAX_LIST).sort(),
+      dependencies: dependencies.slice(0, MAX_LIST).sort(),
     },
     risks: risks.slice(0, MAX_LIST),
     non_actions: [
