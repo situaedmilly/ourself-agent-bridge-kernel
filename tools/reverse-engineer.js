@@ -68,18 +68,30 @@ function getCanonicalGitInventory(root) {
   }
 }
 
-function detectRootIdentity(root) {
-  const detectedManifests = [];
+function deriveRootIdentityFromInventory(canonicalPaths) {
+  const rootIdentity = [];
   for (const name of ROOT_IDENTITY_MANIFESTS) {
-    try {
-      if (existsSync(join(root, name))) {
-        detectedManifests.push(name);
-      }
-    } catch {
-      // ignore fs errors for root pass
+    if (canonicalPaths.includes(name)) {
+      rootIdentity.push(name);
     }
   }
-  return detectedManifests.sort();
+  return rootIdentity;
+}
+
+function validateAndResolvePath(root, relPath) {
+  const fullPath = join(root, relPath);
+  try {
+    const stat = lstatSync(fullPath);
+    if (stat.isSymbolicLink()) {
+      const realPath = realpathSync(fullPath);
+      if (!(realPath === RUORA_BOUNDARY || realPath.startsWith(RUORA_BOUNDARY + sep))) {
+        return { valid: false, reason: 'symlink_outside_boundary' };
+      }
+    }
+    return { valid: true, resolvedPath: fullPath };
+  } catch {
+    return { valid: false, reason: 'unresolvable' };
+  }
 }
 
 /**
@@ -160,15 +172,26 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   }
 
   // ── Canonical inventory strategy ─────────────────────────────────────────────
-  let inventorySource = null;
+  let project_type = 'unknown';
+  let canonicalInventory = [];
+
   if (rootIsDir) {
     if (isGitRepository(root)) {
       const gitInventory = getCanonicalGitInventory(root);
       if (gitInventory) {
-        inventorySource = 'git';
-        // Process canonical git inventory
-        const fileSet = new Set();
-        const dirSet = new Set();
+        canonicalInventory = gitInventory;
+
+        // Derive root identity from COMPLETE uncapped inventory
+        const rootIdentity = deriveRootIdentityFromInventory(gitInventory);
+        if (rootIdentity.includes('package.json')) project_type = 'node';
+        else if (rootIdentity.includes('go.mod')) project_type = 'go';
+        else if (rootIdentity.includes('Cargo.toml')) project_type = 'rust';
+        else if (rootIdentity.includes('pyproject.toml') || rootIdentity.includes('requirements.txt') || rootIdentity.includes('setup.py')) project_type = 'python';
+        else if (rootIdentity.includes('pom.xml') || rootIdentity.includes('build.gradle')) project_type = 'java';
+        else if (rootIdentity.includes('Gemfile')) project_type = 'ruby';
+        else if (rootIdentity.includes('composer.json')) project_type = 'php';
+
+        // Process bounded evidence from canonical inventory
         for (const relPath of gitInventory) {
           if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; break; }
           if (SECRET_PATH.test(relPath)) {
@@ -178,32 +201,23 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
             continue;
           }
 
-          // Validate path stays within boundary (check for symlinks escaping)
-          const fullPath = join(root, relPath);
-          let realPath = fullPath;
-          try {
-            const stat = lstatSync(fullPath);
-            if (stat.isSymbolicLink()) {
-              realPath = realpathSync(fullPath);
-              if (!(realPath === RUORA_BOUNDARY || realPath.startsWith(RUORA_BOUNDARY + sep))) {
-                if (risks.length < MAX_LIST) {
-                  risks.push({ type: 'symlink_outside_boundary', path: relPath, detail: 'symlink target outside RUORA boundary; not followed' });
-                }
-                continue;
-              }
+          // Validate path before processing
+          const validation = validateAndResolvePath(root, relPath);
+          if (!validation.valid) {
+            if (validation.reason === 'symlink_outside_boundary' && risks.length < MAX_LIST) {
+              risks.push({ type: 'symlink_outside_boundary', path: relPath, detail: 'symlink target outside RUORA boundary; not followed' });
             }
-          } catch { /* ignore stat/realpath errors; continue */ }
+            continue;
+          }
 
           const ext = extname(relPath).toLowerCase();
           const lang = LANG_BY_EXT[ext];
-          if (lang && !fileSet.has(relPath)) langCount.set(lang, (langCount.get(lang) || 0) + 1);
-          fileSet.add(relPath);
+          if (lang) langCount.set(lang, (langCount.get(lang) || 0) + 1);
           files.push(relPath);
 
           // Extract directory path
           const dirPath = relPath.substring(0, relPath.lastIndexOf('/'));
-          if (dirPath && !dirSet.has(dirPath)) {
-            dirSet.add(dirPath);
+          if (dirPath) {
             if (!SKIP_DIRS.has(basename(dirPath))) {
               directories.push(dirPath);
             }
@@ -213,8 +227,7 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
     }
 
     // Fallback to bounded filesystem traversal if git inventory unavailable
-    if (!inventorySource) {
-      inventorySource = 'filesystem';
+    if (canonicalInventory.length === 0) {
       function walk(dir, depth) {
         if (depth > MAX_DEPTH) { truncated = true; return; }
         if (directories.length + files.length >= MAX_ENTRIES) { truncated = true; return; }
@@ -282,14 +295,16 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   const fileSet = new Set(files);
   const has = (name) => fileSet.has(name);
 
-  let project_type = 'unknown';
-  if (has('package.json')) project_type = 'node';
-  else if (has('go.mod')) project_type = 'go';
-  else if (has('Cargo.toml')) project_type = 'rust';
-  else if (has('pyproject.toml') || has('requirements.txt') || has('setup.py')) project_type = 'python';
-  else if (has('pom.xml') || has('build.gradle')) project_type = 'java';
-  else if (has('Gemfile')) project_type = 'ruby';
-  else if (has('composer.json')) project_type = 'php';
+  // Derive project_type from bounded files list if not already set (non-Git fallback)
+  if (project_type === 'unknown') {
+    if (has('package.json')) project_type = 'node';
+    else if (has('go.mod')) project_type = 'go';
+    else if (has('Cargo.toml')) project_type = 'rust';
+    else if (has('pyproject.toml') || has('requirements.txt') || has('setup.py')) project_type = 'python';
+    else if (has('pom.xml') || has('build.gradle')) project_type = 'java';
+    else if (has('Gemfile')) project_type = 'ruby';
+    else if (has('composer.json')) project_type = 'php';
+  }
 
   const primary_languages = [...langCount.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([l]) => l);
@@ -329,6 +344,11 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   for (const f of files) {
     if (scanned >= MAX_CONTENT_SCAN_FILES) { truncated = true; break; }
     if (!TEXT_SCAN_EXT.has(extname(f).toLowerCase())) continue;
+
+    // Validate path before reading
+    const pathValidation = validateAndResolvePath(root, f);
+    if (!pathValidation.valid) continue;
+
     let content;
     try {
       const full = join(root, f);
@@ -346,11 +366,14 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   const entrypoints = [];
   if (has('package.json')) {
     try {
-      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8').slice(0, MAX_CONTENT_BYTES));
-      if (typeof pkg.main === 'string') capPush(entrypoints, pkg.main);
-      if (typeof pkg.bin === 'string') capPush(entrypoints, pkg.bin);
-      else if (pkg.bin && typeof pkg.bin === 'object') for (const v of Object.values(pkg.bin)) capPush(entrypoints, String(v));
-      if (pkg.scripts && typeof pkg.scripts.start === 'string') capPush(entrypoints, 'npm start → ' + pkg.scripts.start);
+      const pkgValidation = validateAndResolvePath(root, 'package.json');
+      if (pkgValidation.valid) {
+        const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8').slice(0, MAX_CONTENT_BYTES));
+        if (typeof pkg.main === 'string') capPush(entrypoints, pkg.main);
+        if (typeof pkg.bin === 'string') capPush(entrypoints, pkg.bin);
+        else if (pkg.bin && typeof pkg.bin === 'object') for (const v of Object.values(pkg.bin)) capPush(entrypoints, String(v));
+        if (pkg.scripts && typeof pkg.scripts.start === 'string') capPush(entrypoints, 'npm start → ' + pkg.scripts.start);
+      }
     } catch { /* skip */ }
   }
   for (const conv of ['server.js', 'index.js', 'app.js', 'main.js', 'main.py', 'index.ts', 'main.go']) {
