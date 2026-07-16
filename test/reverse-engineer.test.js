@@ -13,6 +13,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 
 import { startBridge, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from '../tools/reverse-engineer.js';
@@ -27,10 +30,22 @@ const CODE_ONLY = MODULE_SRC
   .replace(/(^|[^:])\/\/.*$/gm, '$1');      // line comments (leaves any `://`)
 
 // ── Source-level safety invariants (item 4 / no-mutation / no-remotes) ───────
-test('the analysis primitive contains NO shell / process / exec primitive', () => {
-  // child_process is the ONLY route to a shell in Node — its absence is airtight.
+test('the analysis primitive contains NO unbounded shell / process / exec primitives', () => {
+  // execFileSync is allowed ONLY for bounded git ls-files query.
+  // Shell interpolation, spawn, spawnSync, bare execSync, and raw execFile are forbidden.
   // (Bare `.exec(` is excluded: that is RegExp.prototype.exec, used for parsing.)
-  assert.doesNotMatch(CODE_ONLY, /child_process|executeCommand|\bspawnSync\b|\bspawn\s*\(|execSync|execFileSync|\bexecFile\s*\(/);
+  assert.doesNotMatch(CODE_ONLY, /\$\{|`.*\$\{|executeCommand|\bspawnSync\b|\bspawn\s*\(|\bexecSync\s*\(|execFile\s*\(/);
+
+  // Verify git ls-files invocation is bounded and is the ONLY execFileSync call
+  const gitCall = CODE_ONLY.match(/execFileSync\s*\(\s*['"`]git['"`]\s*,\s*\[\s*['"`]ls-files['"`]/);
+  assert.ok(gitCall, 'git ls-files invocation must exist with fixed arguments');
+
+  // Ensure no shell interpolation in git call
+  assert.doesNotMatch(CODE_ONLY, /execFileSync\s*\([^)]*\$\{|execFileSync\s*\([^)]*`/);
+
+  // Verify ONLY one execFileSync CALL (import doesn't count)
+  const allExecFileSyncCalls = CODE_ONLY.match(/execFileSync\s*\(/g) || [];
+  assert.equal(allExecFileSyncCalls.length, 1, 'exactly one execFileSync call (git ls-files only)');
 });
 
 test('the analysis primitive contains NO write / mutation fs primitive', () => {
@@ -114,6 +129,98 @@ test('analyzeTarget never reads secret file contents — secret files surface as
   // .env exists in the bridge repo; it must appear only as an excluded risk,
   // never in the file listing, and its contents are never read.
   assert.ok(!a.structure.files.some(f => /(^|\/)\.env(\.|$)/.test(f)), '.env must not be listed');
+});
+
+test('canonical observation is invariant under ignored scratch artifacts (Git mode)', async () => {
+  // Test Git inventory: ignored files never consumed observation budget
+  await mkdir(join(BRIDGE_DIR, '.claude'), { recursive: true });
+  const tempDir = await mkdtemp(join(BRIDGE_DIR, '.claude', 'canonical-git-'));
+  try {
+    execSync('git init', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.email "t@t.com"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.name "T"', { cwd: tempDir, stdio: 'pipe' });
+
+    // Create tracked files
+    await writeFile(join(tempDir, '.gitignore'), '.cache/\n.claude/\n', 'utf8');
+    await writeFile(join(tempDir, 'package.json'), JSON.stringify({
+      name: 'test', version: '1.0.0', dependencies: { express: '1' }
+    }), 'utf8');
+    await writeFile(join(tempDir, 'index.js'), 'app.get("/", () => {})', 'utf8');
+    execSync('git add . && git commit -m "i"', { cwd: tempDir, stdio: 'pipe' });
+
+    const before = analyzeTarget(tempDir, 'inv-git-before');
+
+    // Inject ignored files that sort before package.json and exceed MAX_ENTRIES
+    const cacheDir = join(tempDir, '.cache');
+    await mkdir(cacheDir, { recursive: true });
+    for (let i = 0; i < 5000; i++) {
+      await writeFile(join(cacheDir, `file-${String(i).padStart(5, '0')}.txt`), 'x', 'utf8');
+    }
+
+    const after = analyzeTarget(tempDir, 'inv-git-after');
+
+    // All 7 canonical projections must be identical
+    assert.equal(before.summary.project_type, 'node', 'project type detected');
+    assert.deepEqual(before.summary.project_type, after.summary.project_type, 'project_type');
+    assert.deepEqual(before.summary.primary_languages.sort(), after.summary.primary_languages.sort(), 'primary_languages');
+    assert.deepEqual(before.signals.dependencies.sort(), after.signals.dependencies.sort(), 'dependencies');
+    assert.deepEqual(before.signals.routes.sort(), after.signals.routes.sort(), 'routes');
+    assert.deepEqual(before.signals.schemas.sort(), after.signals.schemas.sort(), 'schemas');
+    assert.deepEqual(before.signals.workflows.sort(), after.signals.workflows.sort(), 'workflows');
+    assert.deepEqual(before.summary.entrypoints.sort(), after.summary.entrypoints.sort(), 'entrypoints');
+
+    // Ignored content never appears (files or directories)
+    const hasIgnored = (a) => a.structure.files.some(f => f.includes('.cache')) || a.structure.directories.some(d => d.includes('.cache'));
+    assert.ok(!hasIgnored(before), 'ignored before');
+    assert.ok(!hasIgnored(after), 'ignored after');
+
+    // Sorted normalization check
+    assert.deepEqual(after.structure.files, [...after.structure.files].sort(), 'files are sorted');
+    assert.deepEqual(after.signals.dependencies, [...after.signals.dependencies].sort(), 'dependencies are sorted');
+  } finally {
+    execSync('rm -rf "' + tempDir + '"', { stdio: 'pipe' });
+  }
+});
+
+test('canonical observation with meaningful tracked changes (Git mode)', async () => {
+  // Test that meaningful changes to tracked files are detected
+  await mkdir(join(BRIDGE_DIR, '.claude'), { recursive: true });
+  const tempDir = await mkdtemp(join(BRIDGE_DIR, '.claude', 'canonical-tracked-'));
+  try {
+    execSync('git init', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.email "t@t.com"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.name "T"', { cwd: tempDir, stdio: 'pipe' });
+
+    // Create initial tracked files
+    await writeFile(join(tempDir, '.gitignore'), '.cache/\n', 'utf8');
+    await writeFile(join(tempDir, 'package.json'), JSON.stringify({
+      name: 'test', version: '1.0.0', dependencies: { axios: '1' }
+    }), 'utf8');
+    await writeFile(join(tempDir, 'index.js'), 'const app = require("express")();', 'utf8');
+    execSync('git add . && git commit -m "i"', { cwd: tempDir, stdio: 'pipe' });
+
+    const baseline = analyzeTarget(tempDir, 'tracked-baseline');
+    assert.equal(baseline.summary.project_type, 'node', 'detects project type');
+    assert.ok(baseline.signals.dependencies.includes('axios'), 'tracks dependencies');
+
+    // Make a meaningful tracked change: modify package.json
+    const pkg = JSON.parse(readFileSync(join(tempDir, 'package.json'), 'utf8'));
+    pkg.dependencies.lodash = '1';
+    await writeFile(join(tempDir, 'package.json'), JSON.stringify(pkg), 'utf8');
+    execSync('git add package.json && git commit -m "add lodash"', { cwd: tempDir, stdio: 'pipe' });
+
+    const updated = analyzeTarget(tempDir, 'tracked-updated');
+
+    // Updated analysis must reflect the tracked change
+    assert.ok(updated.signals.dependencies.includes('lodash'), 'new dependency detected');
+    assert.ok(!baseline.signals.dependencies.includes('lodash'), 'baseline lacked new dependency');
+    assert.ok(updated.signals.dependencies.includes('axios'), 'original dependency preserved');
+
+    // Sort order maintained
+    assert.deepEqual(updated.signals.dependencies, [...updated.signals.dependencies].sort(), 'dependencies sorted');
+  } finally {
+    execSync('rm -rf "' + tempDir + '"', { stdio: 'pipe' });
+  }
 });
 
 // ── HTTP route behavior on an isolated bridge (items 7-12) ────────────────────
