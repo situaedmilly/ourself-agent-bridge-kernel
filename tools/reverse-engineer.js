@@ -16,7 +16,7 @@
 //
 //   The bridge may perceive structure without gaining the right to alter it.
 
-import { realpathSync, readdirSync, statSync, lstatSync, readFileSync } from 'fs';
+import { realpathSync, readdirSync, statSync, lstatSync, readFileSync, existsSync } from 'fs';
 import { resolve, isAbsolute, sep, join, relative, basename, extname } from 'path';
 import { RUORA_BOUNDARY, SECRET_PATH } from './execution-classes.js';
 
@@ -184,24 +184,55 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   const fileSet = new Set(files);
   const has = (name) => fileSet.has(name);
 
+  // Root-level project markers are checked directly against `root` — never via the
+  // capped, depth-first `files` array, which an unrelated large/deep subtree
+  // (sorted earlier in traversal order) can exhaust before the walk ever returns
+  // to the target's own root-level files.
+  const hasRootMarker = (name) => rootIsDir && existsSync(join(root, name));
+
   let project_type = 'unknown';
-  if (has('package.json')) project_type = 'node';
-  else if (has('go.mod')) project_type = 'go';
-  else if (has('Cargo.toml')) project_type = 'rust';
-  else if (has('pyproject.toml') || has('requirements.txt') || has('setup.py')) project_type = 'python';
-  else if (has('pom.xml') || has('build.gradle')) project_type = 'java';
-  else if (has('Gemfile')) project_type = 'ruby';
-  else if (has('composer.json')) project_type = 'php';
+  if (hasRootMarker('package.json')) project_type = 'node';
+  else if (hasRootMarker('go.mod')) project_type = 'go';
+  else if (hasRootMarker('Cargo.toml')) project_type = 'rust';
+  else if (hasRootMarker('pyproject.toml') || hasRootMarker('requirements.txt') || hasRootMarker('setup.py')) project_type = 'python';
+  else if (hasRootMarker('pom.xml') || hasRootMarker('build.gradle')) project_type = 'java';
+  else if (hasRootMarker('Gemfile')) project_type = 'ruby';
+  else if (hasRootMarker('composer.json')) project_type = 'php';
 
   const primary_languages = [...langCount.entries()]
     .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l]) => l);
 
-  const test_files = files.filter(f =>
-    /(^|\/)(test|tests|__tests__)\//.test(f) || /\.(test|spec)\.[a-z]+$/.test(f)
-  ).slice(0, MAX_LIST);
+  // Same root-identity principle as hasRootMarker: a canonical root-level file
+  // matching an existing predicate must not be lost merely because the capped,
+  // depth-first `files` array was exhausted by an unrelated subtree first. This
+  // performs one bounded, non-recursive listing of `root` itself — never a second
+  // recursive traversal — and merges any root-level match the capped walk missed.
+  function mergeRootLevelMatches(cappedList, rootNamePredicate) {
+    const merged = [...cappedList];
+    if (!rootIsDir) return merged.slice(0, MAX_LIST);
+    const seen = new Set(merged);
+    let rootEntries;
+    try { rootEntries = readdirSync(root, { withFileTypes: true }); } catch { rootEntries = []; }
+    for (const ent of rootEntries) {
+      if (!ent.isFile()) continue;
+      if (SECRET_PATH.test(ent.name)) continue; // defense in depth, mirrors the walk's own exclusion
+      if (!rootNamePredicate(ent.name)) continue;
+      if (!seen.has(ent.name)) { seen.add(ent.name); merged.push(ent.name); }
+    }
+    return merged.slice(0, MAX_LIST);
+  }
+
+  const TEST_FILE_NAME = /\.(test|spec)\.[a-z]+$/;
+  const test_files = mergeRootLevelMatches(
+    files.filter(f => /(^|\/)(test|tests|__tests__)\//.test(f) || TEST_FILE_NAME.test(f)),
+    (name) => TEST_FILE_NAME.test(name)
+  );
 
   const CONFIG_NAMES = /^(package\.json|package-lock\.json|tsconfig\.json|\.gitignore|\.eslintrc.*|\.prettierrc.*|.*\.config\.(js|ts|mjs|cjs)|dockerfile|docker-compose\.ya?ml|makefile|vite\.config\..*|webpack\.config\..*|go\.mod|cargo\.toml|pyproject\.toml|requirements\.txt)$/i;
-  const config_files = files.filter(f => CONFIG_NAMES.test(basename(f))).slice(0, MAX_LIST);
+  const config_files = mergeRootLevelMatches(
+    files.filter(f => CONFIG_NAMES.test(basename(f))),
+    (name) => CONFIG_NAMES.test(name)
+  );
 
   // ── Signals (bounded content scan — read-only) ──────────────────────────────
   const routes = [];
@@ -210,7 +241,7 @@ export function analyzeTarget(requestedPath, requestId = 'req') {
   const dependencies = [];
 
   // Dependencies from package.json (names only; never values/scripts secrets).
-  if (has('package.json')) {
+  if (hasRootMarker('package.json')) {
     try {
       const pkgRaw = readFileSync(join(root, 'package.json'), 'utf8').slice(0, MAX_CONTENT_BYTES);
       const pkg = JSON.parse(pkgRaw);
