@@ -185,10 +185,10 @@ test('3. normalizeFailureClass: generic nonzero exits map to NONZERO_EXIT_<n>; t
   assert.equal(normalizeFailureClass('directory-list.witness.v1', { failure_code: 'EXECUTION_SPAWN_FAILED', exit_code: null, stderr: '' }), null);
 });
 
-test('4. the witness-profile registry is frozen and holds exactly the two T-032 operations', () => {
+test('4. the witness-profile registry is frozen and holds exactly the three authorized operations', () => {
   assert.equal(Object.isFrozen(WITNESS_PROFILES), true);
   const ids = Object.keys(WITNESS_PROFILES);
-  assert.deepEqual(ids.sort(), ['directory-list.witness.v1', 'git-status-short.witness.v1']);
+  assert.deepEqual(ids.sort(), ['directory-list.witness.v1', 'git-add-status-short.witness.v1', 'git-status-short.witness.v1']);
   assert.equal(new Set(ids).size, ids.length, 'no duplicate profile ids');
   for (const p of Object.values(WITNESS_PROFILES)) {
     assert.equal(Object.isFrozen(p), true);

@@ -158,23 +158,50 @@ export const WITNESS_PROFILES = Object.freeze({
     applies: Object.freeze({ execution_class: 'inspect', executable: 'ls', argv: Object.freeze([]) }),
     observation: Object.freeze({ executable: 'ls', argv: Object.freeze([]) }),
   }),
+  // SL-008A. Bounded prefix match ONLY: ['add', '--', <exactly one sealed
+  // path>] — no additional arguments, no flags after `--`. The third argv
+  // element is never compared here; by construction
+  // (proposal-execution.js's resolveGitAddTarget) it can only ever be the
+  // single resolved, boundary-checked, non-symlink target sealed into the
+  // proposal before Human_TURN authorization.
+  'git-add-status-short.witness.v1': Object.freeze({
+    profile_id: 'git-add-status-short.witness.v1',
+    normalization_version: NORMALIZATION_VERSION,
+    applies: Object.freeze({ execution_class: 'git-write-local', executable: 'git', argvPrefix: Object.freeze(['add', '--']) }),
+    observation: Object.freeze({ executable: 'git', argv: Object.freeze(['status', '--short']) }),
+  }),
 });
 
-/** Select the witness profile for a persisted execution plan. Fail closed. */
+/**
+ * Select the witness profile for a persisted execution plan. Fail closed.
+ * Exact-argv profiles (git-read, inspect) match byte-for-byte, unchanged
+ * from the original law. Prefix-argv profiles (git-add) additionally
+ * require the total argv length to equal EXACTLY prefix.length + 1 — one
+ * sealed path, never more, never fewer.
+ */
 export function selectWitnessProfile(plan) {
-  if (!plan || typeof plan !== 'object') {
+  if (!plan || typeof plan !== 'object' || !Array.isArray(plan.argv)) {
     return { ok: false, error: EXECUTION_WITNESS_ERRORS.UNSUPPORTED_WITNESS_PROFILE, message: 'no execution plan' };
   }
   for (const profile of Object.values(WITNESS_PROFILES)) {
     const a = profile.applies;
-    if (
-      plan.execution_class === a.execution_class &&
-      plan.executable === a.executable &&
-      Array.isArray(plan.argv) &&
-      plan.argv.length === a.argv.length &&
-      plan.argv.every((v, i) => v === a.argv[i])
-    ) {
-      return { ok: true, profile };
+    if (plan.execution_class !== a.execution_class || plan.executable !== a.executable) continue;
+    if (Array.isArray(a.argv)) {
+      if (plan.argv.length === a.argv.length && plan.argv.every((v, i) => v === a.argv[i])) {
+        return { ok: true, profile };
+      }
+      continue;
+    }
+    if (Array.isArray(a.argvPrefix)) {
+      const remainingIndex = a.argvPrefix.length;
+      if (
+        plan.argv.length === remainingIndex + 1 &&
+        a.argvPrefix.every((v, i) => plan.argv[i] === v) &&
+        typeof plan.argv[remainingIndex] === 'string' &&
+        plan.argv[remainingIndex].length > 0
+      ) {
+        return { ok: true, profile };
+      }
     }
   }
   return {
@@ -453,8 +480,57 @@ function reconciled(outcomeClass) {
  * comparison only — no fuzzy similarity, no model judgment, no discarded
  * lines, no excluded fields (v1 profiles carry no volatile values).
  */
-export function computeProfileReconciliation({ profile, recordedResult, witnessPacket }) {
+function escapeRegExpLiteral(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// SL-008A only. git-add is silent-on-success (empty stdout) — byte-identical
+// stdout comparison (the generic path below) can never succeed for it by
+// construction, not by accident. The meaningful confirmation is narrower and
+// stronger than "the index contains something": the SEALED target — read
+// from the persisted, hash-verified execution plan, never recomputed from
+// anything execution-time — must appear staged (status column A or M) at
+// EXACTLY that path in an independent `git status --short` observation.
+// Absent, wrong-path, or unparseable evidence all fail closed to DIVERGED;
+// none is ever promoted to SUCCESS_CONFIRMED, and none is auto-remediated.
+function reconcileGitAddStagedPath({ recordedResult, witnessPacket, plan }) {
+  const compared = ['staged_path_presence'];
+  if (witnessPacket.observation_classification === 'timeout') {
+    return { ...indeterminate(INDETERMINATE_REASONS.OBSERVATION_TIMEOUT), compared_fields: [] };
+  }
+  if (witnessPacket.observation_classification === 'spawn_failed') {
+    return { ...indeterminate(INDETERMINATE_REASONS.OBSERVATION_SPAWN_FAILED), compared_fields: [] };
+  }
+  const recordedCompleted = recordedResult.failure_code === null || recordedResult.failure_code === undefined;
+  if (!recordedCompleted || recordedResult.exit_code !== 0) {
+    return { ...diverged('staged_path_presence', 'EXECUTION_COMPLETED_EXIT_ZERO', recordedResult.failure_code ?? `exit_${recordedResult.exit_code}`), compared_fields: compared };
+  }
+  if (recordedResult.stdout_truncated) {
+    return { ...indeterminate(INDETERMINATE_REASONS.RECORDED_OUTPUT_TRUNCATED), compared_fields: compared };
+  }
+  if (witnessPacket.stdout_truncated) {
+    return { ...indeterminate(INDETERMINATE_REASONS.WITNESS_OUTPUT_TRUNCATED), compared_fields: compared };
+  }
+  if (witnessPacket.exit_code !== 0) {
+    return { ...diverged('staged_path_presence', 'observation_exit_0', `observation_exit_${witnessPacket.exit_code}`), compared_fields: compared };
+  }
+  const sealedPath = Array.isArray(plan?.argv) ? plan.argv[2] : undefined;
+  if (typeof sealedPath !== 'string' || sealedPath.length === 0) {
+    return { ...diverged('staged_path_presence', 'sealed_target_present_in_plan', 'sealed_target_missing_from_plan'), compared_fields: compared };
+  }
+  const obsOut = normalizeOutput(witnessPacket.stdout);
+  const stagedLinePattern = new RegExp(`^[AM].\\s${escapeRegExpLiteral(sealedPath)}$`, 'm');
+  if (!stagedLinePattern.test(obsOut)) {
+    return { ...diverged('staged_path_presence', sealedPath, obsOut.slice(0, MAX_EXCERPT_LENGTH)), compared_fields: compared };
+  }
+  return { ...reconciled(OUTCOME_CLASSES.SUCCESS_CONFIRMED), compared_fields: compared };
+}
+
+export function computeProfileReconciliation({ profile, recordedResult, witnessPacket, plan }) {
   const profileId = profile.profile_id;
+  if (profileId === 'git-add-status-short.witness.v1') {
+    return reconcileGitAddStagedPath({ recordedResult, witnessPacket, plan });
+  }
   const recordedCompleted = recordedResult.failure_code === null || recordedResult.failure_code === undefined;
 
   // Observation-level indeterminacy applies to both branches.

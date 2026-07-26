@@ -443,6 +443,7 @@ export async function recordSemanticReconciliation(request, options = {}) {
     profile,
     recordedResult: record.execution.result,
     witnessPacket: record.witness,
+    plan,
   });
 
   const computedAt = now();
@@ -611,6 +612,7 @@ export async function verifySemanticReconciliation(storageRoot, proposalId) {
         profile: selected.profile,
         recordedResult: record.execution.result,
         witnessPacket: record.witness,
+        plan: record.execution?.plan,
       });
       if (recomputed.status !== reconciliation.status) details.push('reconciliation_status_not_reproducible');
       if (recomputed.outcome_class !== reconciliation.outcome_class) details.push('reconciliation_outcome_not_reproducible');

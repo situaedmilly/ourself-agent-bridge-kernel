@@ -65,7 +65,7 @@
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import { writeFile, mkdir, lstat, realpath, readFile } from 'node:fs/promises';
-import { join, resolve, sep, isAbsolute } from 'node:path';
+import { join, resolve, sep, isAbsolute, relative } from 'node:path';
 import {
   getPendingProposal,
   verifyPendingProposal,
@@ -79,6 +79,7 @@ import {
 import { canonicalHash } from './canonical-json.js';
 import { EXECUTION_CLASSES } from '../tools/execution-classes.js';
 import { evaluateApproval } from '../tools/execution-classes.js';
+import { SECRET_PATH } from '../tools/execution-classes.js';
 import { inspectCommand, enforceClassPolicy } from '../tools/command-firewall.js';
 
 export const EXECUTION_PLAN_VERSION = 'ourself.execution-plan.v1';
@@ -109,6 +110,7 @@ export const PROPOSAL_EXECUTION_ERRORS = Object.freeze({
   EXECUTION_RESULT_WRITE_FAILED: 'EXECUTION_RESULT_WRITE_FAILED',
   EXECUTION_OVERRIDE_FORBIDDEN: 'EXECUTION_OVERRIDE_FORBIDDEN',
   INVALID_EXECUTION_REQUEST: 'INVALID_EXECUTION_REQUEST',
+  EXECUTION_PRESPAWN_REVALIDATION_FAILED: 'EXECUTION_PRESPAWN_REVALIDATION_FAILED',
 });
 
 const ERR = PROPOSAL_EXECUTION_ERRORS;
@@ -129,7 +131,92 @@ const OPERATION_REGISTRY = Object.freeze({
     argv: Object.freeze([]),
     display: 'ls',
   }),
+  // SL-008A: the sole authorized mutation primitive. argv has no literal
+  // here — it is derived per-proposal by resolveGitAddTarget() from the
+  // SEALED packet.target, never from this call's untrusted request.
+  // requiresTarget marks this branch; exactly one path, always.
+  'git-add::git-write-local': Object.freeze({
+    executable: 'git',
+    requiresTarget: true,
+  }),
 });
+
+// SL-008A target resolution — models tools/reverse-engineer.js's sealed
+// resolveTargetWithinBoundary, scoped to THIS instance's authorizedRoot
+// rather than the global RUORA_BOUNDARY. Re-derives fresh on every call from
+// record.packet.target (part of the record already covered by
+// proposal_record_hash, sealed before Human_TURN authorization) — never
+// from anything execution-time. Fails closed on ambiguity in every branch.
+async function resolveGitAddTarget(rawTarget, authorizedRoot) {
+  if (typeof rawTarget !== 'string' || rawTarget.trim().length === 0) {
+    return fail(ERR.INVALID_EXECUTION_PLAN, 'git-add requires a non-empty sealed target');
+  }
+  // Secret check on the LITERAL sealed string first — never stat/realpath a
+  // path that textually names a secret, even to refute it.
+  if (SECRET_PATH.test(rawTarget)) {
+    return fail(ERR.FIREWALL_DENIED, 'refusing to stage a secret-bearing path');
+  }
+  const abs = isAbsolute(rawTarget) ? resolve(rawTarget) : resolve(authorizedRoot, rawTarget);
+  if (!(abs === authorizedRoot || abs.startsWith(authorizedRoot + sep))) {
+    return fail(ERR.CWD_BOUNDARY_VIOLATION, 'target resolves outside the authorized execution root');
+  }
+  let st;
+  try {
+    st = await lstat(abs);
+  } catch {
+    return fail(ERR.CWD_BOUNDARY_VIOLATION, 'target does not exist or is unreadable');
+  }
+  if (st.isSymbolicLink()) {
+    return fail(ERR.CWD_SYMLINK_VIOLATION, 'target is itself a symlink');
+  }
+  if (!st.isFile()) {
+    return fail(ERR.INVALID_EXECUTION_PLAN, 'target must be a regular file — directories are not staged by SL-008A');
+  }
+  let realTarget;
+  let realRoot;
+  try {
+    realTarget = await realpath(abs);
+    realRoot = await realpath(authorizedRoot);
+  } catch {
+    return fail(ERR.CWD_BOUNDARY_VIOLATION, 'target or authorized root cannot be resolved');
+  }
+  if (!(realTarget === realRoot || realTarget.startsWith(realRoot + sep))) {
+    return fail(ERR.CWD_SYMLINK_VIOLATION, 'target escapes the authorized root through a parent-directory symlink');
+  }
+  if (SECRET_PATH.test(realTarget)) {
+    return fail(ERR.FIREWALL_DENIED, 'resolved target is secret-bearing');
+  }
+  return { ok: true, relativePath: relative(realRoot, realTarget) };
+}
+
+// SL-008A pre-spawn revalidation. resolveGitAddTarget (above) validates the
+// sealed target once, early, while the plan is being derived. Several
+// durable-write awaits (exclusive claim, EXECUTION_STARTED) sit between that
+// first check and the real spawn — this closes that window by re-running the
+// SAME checks, on the SAME sealed value (plan.argv[2], never re-read from
+// the packet or from anything execution-time), as the last gate before the
+// EXECUTION_STARTED sequence begins. Fails closed; never mutates the plan.
+async function revalidateSealedTargetBeforeSpawn(plan, authorizedRoot) {
+  if (
+    !Array.isArray(plan.argv) ||
+    plan.argv.length !== 3 ||
+    plan.argv[0] !== 'add' ||
+    plan.argv[1] !== '--' ||
+    typeof plan.argv[2] !== 'string' ||
+    plan.argv[2].length === 0
+  ) {
+    return fail(ERR.EXECUTION_PRESPAWN_REVALIDATION_FAILED, 'sealed plan argv is not the exact bounded git-add shape');
+  }
+  const sealedRelativeTarget = plan.argv[2];
+  const revalidated = await resolveGitAddTarget(sealedRelativeTarget, authorizedRoot);
+  if (!revalidated.ok) {
+    return fail(ERR.EXECUTION_PRESPAWN_REVALIDATION_FAILED, `sealed target failed pre-spawn revalidation: ${revalidated.message || revalidated.error}`);
+  }
+  if (revalidated.relativePath !== sealedRelativeTarget) {
+    return fail(ERR.EXECUTION_PRESPAWN_REVALIDATION_FAILED, 'sealed target no longer resolves to the same path');
+  }
+  return { ok: true };
+}
 
 // Fixed minimal environment — never inherited from the calling process.
 const MINIMAL_ENV = Object.freeze({
@@ -421,18 +508,34 @@ export function createBoundedProposalExecutor(config) {
       return fail(ERR.INVALID_EXECUTION_PLAN, `no bounded operation is registered for route "${route}" with class "${storedClass}"`);
     }
 
+    // Target-bearing operations (git-add) derive argv/display from the
+    // SEALED packet.target — re-validated fresh against the authorized
+    // execution root on every invocation, never trusted from intake time,
+    // never accepted from this call's untrusted request.
+    let resolvedArgv;
+    let resolvedDisplay;
+    if (operation.requiresTarget) {
+      const resolvedTarget = await resolveGitAddTarget(record.packet?.target, authorizedRoot);
+      if (!resolvedTarget.ok) return resolvedTarget;
+      resolvedArgv = ['add', '--', resolvedTarget.relativePath];
+      resolvedDisplay = `git add -- ${resolvedTarget.relativePath}`;
+    } else {
+      resolvedArgv = [...operation.argv];
+      resolvedDisplay = operation.display;
+    }
+
     // Firewall revalidation — the sealed law this module did not write.
-    const approval = evaluateApproval(storedClass, operation.display);
+    const approval = evaluateApproval(storedClass, resolvedDisplay);
     if (!approval.ok) {
       if (approval.code === 'class_mismatch') return fail(ERR.EXECUTION_CLASS_MISMATCH, approval.reason);
       if (approval.code === 'unknown_class' || approval.code === 'missing_class') return fail(ERR.UNKNOWN_EXECUTION_CLASS, approval.reason);
       return fail(ERR.FIREWALL_DENIED, approval.reason);
     }
-    const classPolicy = enforceClassPolicy(operation.display, storedClass);
+    const classPolicy = enforceClassPolicy(resolvedDisplay, storedClass);
     if (!classPolicy.allowed) {
       return fail(ERR.FIREWALL_DENIED, `class policy denied: ${classPolicy.reason} [rule: ${classPolicy.pattern}]`);
     }
-    const firewall = inspectCommand(operation.display);
+    const firewall = inspectCommand(resolvedDisplay);
     if (!firewall.allowed) {
       return fail(ERR.FIREWALL_DENIED, `firewall denied: ${firewall.reason} [rule: ${firewall.pattern}]`);
     }
@@ -452,8 +555,8 @@ export function createBoundedProposalExecutor(config) {
       semantic_checksum: record.semantic_checksum,
       execution_class: storedClass,
       executable: operation.executable,
-      argv: [...operation.argv],
-      display_command: operation.display,
+      argv: [...resolvedArgv],
+      display_command: resolvedDisplay,
       cwd: cwdVerdict.cwd,
       timeout_ms: timeoutMs,
       environment: { ...MINIMAL_ENV },
@@ -487,6 +590,14 @@ export function createBoundedProposalExecutor(config) {
     const reread = await getPendingProposal(storageRoot, proposalId);
     if (!reread.ok || reread.record.state !== 'AUTHORIZED_PENDING_EXECUTION' || reread.record.integrity.record_hash !== record.integrity.record_hash) {
       return fail(ERR.CONCURRENT_EXECUTION_CONFLICT, 'proposal changed between validation and claim');
+    }
+
+    // Pre-spawn revalidation (SL-008A) — the last gate before EXECUTION_STARTED
+    // is recorded. Target-bearing operations only; a failure here must never
+    // record EXECUTION_STARTED, so this runs before that durable write.
+    if (operation.requiresTarget) {
+      const prespawn = await revalidateSealedTargetBeforeSpawn(plan, authorizedRoot);
+      if (!prespawn.ok) return prespawn;
     }
 
     // ── Durable EXECUTION_STARTED before any process invocation ─────────────
