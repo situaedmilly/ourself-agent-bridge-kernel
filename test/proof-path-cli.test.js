@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { computeRequestDigest } from '../tools/proof-path-cli.js';
 
 const CLI = fileURLToPath(new URL('../tools/proof-path-cli.js', import.meta.url));
@@ -62,6 +62,7 @@ async function fixture(fn, decision = 'AUTHORIZE', proposalOverrides = {}) {
     const config = join(dir, 'operator.mjs');
     await writeFile(config, `import { createStaticHumanTurnTokenVerifier } from ${JSON.stringify(VERIFIER)};
 export default {
+  ${proposalOverrides.target === 'effect.txt' ? `executionPreimage: ${JSON.stringify({ target: 'effect.txt', sha256: createHash('sha256').update('bounded effect\n').digest('hex') })},` : ''}
   requestDigest: ${JSON.stringify(computeRequestDigest(request))},
   storageRoot: ${JSON.stringify(store)},
   authorizedExecutionRoot: ${JSON.stringify(workspace)},

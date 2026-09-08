@@ -230,6 +230,8 @@ export function createProofPathDriver(config) {
 
     // ── EXECUTE (T-032) ─────────────────────────────────────────────────────
     const executor = createBoundedProposalExecutor({
+      executionPreimage: cfg.executionPreimage,
+      requireExecutionPreimage: cfg.requireExecutionPreimage,
       authorizedExecutionRoot: executionRoot,
       ...(typeof cfg.executionSpawnImpl === 'function' ? { spawnImpl: cfg.executionSpawnImpl } : {}),
       ...passthrough,

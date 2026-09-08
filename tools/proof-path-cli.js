@@ -73,6 +73,8 @@ function summarize(result, verification) {
     halted_at: result.halted_at ?? null,
     outcome: result.outcome ?? null,
     error: result.error ?? null,
+    execution_error: result.stages?.execute?.error ?? null,
+    actuation_attempted: result.stages?.execute?.error === 'EXECUTION_PREIMAGE_MISMATCH' ? false : null,
     proof_chain_valid: verification ? verification.ok === true : null,
   };
 }
@@ -114,7 +116,7 @@ export async function main(args, { input = process.stdin, output = process.stdou
       emit({ ok: false, phase, error: 'REVIEWED_REQUEST_MISMATCH', effect_state: 'NOT_ATTEMPTED' });
       return 1;
     }
-    const driver = createProofPathDriver(config);
+    const driver = createProofPathDriver({ ...config, requireExecutionPreimage: true });
     phase = 'execution';
     const result = await driver.runProofPath(request);
     const verification = result.completed

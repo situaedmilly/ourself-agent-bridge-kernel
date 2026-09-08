@@ -42,8 +42,37 @@ Freeze that value in the operator config. Do not compute it from the live inboun
 request during invocation: doing so would remove the independent preimage check.
 Missing digest is a configuration failure; mismatch stops before proposal
 persistence, authorization, or dispatch. The invocation summary includes the
-matched digest. This binds request content, not the bytes of external target
-files; execution-time filesystem boundaries remain the executor's responsibility.
+matched digest. Request identity and external target state have separate bindings.
+
+For operator `git-add` requests, also supply this trusted config field:
+
+```js
+executionPreimage: {
+  target: 'the-reviewed-file.txt',
+  sha256: '64-lowercase-hex-sha256-of-reviewed-file-bytes',
+  expiresAt: '2026-09-09T00:00:00.000Z', // optional operator-supplied deadline
+},
+```
+
+The target is one normalized relative path under authorizedExecutionRoot, and
+must match the derived git-add argv. The CLI requires this binding for mutation;
+legacy programmatic callers retain their prior behavior unless they opt in with
+`requireExecutionPreimage: true`. The supplied binding is copied, frozen, and
+included in the hashed execution plan. The executor compares file bytes and the
+optional deadline before claiming execution and again after durable start writes,
+immediately before spawn. Hashing is bounded to regular files of at most 16 MiB.
+Missing, changed, expired, unsafe, or mismatched targets are refused.
+
+A late refusal persists EXECUTION_FAILED with classification `preimage_refused`
+and `actuation_attempted: false`; the prior EXECUTION_STARTED record means the
+attempt entered its durable lifecycle, not that a child process started. The
+driver halts before observation/reconciliation. The retained execution claim
+prevents automatic retry. The CLI exposes EXECUTION_PREIMAGE_MISMATCH.
+
+This verifies correspondence at the check instant. It does not lock out another
+writer between hashing and Git opening the path, bind the entire Git index/HEAD,
+query a revocation service, or prove broader eligibility applicability. The
+optional expiry enforces a supplied deadline; it does not create authority.
 
 The credential check remains separate:
 It binds proposal ID, decision, and deciding authority; it does not independently
