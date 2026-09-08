@@ -5,6 +5,15 @@ import { readFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createProofPathDriver, verifyPersistedProofChain } from './proof-path-driver.js';
+import { canonicalHash } from '../persistence/canonical-json.js';
+
+// Bind the whole reviewed request; a presentation credential is supplied later
+// and is checked independently by T-031. No other decision field is excluded.
+export function computeRequestDigest(request) {
+  const decision = { ...request.decision };
+  delete decision.presentedToken;
+  return canonicalHash({ ...request, decision });
+}
 
 const MAX_REQUEST_BYTES = 1024 * 1024;
 const USAGE = `Usage:
@@ -97,12 +106,20 @@ export async function main(args, { input = process.stdin, output = process.stdou
     if (!config || typeof config !== 'object' || Array.isArray(config)) throw new Error('INVALID_CONFIG');
     if (config.executionSpawnImpl !== undefined || config.observationSpawnImpl !== undefined
         || config.now !== undefined) throw new Error('TEST_SEAM_IN_OPERATOR_CONFIG');
+    if (typeof config.requestDigest !== 'string' || !/^[a-f0-9]{64}$/.test(config.requestDigest)) {
+      throw new Error('REVIEWED_REQUEST_DIGEST_REQUIRED');
+    }
+    phase = 'preimage';
+    if (computeRequestDigest(request) !== config.requestDigest) {
+      emit({ ok: false, phase, error: 'REVIEWED_REQUEST_MISMATCH', effect_state: 'NOT_ATTEMPTED' });
+      return 1;
+    }
     const driver = createProofPathDriver(config);
     phase = 'execution';
     const result = await driver.runProofPath(request);
     const verification = result.completed
       ? await driver.verifyProofChain({ proposalId: result.proposal_id }) : null;
-    emit(summarize(result, verification));
+    emit({ ...summarize(result, verification), request_digest: config.requestDigest });
     if (!result.ok || (verification && !verification.ok)) return 1;
     if (!result.completed) return result.outcome === 'REJECTED_BY_HUMAN_TURN' ? 0 : 1;
     return result.outcome?.outcome_class === 'SUCCESS_CONFIRMED' ? 0 : 1;

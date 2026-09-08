@@ -2,13 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { computeRequestDigest } from '../tools/proof-path-cli.js';
 
-const CLI = resolve('tools/proof-path-cli.js');
-const VERIFIER = pathToFileURL(resolve('persistence/human-turn-decisions.js')).href;
+const CLI = fileURLToPath(new URL('../tools/proof-path-cli.js', import.meta.url));
+const VERIFIER = new URL('../persistence/human-turn-decisions.js', import.meta.url).href;
 const uniqueId = () => `packet-cli-${randomBytes(6).toString('hex')}`;
 function buildProposal({ packetId, executionClass = 'git-read', route = 'git-read', mutation = false, intent = 'show git status of the repo' }) {
   const packet = {
@@ -41,7 +42,7 @@ function buildReviewResult(overrides = {}) {
 }
 
 
-async function fixture(fn, decision = 'AUTHORIZE') {
+async function fixture(fn, decision = 'AUTHORIZE', proposalOverrides = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'bridge-cli-'));
   try {
     const workspace = join(dir, 'workspace');
@@ -49,12 +50,19 @@ async function fixture(fn, decision = 'AUTHORIZE') {
     await mkdir(workspace);
     await mkdir(store);
     assert.equal(spawnSync('git', ['init', '-q', workspace]).status, 0);
-    const reviewResult = buildReviewResult();
+    const reviewResult = buildReviewResult(proposalOverrides);
+    if (proposalOverrides.target !== undefined) reviewResult.proposal.data.packet.target = proposalOverrides.target;
     const id = reviewResult.proposal.id;
     const token = randomBytes(32).toString('hex');
+    const request = { reviewResult, decision: {
+      decision, decisionId: uniqueId(), decidedBy: 'MYSELF',
+      decidedAt: new Date().toISOString(), reason: 'Isolated operator integration test',
+      presentedToken: token,
+    } };
     const config = join(dir, 'operator.mjs');
     await writeFile(config, `import { createStaticHumanTurnTokenVerifier } from ${JSON.stringify(VERIFIER)};
 export default {
+  requestDigest: ${JSON.stringify(computeRequestDigest(request))},
   storageRoot: ${JSON.stringify(store)},
   authorizedExecutionRoot: ${JSON.stringify(workspace)},
   verifyHumanTurnAuthorization: createStaticHumanTurnTokenVerifier({
@@ -62,16 +70,12 @@ export default {
     expectedToken: process.env.PROOF_TEST_TOKEN,
   }),
 };\n`);
-    const request = { reviewResult, decision: {
-      decision, decisionId: uniqueId(), decidedBy: 'MYSELF',
-      decidedAt: new Date().toISOString(), reason: 'Isolated operator integration test',
-      presentedToken: token,
-    } };
     const invoke = (args, body = '') => {
       const child = spawnSync(process.execPath, [CLI, ...args], {
         input: typeof body === 'string' ? body : JSON.stringify(body), encoding: 'utf8',
         env: { ...process.env, PROOF_TEST_TOKEN: token, OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '' },
         timeout: 15000,
+        cwd: dir,
       });
       assert.equal(child.error, undefined, String(child.error));
       assert.ok(!child.stdout.includes(token), 'credential must not appear in stdout');
@@ -176,4 +180,61 @@ test('a failed real command is not reported as successful completion', async () 
     assert.equal(run.code, 1);
     assert.notEqual(run.result.outcome?.outcome_class, 'SUCCESS_CONFIRMED');
   });
+});
+
+test('reviewed git-add mutates only its sealed target and its proof survives process succession', async () => {
+  await fixture(async ({ config, workspace, request, store, id, invoke }) => {
+    await writeFile(join(workspace, 'effect.txt'), 'bounded effect\n');
+    await writeFile(join(workspace, 'other.txt'), 'must remain unstaged\n');
+    const run = invoke(['run', '--config', config], request);
+    assert.equal(run.code, 0, JSON.stringify(run));
+    assert.equal(run.result.outcome.outcome_class, 'SUCCESS_CONFIRMED');
+    assert.equal(run.result.request_digest, computeRequestDigest(request));
+    const staged = () => spawnSync('git', ['-C', workspace, 'diff', '--cached', '--name-only'], { encoding: 'utf8' });
+    assert.equal(staged().status, 0);
+    assert.equal(staged().stdout, 'effect.txt\n');
+    assert.equal(invoke(['verify', '--storage-root', store, '--proposal-id', id]).code, 0);
+    const repeated = invoke(['run', '--config', config], request);
+    assert.equal(repeated.code, 1, 'completed proposal cannot be executed again');
+    assert.equal(staged().stdout, 'effect.txt\n');
+  }, 'AUTHORIZE', { executionClass: 'git-write-local', route: 'git-add', mutation: true, target: 'effect.txt' });
+});
+
+test('same proposal ID and credential cannot substitute target, intent, decision, or constraints', async () => {
+  await fixture(async ({ config, request, store, workspace, invoke }) => {
+    const changes = [
+      r => { r.reviewResult.proposal.data.packet.target = 'other.txt'; },
+      r => { r.reviewResult.proposal.data.packet.intent = 'different act'; },
+      r => { r.decision.decisionId = 'different-decision'; },
+      r => { r.decision.constraints = ['widened-scope']; },
+    ];
+    for (const change of changes) {
+      const substituted = structuredClone(request);
+      change(substituted);
+      const run = invoke(['run', '--config', config], substituted);
+      assert.equal(run.code, 1);
+      assert.equal(run.result.error, 'REVIEWED_REQUEST_MISMATCH');
+      assert.equal(run.result.effect_state, 'NOT_ATTEMPTED');
+    }
+    assert.deepEqual(await readdir(store), []);
+    assert.equal(spawnSync('git', ['-C', workspace, 'diff', '--cached', '--name-only'], { encoding: 'utf8' }).stdout, '');
+  }, 'AUTHORIZE', { executionClass: 'git-write-local', route: 'git-add', mutation: true, target: 'effect.txt' });
+});
+
+test('operator must bind a reviewed digest before invocation', async () => {
+  await fixture(async ({ config, request, store, invoke }) => {
+    await writeFile(config, (await readFile(config, 'utf8')).replace(/  requestDigest: .*\n/, ''));
+    const run = invoke(['run', '--config', config], request);
+    assert.equal(run.code, 2);
+    assert.equal(run.result.phase, 'configuration');
+    assert.deepEqual(await readdir(store), []);
+  });
+});
+
+test('request binding preserves key-order equivalence while excluding only the presented credential', () => {
+  const request = { reviewResult: buildReviewResult(), decision: { decision: 'AUTHORIZE', presentedToken: 'one' } };
+  const reordered = { decision: { presentedToken: 'two', decision: 'AUTHORIZE' }, reviewResult: request.reviewResult };
+  assert.equal(computeRequestDigest(request), computeRequestDigest(reordered));
+  reordered.decision.reason = 'different';
+  assert.notEqual(computeRequestDigest(request), computeRequestDigest(reordered));
 });

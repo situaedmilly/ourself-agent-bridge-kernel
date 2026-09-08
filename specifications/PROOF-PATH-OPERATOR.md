@@ -16,6 +16,7 @@ import { createStaticHumanTurnTokenVerifier } from
   '/absolute/kernel/persistence/human-turn-decisions.js';
 
 export default {
+  requestDigest: '64-lowercase-hex-digest-of-the-reviewed-request',
   storageRoot: '/absolute/proof-store',
   authorizedExecutionRoot: '/absolute/authorized-workspace',
   verifyHumanTurnAuthorization: createStaticHumanTurnTokenVerifier({
@@ -30,6 +31,21 @@ export default {
 ```
 
 The static verifier is the existing T-031 credential-agreement mechanism.
+The operator config also requires `requestDigest`, computed with the exported
+`computeRequestDigest(request)` from `tools/proof-path-cli.js` on the reviewed
+request before handing it to the execution caller. This uses the existing
+protocol canonical hash and excludes only `decision.presentedToken`. Envelope,
+adapted proposal, target, intent, decision identity, timestamp, reason, and
+constraints remain bound. Key order does not change the digest.
+
+Freeze that value in the operator config. Do not compute it from the live inbound
+request during invocation: doing so would remove the independent preimage check.
+Missing digest is a configuration failure; mismatch stops before proposal
+persistence, authorization, or dispatch. The invocation summary includes the
+matched digest. This binds request content, not the bytes of external target
+files; execution-time filesystem boundaries remain the executor's responsibility.
+
+The credential check remains separate:
 It binds proposal ID, decision, and deciding authority; it does not independently
 prove physical human identity. Use the estate's trusted verifier where stronger
 authority semantics are required. Never derive expected credentials or trusted
@@ -98,3 +114,9 @@ refusal, missing evidence, and a real failed Git operation.
 
 Tests use disposable workspaces and generated test credentials; these are execution
 witnesses for the integration tests, not a production launch or Founder act receipt.
+
+The operator tests additionally stage a real `effect.txt` through the existing
+SL-008A operation, confirm that an unrelated file stays unstaged, cold-verify the
+proof in another process, and refuse a repeated execution. Substituted target,
+intent, decision identity, or constraints are refused despite retaining the same
+proposal ID and presented credential. Test processes run outside the kernel cwd.
