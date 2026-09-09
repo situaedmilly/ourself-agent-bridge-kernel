@@ -1,1 +1,26 @@
-{"contract":"WORKFLOWEXECUTION_SIGNAL","version":"v1","realm":"ourself-agent-bridge-kernel","canonical_repository":"situaedmilly/self-protocol-suite","canonical_spec":"specifications/WORKFLOW-EXECUTION-SIGNAL-HIERARCHY-v1.md","priority":["STOP_SIGNAL","AUTHORITY_SIGNAL","OPERATING_SIGNAL","OBJECTIVE_SIGNAL","INSPECTION_SIGNAL","MUTATION_SIGNAL","VERIFICATION_SIGNAL","SEAL_SIGNAL","FOUNDATION_SIGNAL"],"unclassified_action":"STOP_BEFORE_INSPECTION","unknown_signal_action":"FAIL_CLOSED","session_posture_signal":"OPERATING_SIGNAL"}
+{
+  "contract": "WORKFLOWEXECUTION_SIGNAL",
+  "version": "v1",
+  "realm": "ourself-agent-bridge-kernel",
+  "canonical_repository": "situaedmilly/self-protocol-suite",
+  "canonical_spec": "specifications/WORKFLOW-EXECUTION-SIGNAL-HIERARCHY-v1.md",
+  "priority": [
+    "STOP_SIGNAL",
+    "AUTHORITY_SIGNAL",
+    "OPERATING_SIGNAL",
+    "OBJECTIVE_SIGNAL",
+    "INSPECTION_SIGNAL",
+    "MUTATION_SIGNAL",
+    "VERIFICATION_SIGNAL",
+    "SEAL_SIGNAL",
+    "FOUNDATION_SIGNAL"
+  ],
+  "unclassified_action": "CONTINUE_LAWFUL_WORK",
+  "unknown_signal_action": "RECONTACT_JURISDICTION_CONTINUE_LAWFUL_WORK",
+  "session_posture_signal": "OPERATING_SIGNAL",
+  "revision": "FOUNDER_SIGNAL_CORRECTION_2026_09_09",
+  "signal_required": false,
+  "missing_authority_action": "DEFER_ONLY_AFFECTED_EFFECT",
+  "stop_signal_scope": "EXPLICIT_CURRENT_USER_SCOPE",
+  "signal_labels_grant_authority": false
+}
