@@ -1,0 +1,49 @@
+{
+  "version": "0.1",
+  "authority": "OURSELFd",
+  "transition_endpoint": "POST /v1/transitions/request",
+  "capabilities": {
+    "repo.read": {
+      "mutability": "read",
+      "exposed": true,
+      "receipt_required": true
+    },
+    "repo.status": {
+      "mutability": "read",
+      "exposed": true,
+      "receipt_required": true,
+      "operation": "git_status"
+    },
+    "repo.diff": {
+      "mutability": "read",
+      "exposed": true,
+      "receipt_required": true
+    }
+  },
+  "explicitly_absent": [
+    "shell.execute",
+    "process.start",
+    "repo.write",
+    "file.write",
+    "arbitrary_filesystem_access"
+  ],
+  "state_machine": [
+    "REQUESTED",
+    "RESOLVED",
+    "AUTHENTICATED",
+    "AUTHORIZED",
+    "PRECONDITIONS_SATISFIED",
+    "ADMITTED",
+    "ACTUATED",
+    "OBSERVED",
+    "RECEIPTED"
+  ],
+  "non_collapse": [
+    "INTENT != AUTHORITY",
+    "AUTHORITY != ADMISSION",
+    "ADMISSION != ACTUATION",
+    "ACTUATION != OBSERVATION",
+    "OBSERVATION != RECEIPT",
+    "RECEIPT != MEMORY"
+  ]
+}
