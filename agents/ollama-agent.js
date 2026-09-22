@@ -77,7 +77,7 @@ const COGNITIVE_SCHEMA = Object.freeze({
 });
 
 function normalizeBaseUrl(value) {
-  const raw = String(value || DEFAULT_OLLAMA_BASE_URL).replace(/\\/$/, '');
+  const raw = String(value || DEFAULT_OLLAMA_BASE_URL).replace(/\/$/, '');
   const url = new URL(raw);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new TypeError('OLLAMA_BASE_URL must use http or https');
