@@ -28,8 +28,13 @@ const FORBIDDEN_CAPABILITIES = new Set([
   "shell.execute",
   "process.start",
   "repo.write",
-  "file.write"
+  "file.write",
+  "arbitrary_filesystem_access"
 ]);
+
+const OPERATIONS = Object.freeze({
+  "repo.status": new Set(["git_status"])
+});
 
 const now = () => new Date().toISOString();
 const id = (prefix) => `${prefix}-${crypto.randomUUID()}`;
@@ -48,6 +53,11 @@ function assertCapability(name) {
 function transition(record, state) {
   record.states.push({ state, at: now() });
   record.state = state;
+}
+
+function isWithinRoot(candidate, root) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 export class OURSELFdCore {
@@ -76,11 +86,14 @@ export class OURSELFdCore {
       resolved_at: null,
       metadata: structuredClone(metadata)
     };
+
     this.instances.set(instance.instance_id, instance);
+
     instance.state = "INSTANCE_OBSERVED";
     instance.observed_at = now();
     instance.state = "INSTANCE_RESOLVED";
     instance.resolved_at = now();
+
     return structuredClone(instance);
   }
 
@@ -110,30 +123,36 @@ export class OURSELFdCore {
     transition(record, "RESOLVED");
 
     assertCapability(capability);
-    if (operation !== operation.trim() || !operation) {
+
+    if (typeof operation !== "string" || !operation.trim() || operation !== operation.trim()) {
       throw new Error("OPERATION_INVALID");
+    }
+
+    if (!OPERATIONS[capability]?.has(operation)) {
+      throw new Error("OPERATION_NOT_IMPLEMENTED");
     }
 
     transition(record, "AUTHENTICATED");
     transition(record, "AUTHORIZED");
 
-    const repo = path.resolve(this.repoRoot);
-    if (!repo.startsWith(this.repoRoot + path.sep) && repo !== this.repoRoot) {
+    const targetRoot = path.resolve(this.repoRoot);
+    const requestedTarget = target ? path.resolve(targetRoot, target) : targetRoot;
+
+    if (!isWithinRoot(requestedTarget, targetRoot)) {
       throw new Error("TARGET_OUTSIDE_REPOSITORY");
     }
 
-    await fs.access(repo);
+    await fs.access(requestedTarget);
     transition(record, "PRECONDITIONS_SATISFIED");
     transition(record, "ADMITTED");
 
+    transition(record, "ACTUATED");
+
     let observation;
     if (capability === "repo.status" && operation === "git_status") {
-      observation = await this.#repoStatus();
-    } else {
-      throw new Error("OPERATION_NOT_IMPLEMENTED");
+      observation = await this.#repoStatus(requestedTarget);
     }
 
-    transition(record, "ACTUATED");
     transition(record, "OBSERVED");
 
     const receipt = {
@@ -142,7 +161,7 @@ export class OURSELFdCore {
       instance_id,
       capability,
       operation,
-      target,
+      target: target || ".",
       state: "RECEIPTED",
       observation,
       evidence: {
@@ -151,7 +170,7 @@ export class OURSELFdCore {
           instance_id,
           capability,
           operation,
-          target
+          target: target || "."
         }),
         observation_hash: sha256(observation)
       },
@@ -163,8 +182,6 @@ export class OURSELFdCore {
       created_at: now()
     };
 
-    record.state = "RECEIPTED";
-    record.states = receipt.states;
     this.receipts.set(receipt.receipt_id, receipt);
 
     if (this.receiptDir) {
@@ -185,19 +202,19 @@ export class OURSELFdCore {
     return structuredClone(receipt);
   }
 
-  async #repoStatus() {
+  async #repoStatus(repoPath) {
     const { stdout } = await execFileAsync(
       "git",
       ["status", "--short", "--branch", "--porcelain=v1"],
       {
-        cwd: this.repoRoot,
+        cwd: repoPath,
         timeout: 5000,
         maxBuffer: 1024 * 1024
       }
     );
 
     return {
-      repository: this.repoRoot,
+      repository: repoPath,
       git_status: stdout
     };
   }
