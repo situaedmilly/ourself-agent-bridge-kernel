@@ -19,9 +19,24 @@ export const TRANSITION_STATES = Object.freeze([
 ]);
 
 export const CAPABILITIES = Object.freeze({
-  "repo.read": Object.freeze({ id: "repo.read", mutability: "read", exposed: true }),
-  "repo.status": Object.freeze({ id: "repo.status", mutability: "read", exposed: true }),
-  "repo.diff": Object.freeze({ id: "repo.diff", mutability: "read", exposed: true })
+  "repo.read": Object.freeze({
+    id: "repo.read",
+    mutability: "read",
+    exposed: false,
+    implementation_status: "DECLARED_NOT_IMPLEMENTED"
+  }),
+  "repo.status": Object.freeze({
+    id: "repo.status",
+    mutability: "read",
+    exposed: true,
+    implementation_status: "IMPLEMENTED"
+  }),
+  "repo.diff": Object.freeze({
+    id: "repo.diff",
+    mutability: "read",
+    exposed: false,
+    implementation_status: "DECLARED_NOT_IMPLEMENTED"
+  })
 });
 
 const FORBIDDEN_CAPABILITIES = new Set([
