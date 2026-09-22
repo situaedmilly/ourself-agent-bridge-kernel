@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "ourselfd:m1": "node runtime/ourselfd/m1.js"
+    "ourselfd:m1": "node runtime/ourselfd/m1.js",
+    "ourselfd:m1:evidence": "node --test test/ourselfd-evidence.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.20.0",
