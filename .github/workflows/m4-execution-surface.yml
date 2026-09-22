@@ -1,0 +1,32 @@
+name: M4 Execution Surface
+
+on:
+  push:
+    branches:
+      - ourselfd/m4-build-verify-bounded-birth
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m4-execution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Verify
+        run: npm test
+
+      - name: Bounded runtime birth
+        run: node runtime/ourselfd/m4-bounded-runtime.js
