@@ -1,0 +1,33 @@
+name: OURSELFd M4 Registration Resolver
+
+on:
+  push:
+    branches:
+      - "ourselfd/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registration-resolver:
+    name: registration-resolver
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build Verify
+        run: |
+          node --version
+          npm install
+          npm test
+      - name: Bounded Birth
+        run: node runtime/ourselfd/m4-bounded-runtime.js
