@@ -22,8 +22,8 @@ jobs:
           echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
           echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
           echo "GITHUB_SHA=$GITHUB_SHA"
-          test "$GITHUB_SHA" = "8596418b8ee1b36d447dc100acba017e9b008566" || {
-            echo "BOUNDARY_VIOLATION=UNEXPECTED_SHA"
+          test "$GITHUB_REF_NAME" = "signal/local-ollama-cognition-20260922" || {
+            echo "BOUNDARY_VIOLATION=UNEXPECTED_BRANCH"
             exit 1
           }
           echo "RUNNER_ADMISSION=EXECUTED_ON_SELECTED_RUNNER"
