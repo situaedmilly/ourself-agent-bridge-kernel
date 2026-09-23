@@ -10,6 +10,8 @@ import { executeCommand } from './tools/terminal.js';
 import { classifyCommand, evaluateApproval, EXECUTION_CLASSES } from './tools/execution-classes.js';
 import { createRealmGate } from './tools/realm-gate.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from './tools/reverse-engineer.js';
+import { createGitHubActionsTransport } from './adapters/github-actions-transport.js';
+import { githubActionsControl } from './agentbridge/github-actions-control.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
