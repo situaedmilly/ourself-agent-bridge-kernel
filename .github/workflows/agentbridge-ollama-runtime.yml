@@ -8,7 +8,9 @@ on:
 
 jobs:
   prove-agentbridge-ollama:
-    runs-on: [self-hosted, OURSELFPIMAC]
+    # Path B fallback: use GitHub's default self-hosted labels.
+    # Path A may additionally add the custom OURSELFPIMAC label to the runner.
+    runs-on: [self-hosted, Linux, ARM64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
