@@ -1,0 +1,24 @@
+name: OURSELF Job Birth Probe
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ourself-job-birth-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  job-birth:
+    name: Job Birth
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prove step execution
+        run: |
+          echo "OURSELF_JOB_BIRTH=EXECUTED"
+          echo "RUNNER=$RUNNER_NAME"
+          echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+          echo "GITHUB_JOB=$GITHUB_JOB"
