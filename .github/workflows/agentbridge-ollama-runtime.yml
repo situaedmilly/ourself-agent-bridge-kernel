@@ -1,0 +1,29 @@
+name: AgentBridge Ollama Runtime Proof
+
+on:
+  push:
+    branches:
+      - signal/local-ollama-cognition-20260922
+  workflow_dispatch:
+
+jobs:
+  prove-agentbridge-ollama:
+    runs-on: [self-hosted, OURSELFPIMAC]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Ollama endpoint
+        run: curl --fail --silent http://127.0.0.1:11434/api/tags
+      - name: Verify target model
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent http://127.0.0.1:11434/api/tags > /tmp/ollama-tags.json
+          grep -q '"name":"qwen2.5-coder:7b"' /tmp/ollama-tags.json
+      - name: Execute AgentBridge cognition proof
+        run: node --test tests/agentbridge-ollama-runtime.test.js
+      - name: Emit governed boundary
+        run: |
+          echo "COGNITION_PROVEN=AGENTBRIDGE->OLLAMA"
+          echo "AUTHORITY_GRANTED=NONE"
+          echo "ACTUATION=NOT_PERFORMED"
