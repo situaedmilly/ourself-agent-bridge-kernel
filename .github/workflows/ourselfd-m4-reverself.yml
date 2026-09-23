@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "ourselfd/m4-build-verify-bounded-birth"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
