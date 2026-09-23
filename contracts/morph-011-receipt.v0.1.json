@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "0.1",
+  "name": "MORPH-011-receipt",
+  "purpose": "Bind a model proposal to AgentBridge admission, isolated actuation or blocked execution, observation, and receipt.",
+  "required": [
+    "receipt_type",
+    "proposal_id",
+    "model_id",
+    "model_output",
+    "action_class",
+    "target",
+    "operation",
+    "side_effect",
+    "admission_decision",
+    "policy_id",
+    "actuation_id",
+    "actuation_status",
+    "observed_state",
+    "observation_id",
+    "timestamps",
+    "receipt_hash"
+  ],
+  "properties": {
+    "receipt_type": { "const": "MORPH-011-AuthorityReceipt" },
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "model_id": { "type": "string", "minLength": 1 },
+    "model_output": { "type": "string" },
+    "action_class": { "enum": ["OBSERVE", "SHELL", "UNKNOWN"] },
+    "target": { "type": "string", "minLength": 1 },
+    "operation": { "type": "string", "minLength": 1 },
+    "side_effect": { "enum": ["NONE", "UNKNOWN"] },
+    "admission_decision": { "enum": ["ADMITTED", "DENIED"] },
+    "policy_id": { "type": "string", "minLength": 1 },
+    "actuation_id": { "type": "string", "minLength": 1 },
+    "actuation_status": { "enum": ["EXECUTED", "BLOCKED", "NOT_ATTEMPTED"] },
+    "observed_state": {},
+    "observation_id": { "type": "string", "minLength": 1 },
+    "timestamps": {
+      "type": "object",
+      "required": ["proposal", "admission", "actuation", "observation", "receipt"],
+      "properties": {
+        "proposal": { "type": "string" },
+        "admission": { "type": "string" },
+        "actuation": { "type": "string" },
+        "observation": { "type": "string" },
+        "receipt": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "receipt_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": false
+}
