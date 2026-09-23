@@ -25,3 +25,4 @@ jobs:
           echo "RUN_ID=$GITHUB_RUN_ID"
           echo "RUNNER=$RUNNER_NAME"
           echo "CURSOR_MORPH=WORKFLOW_RUN->JOB->RUNNER"
+          echo "REVERSELF_TRIGGER_COMMIT=$GITHUB_SHA"
