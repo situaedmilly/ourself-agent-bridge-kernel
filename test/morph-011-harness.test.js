@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';\nimport { readFileSync } from 'node:fs';
 
 function canonical(value) {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
@@ -51,7 +51,7 @@ test('MORPH-011 denies a sudo proposal', () => {
 });
 
 test('denied path has no actuator invocation surface', () => {
-  const source = require('node:fs').readFileSync(new URL('../tools/morph-011-harness.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../tools/morph-011-harness.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /from ['"]node:child_process['"]/);
   assert.doesNotMatch(source, /child_process/);
   assert.doesNotMatch(source, /execSync|spawnSync|execFileSync/);
