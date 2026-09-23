@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ourself-morph.v0.1",
+  "title": "OURSELF Morph Specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "origin_state_commitment",
+    "correspondence_set",
+    "domain",
+    "field_parameters",
+    "invariant_set",
+    "membrane_ref",
+    "authority_ref",
+    "admission_conditions",
+    "actuator_contract",
+    "receipt_contract"
+  ],
+  "properties": {
+    "origin_state_commitment": { "type": "string", "minLength": 1 },
+    "correspondence_set": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "target", "weight"],
+        "properties": {
+          "source": { "type": "string", "minLength": 1 },
+          "target": { "type": "string", "minLength": 1 },
+          "weight": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      }
+    },
+    "domain": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "field_parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["epsilon", "max_displacement"],
+      "properties": {
+        "epsilon": { "type": "number", "minimum": 0 },
+        "max_displacement": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "invariant_set": { "type": "array", "items": { "type": "string" } },
+    "membrane_ref": { "type": "string", "minLength": 1 },
+    "authority_ref": { "type": "string", "minLength": 1 },
+    "admission_conditions": { "type": "array", "items": { "type": "string" } },
+    "actuator_contract": { "type": "string", "minLength": 1 },
+    "receipt_contract": { "type": "string", "minLength": 1 }
+  }
+}
