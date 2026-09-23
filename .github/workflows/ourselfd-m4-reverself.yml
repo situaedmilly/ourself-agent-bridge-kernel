@@ -21,3 +21,22 @@ jobs:
       - run: npm install
       - run: npm test
       - run: node runtime/ourselfd/m4-bounded-runtime.js
+      - name: Emit bounded birth receipt
+        run: |
+          mkdir -p evidence
+          cat > evidence/ourselfd-m4-receipt.json <<'EOF'
+          {
+            "schema": "OURSELFd_M4_EXECUTION_RECEIPT_V0.1",
+            "claim": "BOUNDED_RUNTIME_BIRTH",
+            "institution": "GitHub Actions",
+            "execution_surface": "workflow/job/runner/step",
+            "runner": "github-hosted",
+            "verification_boundary": "external_observation_required"
+          }
+          EOF
+          cat evidence/ourselfd-m4-receipt.json
+      - name: Upload execution receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ourselfd-m4-execution-receipt
+          path: evidence/ourselfd-m4-receipt.json
