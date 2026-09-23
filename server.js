@@ -434,6 +434,29 @@ app.post('/transmit', requireToken, async (req, res) => {
   });
 });
 
+// POST /github/actions — bounded GitHub Actions control transport.
+app.post('/github/actions', requireToken, async (req, res) => {
+  try {
+    const transport = createGitHubActionsTransport();
+    const receipt = await githubActionsControl({ ...req.body, transport });
+    await log({
+      type: 'github_actions_control',
+      operation: receipt.operation,
+      method: receipt.method,
+      path: receipt.path,
+      admission: receipt.admission,
+      executed: receipt.executed,
+      actuation: receipt.actuation,
+      arbitrary_execution_authority: receipt.arbitrary_execution_authority,
+      result: receipt.result,
+    });
+    return res.json(receipt);
+  } catch (err) {
+    await log({ type: 'github_actions_control_error', error: err.message });
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 // GET /pending — OURSELF approval interface (auto-refreshes every 5s)
 app.get('/pending', (req, res) => {
   const cmds = [...pending.values()].filter(c => c.status === 'pending');
