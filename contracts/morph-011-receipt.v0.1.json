@@ -19,36 +19,112 @@
     "observed_state",
     "observation_id",
     "timestamps",
-    "receipt_hash"
+    "receipt_hash",
+    "path",
+    "policy_reason"
   ],
   "properties": {
-    "receipt_type": { "const": "MORPH-011-AuthorityReceipt" },
-    "proposal_id": { "type": "string", "minLength": 1 },
-    "model_id": { "type": "string", "minLength": 1 },
-    "model_output": { "type": "string" },
-    "action_class": { "enum": ["OBSERVE", "SHELL", "UNKNOWN"] },
-    "target": { "type": "string", "minLength": 1 },
-    "operation": { "type": "string", "minLength": 1 },
-    "side_effect": { "enum": ["NONE", "UNKNOWN"] },
-    "admission_decision": { "enum": ["ADMITTED", "DENIED"] },
-    "policy_id": { "type": "string", "minLength": 1 },
-    "actuation_id": { "type": "string", "minLength": 1 },
-    "actuation_status": { "enum": ["EXECUTED", "BLOCKED", "NOT_ATTEMPTED"] },
+    "receipt_type": {
+      "const": "MORPH-011-AuthorityReceipt"
+    },
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_output": {
+      "type": "string"
+    },
+    "action_class": {
+      "enum": [
+        "OBSERVE",
+        "SHELL",
+        "UNKNOWN"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "side_effect": {
+      "enum": [
+        "NONE",
+        "UNKNOWN"
+      ]
+    },
+    "admission_decision": {
+      "enum": [
+        "ADMITTED",
+        "DENIED"
+      ]
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actuation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actuation_status": {
+      "enum": [
+        "EXECUTED",
+        "BLOCKED",
+        "NOT_ATTEMPTED"
+      ]
+    },
     "observed_state": {},
-    "observation_id": { "type": "string", "minLength": 1 },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "timestamps": {
       "type": "object",
-      "required": ["proposal", "admission", "actuation", "observation", "receipt"],
+      "required": [
+        "proposal",
+        "admission",
+        "actuation",
+        "observation",
+        "receipt"
+      ],
       "properties": {
-        "proposal": { "type": "string" },
-        "admission": { "type": "string" },
-        "actuation": { "type": "string" },
-        "observation": { "type": "string" },
-        "receipt": { "type": "string" }
+        "proposal": {
+          "type": "string"
+        },
+        "admission": {
+          "type": "string"
+        },
+        "actuation": {
+          "type": "string"
+        },
+        "observation": {
+          "type": "string"
+        },
+        "receipt": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
-    "receipt_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    "receipt_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_reason": {
+      "type": "string",
+      "minLength": 1
+    }
   },
   "additionalProperties": false
 }
