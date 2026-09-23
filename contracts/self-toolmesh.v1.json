@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SELF ToolMesh v1",
+  "type": "object",
+  "required": ["tool_id","capability","jurisdiction","input_schema","output_schema","side_effect","requires_admission","receipt"],
+  "properties": {
+    "tool_id": {"type":"string","pattern":"^[a-z0-9._-]+$"},
+    "capability": {"enum":["OBSERVE","READ","COMPUTE","TRANSFORM","WRITE","GIT","EXECUTE","EXTERNAL"]},
+    "jurisdiction": {"const":"CHAMBOXREALITY"},
+    "input_schema": {"type":"object"},
+    "output_schema": {"type":"object"},
+    "scope": {"type":"string"},
+    "authority_level": {"type":"integer","minimum":0,"maximum":5},
+    "side_effect": {"enum":["NONE","WORKSPACE_MUTATION","GIT_MUTATION","PROCESS_EXECUTION","EXTERNAL_IO"]},
+    "requires_admission": {"type":"boolean"},
+    "receipt": {"const":"REQUIRED"},
+    "rollback": {"type":["string","null"]}
+  }
+}
