@@ -1,4 +1,4 @@
-name: AgentBridge Ollama Runtime Proof
+name: AgentBridge Ollama Runtime Proof v2
 
 on:
   push:
@@ -8,8 +8,6 @@ on:
 
 jobs:
   prove-agentbridge-ollama:
-    # Path B fallback: use GitHub's default self-hosted labels.
-    # Path A may additionally add the custom OURSELFPIMAC label to the runner.
     runs-on: [self-hosted, Linux, ARM64]
     timeout-minutes: 10
     steps:
