@@ -1,0 +1,30 @@
+{
+  "contract": "OURSELF Runner Admission Membrane",
+  "version": "v1",
+  "jurisdiction": "OURSELFPIMAC",
+  "purpose": "Prove that the AgentBridge Ollama runtime job was admitted to the intended machine before any cognition proof is credited.",
+  "selector": ["self-hosted", "OURSELFPIMAC"],
+  "admission_invariants": [
+    "The workflow MUST retain the OURSELFPIMAC label.",
+    "A run with startup_failure and zero jobs is NOT runtime execution.",
+    "No cognition receipt may be credited until a job reaches in_progress or completed with an executed proof step.",
+    "Generic self-hosted substitution is forbidden for this proof."
+  ],
+  "required_runtime_evidence": [
+    "runner name",
+    "runner operating system",
+    "runner architecture",
+    "GITHUB_RUN_ID",
+    "GITHUB_RUN_ATTEMPT",
+    "GITHUB_SHA",
+    "Ollama /api/tags response proving qwen2.5-coder:7b",
+    "deterministic AgentBridge cognition receipt"
+  ],
+  "state": {
+    "runner_admission": "PENDING_VERIFICATION",
+    "agentbridge_ollama_runtime": "IMPLEMENTED_NOT_WITNESSED",
+    "authority_granted": "NONE",
+    "actuation": "NOT_PERFORMED"
+  },
+  "alchemy_rule": "Declaration of runner identity is not evidence of runner admission; only an executed job on the selected runner can establish admission."
+}
