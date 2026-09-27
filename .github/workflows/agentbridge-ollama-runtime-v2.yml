@@ -1,0 +1,44 @@
+name: AgentBridge Ollama Runtime Proof v2
+
+on:
+  push:
+    branches:
+      - signal/local-ollama-cognition-20260922
+  workflow_dispatch:
+
+jobs:
+  prove-agentbridge-ollama:
+    runs-on: [self-hosted, Linux, ARM64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record admitted runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUNNER_NAME=$RUNNER_NAME"
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "RUNNER_ARCH=$RUNNER_ARCH"
+          echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+          echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          test "$GITHUB_REF_NAME" = "signal/local-ollama-cognition-20260922" || {
+            echo "BOUNDARY_VIOLATION=UNEXPECTED_BRANCH"
+            exit 1
+          }
+          echo "RUNNER_ADMISSION=EXECUTED_ON_SELECTED_RUNNER"
+      - name: Verify Ollama endpoint
+        run: curl --fail --silent http://127.0.0.1:11434/api/tags
+      - name: Verify target model
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent http://127.0.0.1:11434/api/tags > /tmp/ollama-tags.json
+          grep -q '"name":"qwen2.5-coder:7b"' /tmp/ollama-tags.json
+      - name: Execute AgentBridge cognition proof
+        run: node --test tests/agentbridge-ollama-runtime.test.js
+      - name: Emit governed boundary
+        run: |
+          echo "COGNITION_PROVEN=AGENTBRIDGE->OLLAMA"
+          echo "AUTHORITY_GRANTED=NONE"
+          echo "ACTUATION=NOT_PERFORMED"
