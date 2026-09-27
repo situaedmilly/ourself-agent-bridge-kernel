@@ -1,0 +1,28 @@
+{
+  "receipt_id": "OURSELF-SELFGRAPH-REALISELF-BOOT-001",
+  "timestamp": "2026-09-27T00:44:00-04:00",
+  "target_repo": "situaedmilly/ourself-agent-bridge-kernel",
+  "target_branch": "main",
+  "operation": "PUBLISH_SELFGRAPH_REALISELF_INSTANCE_REQUIREMENTS",
+  "evidence": {
+    "contract_commit": "f7dc7f8cd85f84fa937ea9908e6b6d0db1709d43",
+    "readme_commit": "982091b0d5262029aea5174ca39117330ce92847",
+    "validator_commit": "6e79b5bfb65b028adc18046ec1c133c5f7f8b315",
+    "test_commit": "37c06917d765f9bd8ea636cd5aaf1cd05820d346",
+    "validator_normalization_commit": "cc0e8caf4b931f22d25c4031bdb0266605e99585"
+  },
+  "standing": {
+    "contract": "PUBLISHED",
+    "runtime_graph_instances": "NOT_ESTABLISHED",
+    "local_execution": "NOT_WITNESSED_HERE",
+    "admission": "NOT_REQUESTED",
+    "actuation": "NOT_REQUESTED",
+    "effect": "NOT_ESTABLISHED"
+  },
+  "constitutional_result": {
+    "minimum_jurisdiction_instances": 17,
+    "admission_graph": "FORBIDDEN",
+    "admission_representation": "TYPED_CROSS_GRAPH_RELATION",
+    "reality_realization_claim": "BOUNDED_EVIDENCE_GATE_ONLY"
+  }
+}
