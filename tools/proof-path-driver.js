@@ -230,6 +230,8 @@ export function createProofPathDriver(config) {
 
     // ── EXECUTE (T-032) ─────────────────────────────────────────────────────
     const executor = createBoundedProposalExecutor({
+      executionPreimage: cfg.executionPreimage,
+      requireExecutionPreimage: cfg.requireExecutionPreimage,
       authorizedExecutionRoot: executionRoot,
       ...(typeof cfg.executionSpawnImpl === 'function' ? { spawnImpl: cfg.executionSpawnImpl } : {}),
       ...passthrough,
@@ -286,18 +288,30 @@ export function createProofPathDriver(config) {
    * completed chain is enforced by the hash-chained event ledger.
    */
   async function verifyProofChain({ proposalId }) {
-    if (typeof proposalId !== 'string' || proposalId.length === 0) {
-      return { ok: false, error: DRIVER_ERRORS.INVALID_REQUEST, message: 'proposalId is required' };
-    }
-    const checks = {
-      pending_proposal: await verifyPendingProposal(storageRoot, proposalId),
-      execution_witness: await verifyExecutionWitness(storageRoot, proposalId),
-      semantic_reconciliation: await verifySemanticReconciliation(storageRoot, proposalId),
-      event_ledger: await verifyEventLedger(storageRoot),
-    };
-    const allOk = Object.values(checks).every((c) => c && c.ok === true && c.valid !== false);
-    return { ok: allOk, driver_version: DRIVER_VERSION, proposal_id: proposalId, checks };
+    return verifyPersistedProofChain({ storageRoot, proposalId });
   }
 
   return { runProofPath, verifyProofChain };
+}
+
+// Read-only entry point for fresh-process recontact. Verification needs no
+// execution root or authority verifier and cannot dispatch an operation.
+export async function verifyPersistedProofChain({ storageRoot, proposalId }) {
+  const root = assertAbsolutePath(storageRoot, 'storageRoot');
+  if (typeof proposalId !== 'string' || proposalId.length === 0) {
+    return { ok: false, error: DRIVER_ERRORS.INVALID_REQUEST, message: 'proposalId is required' };
+  }
+  const checks = {
+    pending_proposal: await verifyPendingProposal(root, proposalId),
+    execution_witness: await verifyExecutionWitness(root, proposalId),
+    semantic_reconciliation: await verifySemanticReconciliation(root, proposalId),
+    event_ledger: await verifyEventLedger(root),
+  };
+  const integrityValid = Object.values(checks).every(c => c && c.ok === true && c.valid === true);
+  const complete = checks.execution_witness.witnessed === true
+    && checks.semantic_reconciliation.reconciled === true;
+  return { ok: integrityValid && complete, driver_version: DRIVER_VERSION,
+    proposal_id: proposalId, checks,
+    ...(!complete ? { error: 'PROOF_CHAIN_INCOMPLETE' } : {}),
+  };
 }
