@@ -1,0 +1,119 @@
+{
+  "contract_id": "OURSELF-SELFGRAPH-REALISELF-INSTANCE-REQUIREMENTS-001",
+  "version": "1.0.0",
+  "standing": "CONTRACTUAL_DESIGN",
+  "purpose": "Define the minimum witnessed instance classes required before a bounded OURSELF reality target may be described as runtime-realized. Instance count is evidence scope, not a metaphysical claim that quantity creates reality.",
+  "constitutional_invariants": [
+    "DECLARED != REGISTERED",
+    "REGISTERED != PERSISTED",
+    "PERSISTED != INITIALIZED",
+    "INITIALIZED != RUNNING",
+    "RUNNING != WITNESSED",
+    "WITNESSED != ADMITTED",
+    "ADMITTED != ACTUATED",
+    "ACTUATED != EFFECTED",
+    "EFFECTED != CUSTODIED",
+    "CUSTODIED != PERMANENT",
+    "CAPABILITY != AUTHORITY",
+    "AUTHORITY != ADMISSION",
+    "ACTION != EFFECT",
+    "EVENT != CAUSAL_TRUTH",
+    "EVIDENCE != TRUTH",
+    "NO_GRAPH_MAY_ANSWER_A_FOREIGN_JURISDICTION_WITHOUT_A_WITNESSED_CROSS_GRAPH_RELATION"
+  ],
+  "target_model": {
+    "target": "BOUNDED_REALITY_INSTANCE",
+    "required_fields": [
+      "reality_id",
+      "scope",
+      "time_window",
+      "target_claim",
+      "required_jurisdictions"
+    ],
+    "realization_rule": "A target may be marked REALIZED only when every required jurisdiction has a witnessed runtime instance or an explicit witnessed reason that the jurisdiction is non-runtime for this target, and every required cross-graph relation has a witness.",
+    "anti_collapse": "REALIZED is a lifecycle/evidence standing for the bounded target. It does not assert permanence, universal truth, or metaphysical creation."
+  },
+  "jurisdiction_instance_requirements": [
+    {"graph_id":"CORE","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"IDENTITY","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"REALITY","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"FILE","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"RUNTIME","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"NETWORK","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"CAPABILITY","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"AUTHORITY","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"COGNITION","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"AGENTBRIDGE","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"SELFCOMM","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"ACTION","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"ALCHEMY","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"STATE_LINEAGE","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"EVENT","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"EVIDENCE","minimum_instances":1,"required_standing":"WITNESSED"},
+    {"graph_id":"LIFECYCLE","minimum_instances":1,"required_standing":"WITNESSED"}
+  ],
+  "admission": {
+    "graph_id": null,
+    "represented_as": "CROSS_GRAPH_RELATION",
+    "minimum_required_relations": [
+      "ADMITTED_AS"
+    ],
+    "rule": "ADMISSION is not an independent graph jurisdiction. It is a typed relation requiring capability, authority, context, target, constraints, and evidence."
+  },
+  "realization_phases": [
+    {
+      "phase": "CONSTITUTIONAL",
+      "requires": ["GRAPH_JURISDICTION_REGISTRY"],
+      "standing": "REGISTERED"
+    },
+    {
+      "phase": "INSTANCE",
+      "requires": ["17_JURISDICTION_INSTANCES"],
+      "standing": "PERSISTED"
+    },
+    {
+      "phase": "RELATIONAL",
+      "requires": ["CROSS_GRAPH_RELATIONS"],
+      "standing": "WITNESSED"
+    },
+    {
+      "phase": "RUNTIME",
+      "requires": ["RUNTIME_INSTANCE","ACTION_INSTANCE","EVENT_INSTANCE"],
+      "standing": "WITNESSED"
+    },
+    {
+      "phase": "EVIDENTIARY",
+      "requires": ["EVIDENCE_INSTANCE","STATE_LINEAGE_INSTANCE","LIFECYCLE_INSTANCE"],
+      "standing": "WITNESSED"
+    },
+    {
+      "phase": "ADMISSION",
+      "requires": ["ADMITTED_AS_RELATION"],
+      "standing": "ADMITTED"
+    },
+    {
+      "phase": "ACTUATION",
+      "requires": ["ACTUATED_ACTION_INSTANCE"],
+      "standing": "ACTUATED"
+    },
+    {
+      "phase": "EFFECT",
+      "requires": ["EFFECT_EVENT_OR_EXTERNAL_STATE_WITNESS"],
+      "standing": "EFFECTED"
+    }
+  ],
+  "minimum_jurisdiction_instance_count": 17,
+  "count_semantics": "17 is the minimum one-per-jurisdiction graph-instance set for a fully represented bounded target. Cross-graph relations, events, evidence, state-lineage records, and receipts are unbounded and must be counted separately.",
+  "fail_closed_conditions": [
+    "missing_jurisdiction_instance",
+    "instance_not_witnessed",
+    "unknown_cross_graph_endpoint",
+    "missing_cross_graph_witness",
+    "admission_without_capability_reference",
+    "admission_without_authority_reference",
+    "admission_without_context_reference",
+    "admission_without_target_reference",
+    "actuation_without_admission",
+    "effect_claim_without_effect_witness"
+  ]
+}
