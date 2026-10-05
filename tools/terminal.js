@@ -16,7 +16,7 @@ function isWithinBoundary(workingDir) {
 // Execute an approved command.
 // Throws if working_dir is outside the RUORA boundary.
 // This function must ONLY be called after OURSELF approval — never autonomously.
-export async function executeCommand(action, workingDir, executionClass = null) {
+export async function executeCommand(action, workingDir, executionClass = null, approval = null) {
   if (!workingDir) throw new Error('Working directory is required.');
 
   if (!isWithinBoundary(workingDir)) {
@@ -76,6 +76,11 @@ export async function executeCommand(action, workingDir, executionClass = null) 
       cwd: resolve(workingDir),
       timeout: TIMEOUT_MS,
       shell: '/bin/zsh',
+      env: {
+        ...process.env,
+        OURSELF_APPROVAL_COMMAND_ID: approval?.commandId ?? '',
+        OURSELF_APPROVAL_AT: approval?.approvedAt ?? '',
+      },
     }));
   } catch (err) {
     // exec rejects on non-zero exit code — surface stderr as the error message
