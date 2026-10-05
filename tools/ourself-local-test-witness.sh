@@ -10,7 +10,6 @@ REPO_DIR="${OURSELF_REPO_DIR:-/Users/millysituated/RUORA/projects/ourself-agent-
 RECEIPT_DIR="$REPO_DIR/proof/local-execution"
 RECEIPT="$RECEIPT_DIR/r2-local-execution-receipt.json"
 
-mkdir -p "$RECEIPT_DIR"
 cd "$REPO_DIR"
 
 echo "=== OURSELF LOCAL EXECUTION WITNESS ==="
@@ -26,11 +25,14 @@ echo "Commit:     $ACTUAL_COMMIT"
 [[ "$ACTUAL_BRANCH" == "$BRANCH" ]] || { echo "BLOCK: branch mismatch."; exit 21; }
 [[ "$ACTUAL_COMMIT" == "$EXPECTED_COMMIT" ]] || { echo "BLOCK: commit mismatch."; exit 22; }
 
-if [[ -n "$(git status --porcelain)" ]]; then
+DIRTY="$(git status --porcelain --untracked-files=all | grep -v "^?? proof/local-execution/r2-local-execution-receipt.json$" || true)"
+if [[ -n "$DIRTY" ]]; then
   echo "BLOCK: working tree is dirty before execution."
+  printf "%s\n" "$DIRTY"
   exit 23
 fi
 
+mkdir -p "$RECEIPT_DIR"
 echo "[1] npm ci"
 npm ci
 
