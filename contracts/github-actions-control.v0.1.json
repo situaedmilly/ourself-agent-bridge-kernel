@@ -1,0 +1,81 @@
+{
+  "version": "0.1",
+  "name": "github-actions-control",
+  "authority": "AgentBridge",
+  "purpose": "Expose bounded GitHub Actions control-plane operations without granting arbitrary repository, shell, or machine execution authority.",
+  "operations": {
+    "workflow.list": {
+      "method": "GET",
+      "scope": "/repos/{owner}/{repo}/actions/workflows",
+      "mutability": "read",
+      "receipt_required": true
+    },
+    "workflow.read": {
+      "method": "GET",
+      "scope": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}",
+      "mutability": "read",
+      "receipt_required": true
+    },
+    "workflow.enable": {
+      "method": "PUT",
+      "scope": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable",
+      "mutability": "control",
+      "receipt_required": true,
+      "requires_admission": true
+    },
+    "workflow.disable": {
+      "method": "PUT",
+      "scope": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable",
+      "mutability": "control",
+      "receipt_required": true,
+      "requires_admission": true
+    },
+    "workflow.dispatch": {
+      "method": "POST",
+      "scope": "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",
+      "mutability": "control",
+      "receipt_required": true,
+      "requires_admission": true
+    },
+    "actions.permissions.read": {
+      "method": "GET",
+      "scope": "/repos/{owner}/{repo}/actions/permissions",
+      "mutability": "read",
+      "receipt_required": true
+    },
+    "actions.workflow.permissions.read": {
+      "method": "GET",
+      "scope": "/repos/{owner}/{repo}/actions/permissions/workflow",
+      "mutability": "read",
+      "receipt_required": true
+    },
+    "runner.groups.read": {
+      "method": "GET",
+      "scope": "/repos/{owner}/{repo}/actions/runner-groups",
+      "mutability": "read",
+      "receipt_required": true
+    },
+    "runners.read": {
+      "method": "GET",
+      "scope": "/repos/{owner}/{repo}/actions/runners",
+      "mutability": "read",
+      "receipt_required": true
+    }
+  },
+  "explicitly_absent": [
+    "arbitrary_github_url",
+    "arbitrary_github_api_method",
+    "repository_file_write",
+    "git_ref_write",
+    "shell.execute",
+    "runner_command_execute",
+    "machine.actuate"
+  ],
+  "non_collapse": [
+    "INTENT != AUTHORITY",
+    "AUTHORITY != ADMISSION",
+    "ADMISSION != ACTUATION",
+    "ACTUATION != OBSERVATION",
+    "OBSERVATION != RECEIPT"
+  ]
+}
