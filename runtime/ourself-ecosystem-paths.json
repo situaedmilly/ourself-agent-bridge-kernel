@@ -1,0 +1,51 @@
+{
+  "schema": "OURSELF-ECOSYSTEM-PATHS-v0.1",
+  "status": "DECLARED",
+  "workspace_root": "/Users/millysituated/OURSELF",
+  "launch_realm": {
+    "address_repo": {
+      "repository": "situaedmilly/SELFVEREIGN-ADDRESSELF",
+      "local_path": "/Users/millysituated/OURSELF/SELFVEREIGN-ADDRESSELF",
+      "branch": "feat/ourself-mcp-model-launch-v0.1",
+      "role": "ADDRESS_REALM"
+    },
+    "execution_repo": {
+      "repository": "situaedmilly/FLOWACTIONSELFWORK",
+      "local_path": "/Users/millysituated/OURSELF/FLOWACTIONSELFWORK",
+      "branch": "feat/ourself-mcp-model-launch-v0.1",
+      "role": "EXECUTION_REALM",
+      "runtime_entrypoint": "/Users/millysituated/OURSELF/FLOWACTIONSELFWORK/runtime/ourself-mcp-model-server.mjs"
+    },
+    "cognition_repo": {
+      "repository": "situaedmilly/Cognitive-Transmutation-Core",
+      "local_path": "/Users/millysituated/OURSELF/Cognitive-Transmutation-Core",
+      "branch": "feat/ourself-mcp-model-launch-v0.1",
+      "role": "COGNITION_REALM"
+    }
+  },
+  "canonical_server": {
+    "server_id": "OURSELF-MCP-MODEL-SERVER",
+    "instance_id": "OURSELF-INSTANCE-0001",
+    "authority": "OURSELF",
+    "ollama_role": "COGNITION_SUBSTRATE",
+    "model_target": "QWEN_27B_80K_LOCAL"
+  },
+  "ecosystem_repos": [
+    "situaedmilly/ourself-core",
+    "situaedmilly/ourself-agent-bridge-kernel",
+    "situaedmilly/ourself-agent-bridge",
+    "situaedmilly/self-communication",
+    "situaedmilly/SELFCOMM-SIMPLE-V0.1",
+    "situaedmilly/ourself-cloud-server-network",
+    "situaedmilly/self-protocol-suite",
+    "situaedmilly/OURPROCESSORSELF",
+    "situaedmilly/ALTONUMBUSELF",
+    "situaedmilly/Bubbleself",
+    "situaedmilly/SELFBull",
+    "situaedmilly/GOLDSELFSCAN",
+    "situaedmilly/self-public-source",
+    "situaedmilly/SELFVEREIGN-ADDRESSELF",
+    "situaedmilly/FLOWACTIONSELFWORK",
+    "situaedmilly/Cognitive-Transmutation-Core"
+  ]
+}
