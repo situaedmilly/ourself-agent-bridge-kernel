@@ -1,3 +1,5 @@
+Process started with PID 72628 (shell: /bin/zsh)
+Initial output:
 // test/path-boundary.test.js
 // ── Bridge Pass 20 · RUORA path boundary (direct import) ─────────────────────
 // Proves executeCommand confines work to the RUORA boundary using RESOLVED
@@ -7,8 +9,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { executeCommand } from '../tools/terminal.js';
+import { RUORA_BOUNDARY } from '../tools/execution-classes.js';
 
-const RUORA = '/Users/millysituated/RUORA';
+const RUORA = RUORA_BOUNDARY;
 
 test('inside the RUORA boundary: harmless pwd executes', async () => {
   const res = await executeCommand('pwd', RUORA);
@@ -44,3 +47,4 @@ test('sibling-prefix traversal (RUORA/../RUORA-evil) rejected', async () => {
 test('a missing working directory is rejected', async () => {
   await assert.rejects(() => executeCommand('pwd', ''), /Working directory is required/);
 });
+
