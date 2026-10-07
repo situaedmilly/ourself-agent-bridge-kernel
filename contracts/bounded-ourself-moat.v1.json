@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "contract_id": "boundedOURSELFMOAT",
+  "version": "1.0.0",
+  "purpose": "Encode non-surface moat semantics as executable invariants rather than access prose.",
+  "access_model": "POSSIBILITY_MEMBRANE",
+  "mutations": {
+    "access_to_possibility": true,
+    "identity_to_continuity": true,
+    "action_to_anti_substitution": true,
+    "capability_to_negative_space": true,
+    "authorization_to_temporal_object": true,
+    "crossing_to_evidence": true,
+    "admission_to_graph_mutation": true,
+    "receipt_to_custody": true
+  },
+  "runtime_invariants": {
+    "runtime_identity_binding": [
+      "pid",
+      "endpoint",
+      "source_sha256"
+    ],
+    "exact_action_binding": true,
+    "exact_capability_binding": true,
+    "exact_intent_binding": true,
+    "default_deny": true,
+    "unknown_capability": "DENY",
+    "authorization_bounded": true,
+    "crossing_process_observation_required": true,
+    "matched_pid_required": true,
+    "graph_admission_required": true,
+    "receipt_persisted_before_graph_admission": true,
+    "receipt_recontact_hash_required": true,
+    "no_automatic_destructive_rollback": true
+  },
+  "boundary": {
+    "execution_host": "RAWMAC",
+    "graph_boundary": "LOCAL_ONLY_NOT_INSTITUTIONAL_SELFGRAPH",
+    "authority": "OURSELF"
+  }
+}
