@@ -1,3 +1,5 @@
+Process started with PID 72795 (shell: /bin/zsh)
+Initial output:
 // test/helpers/bridge-process.js
 // ── Bridge Pass 20 · Isolated bridge launcher ───────────────────────────────
 //
@@ -59,6 +61,10 @@ function childEnv({ tempDir, token, port, withToken = true, extra = {} }) {
     // Ensure no live provider keys leak in from the parent shell.
     ANTHROPIC_API_KEY: '',
     OPENAI_API_KEY: '',
+    OURSELFD_STATE_ROOT: join(tempDir, 'ourselfd-state'),
+    OURSELFD_HEALTH_URL: 'http://127.0.0.1:9/health',
+    OURSELFD_POLICY_PATH: join(tempDir, 'ourselfd-policy.json'),
+    RUORA_BOUNDARY: BRIDGE_DIR,
     ...extra,
   };
   if (withToken) env.BRIDGE_TOKEN = token;
@@ -144,3 +150,4 @@ export async function startBridge(opts = {}) {
 export function tokenHeader(token) {
   return { 'x-ourself-token': token };
 }
+
