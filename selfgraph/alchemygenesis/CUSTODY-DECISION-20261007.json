@@ -1,0 +1,23 @@
+{
+  "record_type": "ALCHEMYGENESIS_CUSTODY_DECISION",
+  "decision": "GRANT",
+  "repo": "ourself-agent-bridge-kernel",
+  "mutation_role": "AGENT_BRIDGE_AND_EXECUTION_BOUNDARY",
+  "preimage_head": "e560c09",
+  "role_binding": {
+    "boundary": "admission module actuation=NOT_PERFORMED; cognition via OpenAI-compatible API only",
+    "hermes_bind": "VERIFIED (HERMES_GENESIS_BOUND, server slot task 118)",
+    "execution_policy": {
+      "remote_execution": false,
+      "arbitrary_commands": false
+    }
+  },
+  "decided_at": "2026-10-07",
+  "canonical_graph_id": "SELFGRAPH-ALCHEMYGENESIS-LAUNCH-001",
+  "canonical_graph_sha256": "fa1795dd604fbf59f28ca5dbeb73711e68dc521b37bb65514f56657d65ac575a",
+  "canonical_admission": "CANONICAL-ADMISSION-ALCHEMY-REVERSELF-20261007 (FOUNDER_DISPOSITION 2026-10-07T20:38:05Z)",
+  "primary_custody": "situaedmilly/Cognitive-Transmutation-Core @ alchemy/realself-runtime-v0.1 commit 93e4761",
+  "gguf_sha256": "16c9802111aa9ef3acde465188d6d601f8db128ee3d828ad983a5caca4135ecb",
+  "authority": "FOUNDER WORD: MICRO-SYMMETRICAL PIPEPORTAL custody frame, 2026-10-07",
+  "law": "decision != mutation != remote effect; additive only; seal bytes never rewritten"
+}
