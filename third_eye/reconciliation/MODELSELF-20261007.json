@@ -1,0 +1,49 @@
+{
+  "schema": "OURSELF-THIRD-EYE-MODELSELF-RECONCILIATION-v0.1",
+  "status": "RECONCILED_OBSERVATION",
+  "authority": "OURSELF",
+  "observation_basis": {
+    "host": "OURSELFMAC.lan",
+    "endpoint": "http://127.0.0.1:11435",
+    "pid": 70370,
+    "substrate": "LLAMA_CPP",
+    "model": "NousResearch/Hermes-3-Llama-3.2-3B-GGUF:Q4_K_M",
+    "context_size": 32768,
+    "health": "ok",
+    "model_discovery": "proven",
+    "inference_response": "MODELSELF ONLINE",
+    "witness_sha256": "4e1b1153687c8cecce4bed611d632d37630021bf97b4c9eea875aa33d14daebd"
+  },
+  "comparison": {
+    "github_main_claim": {
+      "server_id": "OURSELF-MCP-MODEL-SERVER",
+      "ollama_role": "COGNITION_SUBSTRATE",
+      "model_target": "QWEN_27B_80K_LOCAL"
+    },
+    "classifications": {
+      "server_id": "STALE",
+      "ollama_role": "STALE",
+      "model_target": "STALE",
+      "live_endpoint": "CURRENT",
+      "live_substrate": "CURRENT",
+      "live_model": "CURRENT",
+      "live_pid": "CURRENT",
+      "live_context_size": "CURRENT",
+      "live_health": "CURRENT",
+      "live_inference": "CURRENT",
+      "local_witness_file": "PRESENT_LOCAL_MISSING_GITHUB_MAIN"
+    }
+  },
+  "rule": {
+    "github_registry": "DECLARED_HISTORICAL_EVIDENCE",
+    "live_socket_process_observation": "CURRENT_RUNTIME_EVIDENCE",
+    "registry_is_runtime_authority": false,
+    "blind_overwrite": false
+  },
+  "action": {
+    "type": "CONTROLLED_RECONCILIATION",
+    "preserve_historical_claim": true,
+    "write_reconciled_matter": true,
+    "do_not_claim_genesis": true
+  }
+}
