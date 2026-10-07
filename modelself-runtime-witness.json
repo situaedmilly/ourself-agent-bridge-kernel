@@ -1,0 +1,35 @@
+{
+  "schema": "MODELSELF-RUNTIME-WITNESS-v0.1",
+  "status": "OBSERVED_LIVE",
+  "host": "OURSELFMAC.lan",
+  "workspace_root": "/Users/millysituated/OURSELF",
+  "substrate": "LLAMA_CPP",
+  "binary": "/Users/millysituated/OURSELF/llama.cpp/build/bin/llama-server",
+  "binary_version": "0.6.0-dev",
+  "build": 11441,
+  "commit": "6c73b3e12",
+  "model": "NousResearch/Hermes-3-Llama-3.2-3B-GGUF:Q4_K_M",
+  "parameter_count": 3212749888,
+  "model_size_bytes": 2011539712,
+  "quantization": "Q4_K - Medium",
+  "endpoint": "http://127.0.0.1:11435",
+  "context_size": 32768,
+  "training_context_size": 131072,
+  "health": "ok",
+  "model_discovery": "proven",
+  "inference": {
+    "response": "MODELSELF ONLINE",
+    "prompt_tokens": 16,
+    "generated_tokens": 4,
+    "prompt_tokens_per_second": 60.6019,
+    "generation_tokens_per_second": 43.1611
+  },
+  "resource_snapshot": {
+    "pid": 70370,
+    "rss_kb": 5652944,
+    "memory_free_percent": 28
+  },
+  "stress_admission": "PENDING_24K_TOKEN_CONTROLLED_TEST",
+  "authority": "NONE_FROM_MODEL",
+  "execution_admission": "AGENTBRIDGE_REQUIRED"
+}
