@@ -1,3 +1,5 @@
+Process started with PID 72609 (shell: /bin/zsh)
+Initial output:
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -15,7 +17,7 @@ test("repo.status traverses the full non-collapsed transition chain", async () =
     instance_id: instance.instance_id,
     capability: "repo.status",
     operation: "git_status",
-    target: "OURSELFEREIGNTY"
+    target: "."
   });
 
   assert.equal(receipt.state, "RECEIPTED");
@@ -46,8 +48,9 @@ test("forbidden capabilities cannot cross the membrane", async () => {
       instance_id: instance.instance_id,
       capability: "shell.execute",
       operation: "anything",
-      target: "OURSELFEREIGNTY"
+      target: "."
     }),
     /CAPABILITY_FORBIDDEN/
   );
 });
+
