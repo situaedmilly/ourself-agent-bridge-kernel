@@ -10,6 +10,7 @@ import { executeCommand } from './tools/terminal.js';
 import { classifyCommand, evaluateApproval, EXECUTION_CLASSES } from './tools/execution-classes.js';
 import { createRealmGate } from './tools/realm-gate.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from './tools/reverse-engineer.js';
+import { reverseEngineerGitHubBlob, compareLocalFileToBlob } from './runtime/blobself.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -790,6 +791,59 @@ app.post('/reverse-engineer', requireToken, async (req, res) => {
     message: 'reverse_engineer structured analysis queued — OURSELF approval required (non-terminal, read-only).',
     request: pendingEntry,
     next: `Approve at: curl -X POST -H "x-ourself-token: $OURSELF_TOKEN" http://localhost:${PORT}/approve/${cmdId}`,
+  });
+});
+
+
+// ── BlobSELF REVERSELF v1 — GitHub HTTP blob observation ─────────────────────
+// Authenticated, read-only remote observation. No shell, no GitHub mutation,
+// no model execution. Optional localPath comparison uses Git's blob SHA rule.
+app.post('/blobself/reverse-engineer', requireToken, async (req, res) => {
+  const { owner, repo, path, ref = null, localPath = null } = req.body || {};
+
+  const observed = await reverseEngineerGitHubBlob({ owner, repo, path, ref });
+  if (!observed.ok) {
+    return res.status(observed.status === 404 ? 404 : 400).json(observed);
+  }
+
+  let comparison = null;
+  if (localPath) {
+    let resolvedLocal;
+    try {
+      resolvedLocal = resolveTargetWithinBoundary(localPath);
+    } catch (err) {
+      return res.status(400).json({ error: err.code ?? 'invalid_local_target', message: err.message });
+    }
+    comparison = await compareLocalFileToBlob(resolvedLocal.resolvedPath, observed.blob.sha);
+    if (!comparison.ok) {
+      return res.status(422).json({ ...observed, comparison });
+    }
+  }
+
+  const witness = {
+    witness_version: 'ourself.blobself.witness.v1',
+    class: observed.class,
+    source: observed.source,
+    locator: observed.locator,
+    blob: observed.blob,
+    evidence: observed.evidence,
+    comparison,
+    non_actions: observed.non_actions,
+    observed_at: new Date().toISOString(),
+  };
+
+  await log({
+    type: 'blobself_reverse_engineer_observed',
+    witness_version: witness.witness_version,
+    locator: witness.locator,
+    blob_sha: witness.blob.sha,
+    local_comparison_match: comparison?.comparison?.match ?? null,
+  });
+
+  return res.json({
+    status: 'OBSERVED',
+    admission: 'READ_ONLY_REMOTE_OBSERVATION',
+    witness,
   });
 });
 
