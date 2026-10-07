@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "evidence_type": "LOCAL_EXECUTION_WITNESS",
+  "contract_id": "boundedOURSELFMOAT",
+  "contract_version": "1.0.0",
+  "observed_at": "2026-10-07T14:37:16.072Z",
+  "host": "RAWMAC",
+  "ourselfd": {
+    "instance_id": "6142893f-00d2-4bd2-871e-7f784da7ac11",
+    "pid": 51791,
+    "endpoint": "127.0.0.1:65141",
+    "boot_id": "bfa8330d-66f9-40ba-9e35-e9064ee5ded4"
+  },
+  "agentbridge": {
+    "pid": 52097,
+    "endpoint": "127.0.0.1:3001",
+    "source_sha256": "b409f22bbd10b682d50bed77064107c84a7c3b492193c605a2e2679e52352fcd"
+  },
+  "execution": {
+    "action": "CREATE_LOCAL_WITNESS",
+    "authorization_id": "3553b3a0-6634-4a7e-ad70-e9b64d0152a3",
+    "request_id": "91d98dc0-3ed9-4c5f-8d16-071e459d507d",
+    "intent_id": "58d46614-5a1d-46d9-ba5d-2595e43fe4cf",
+    "witness_path": "witnesses/7625b716-47ac-4794-a460-a55710835bc7.txt",
+    "witness_digest": "c285ba25fd708a561ffc958a44e27d7264e3e74d6e7aec562c5c79851db53d9c",
+    "receipt_path": "receipts/91d98dc0-3ed9-4c5f-8d16-071e459d507d.json",
+    "receipt_hash": "79b9d6e07d0095e64c8649792b7394de382525ffefed41c05d7f7ff3ea9341ee",
+    "receipt_file_sha256": "153987a9a8cd1d08a5faa73c06da09ab5dddae66345c59115f2164c26cf22bdf",
+    "graph_admission_path": "graph/admissions/3553b3a0-6634-4a7e-ad70-e9b64d0152a3.json",
+    "graph_admission_digest": "d5ac1e211ac6881fc9e3d2b82d6ad04527b4b4a87a94442557168020a1643846"
+  },
+  "assertions": {
+    "access_model": "POSSIBILITY_MEMBRANE",
+    "identity_continuity": "BOUND_RUNTIME_IDENTITY",
+    "action_binding": "EXACT_ACTION_CAPABILITY_INTENT",
+    "capability_boundary": "DEFAULT_DENY",
+    "authorization_temporal": "BOUNDED",
+    "crossing_evidence": "PROCESS_OBSERVATION_MATCHED",
+    "admission_mutation": "LOCAL_GRAPH_ADMISSION_REQUIRED",
+    "custody": "RECEIPT_PERSISTED_AND_RECONTACTED",
+    "institutional_selfgraph_admission": false
+  }
+}
