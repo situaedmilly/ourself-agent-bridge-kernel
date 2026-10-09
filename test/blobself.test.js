@@ -1,3 +1,5 @@
+Process started with PID 72772 (shell: /bin/zsh)
+Initial output:
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -46,7 +48,7 @@ test('BlobSELF computes Git blob SHA for a local comparison', async () => {
   const content = Buffer.from('OURSELF BLOBSELF\n');
   await writeFile(file, content);
   const expected = createHash('sha1')
-    .update(Buffer.concat([Buffer.from(`blob ${content.length}\\0`), content]))
+    .update(Buffer.concat([Buffer.from(`blob ${content.length}\0`), content]))
     .digest('hex');
 
   const result = await compareLocalFileToBlob(file, expected);
@@ -54,3 +56,4 @@ test('BlobSELF computes Git blob SHA for a local comparison', async () => {
   assert.equal(result.comparison.match, true);
   assert.equal(result.local.git_blob_sha, expected);
 });
+

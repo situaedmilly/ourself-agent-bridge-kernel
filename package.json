@@ -1,3 +1,5 @@
+Process started with PID 72534 (shell: /bin/zsh)
+Initial output:
 {
   "name": "aethernet-agent-bridge",
   "version": "1.0.0",
@@ -7,7 +9,8 @@
     "setup": "node tools/setup-secret.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "RUORA_BOUNDARY=$PWD npm run thirdeye && RUORA_BOUNDARY=$PWD node --test",
+    "thirdeye": "node tools/thirdeye-reverself.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.20.0",
@@ -17,3 +20,4 @@
     "self-protocol-suite": "git+ssh://git@github.com/situaedmilly/self-protocol-suite.git#b0592772133f037df689bf90860924b06227bb87"
   }
 }
+

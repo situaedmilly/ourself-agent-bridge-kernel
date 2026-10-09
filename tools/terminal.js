@@ -1,3 +1,5 @@
+Process started with PID 72882 (shell: /bin/zsh)
+Initial output:
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { resolve } from 'path';
@@ -5,7 +7,7 @@ import { inspectCommand, enforceClassPolicy } from './command-firewall.js';
 
 const execAsync = promisify(exec);
 
-const RUORA_BOUNDARY = '/Users/millysituated/RUORA';
+const RUORA_BOUNDARY = process.env.RUORA_BOUNDARY || '/Users/millysituated/RUORA';
 const TIMEOUT_MS = 30_000;
 
 function isWithinBoundary(workingDir) {
@@ -90,3 +92,4 @@ export async function executeCommand(action, workingDir, executionClass = null) 
     executedAt: new Date().toISOString(),
   };
 }
+

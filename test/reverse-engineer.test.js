@@ -1,3 +1,5 @@
+Process started with PID 72565 (shell: /bin/zsh)
+Initial output:
 // test/reverse-engineer.test.js
 // ── Bridge Pass 20C · reverse_engineer structured analysis route ─────────────
 // Proves the route is a SAFE inspection organ, never a mutation vector:
@@ -16,7 +18,7 @@ import { dirname } from 'node:path';
 
 import { startBridge, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from '../tools/reverse-engineer.js';
-import { classifyCommand, evaluateApproval, NON_TERMINAL_CLASSES } from '../tools/execution-classes.js';
+import { classifyCommand, evaluateApproval, NON_TERMINAL_CLASSES, RUORA_BOUNDARY } from '../tools/execution-classes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_SRC = readFileSync(join(__dirname, '..', 'tools', 'reverse-engineer.js'), 'utf8');
@@ -69,14 +71,14 @@ test('resolveTargetWithinBoundary refuses traversal that escapes the boundary', 
 });
 
 test('resolveTargetWithinBoundary refuses a secret-bearing path BEFORE touching the fs', () => {
-  assert.throws(() => resolveTargetWithinBoundary('/Users/millysituated/RUORA/.env'),
+  assert.throws(() => resolveTargetWithinBoundary(join(RUORA_BOUNDARY, '.env')),
     (e) => e.code === 'secret_path');
   assert.throws(() => resolveTargetWithinBoundary('projects/agent-bridge/secrets.json'),
     (e) => e.code === 'secret_path');
 });
 
 test('analyzeTarget also refuses a secret-bearing target (defense in depth)', () => {
-  assert.throws(() => analyzeTarget('/Users/millysituated/RUORA/id_rsa'), (e) => e.code === 'secret_path');
+  assert.throws(() => analyzeTarget(join(RUORA_BOUNDARY, 'id_rsa')), (e) => e.code === 'secret_path');
 });
 
 // ── Structured artifact contract (item 7, primitive level) ───────────────────
@@ -87,7 +89,7 @@ test('analyzeTarget returns the strict structured artifact for an in-boundary re
   assert.equal(a.mutation, false);
   assert.equal(a.terminal, false);
   assert.equal(a.target.within_boundary, true);
-  assert.ok(a.target.resolved_path.startsWith('/Users/millysituated/RUORA'));
+  assert.ok(a.target.resolved_path.startsWith(RUORA_BOUNDARY));
   // summary
   assert.equal(a.summary.project_type, 'node');
   assert.ok(a.summary.primary_languages.includes('JavaScript'));
@@ -150,7 +152,7 @@ test('POST /reverse-engineer refuses an outside-boundary target → 400 outside_
 test('POST /reverse-engineer refuses a secret-bearing target → 400 secret_path', async () => {
   const r = await fetch(bridge.baseUrl + '/reverse-engineer', {
     method: 'POST', headers: { 'content-type': 'application/json', ...tokenHeader(bridge.token) },
-    body: JSON.stringify({ target_path: '/Users/millysituated/RUORA/.env' }),
+    body: JSON.stringify({ target_path: join(RUORA_BOUNDARY, '.env') }),
   });
   assert.equal(r.status, 400);
   assert.equal((await r.json()).code, 'secret_path');
@@ -187,3 +189,4 @@ test('reverse_engineer is APPROVAL-GATED: enqueue is pending with no artifact; a
   assert.equal(apprBody.result, undefined);
   assert.equal(apprBody.artifact.stdout, undefined);
 });
+

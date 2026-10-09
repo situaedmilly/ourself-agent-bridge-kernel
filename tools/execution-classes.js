@@ -1,3 +1,5 @@
+Process started with PID 72856 (shell: /bin/zsh)
+Initial output:
 // tools/execution-classes.js
 // ── Pass 20A · Constrained Execution Classes ────────────────────────────────
 //
@@ -33,7 +35,7 @@
 
 import { inspectCommand } from './command-firewall.js';
 
-export const RUORA_BOUNDARY = '/Users/millysituated/RUORA';
+export const RUORA_BOUNDARY = process.env.RUORA_BOUNDARY || '/Users/millysituated/RUORA';
 
 // ── Class schema ─────────────────────────────────────────────────────────────
 // terminal:false  ⇒ may NEVER reach the shell executor (fail-closed at approval)
@@ -318,3 +320,4 @@ export function evaluateApproval(storedClass, action) {
   }
   return { ok: true, code: 'ok', reason: `class verified (${live.class})`, live };
 }
+
