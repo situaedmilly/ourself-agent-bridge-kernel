@@ -1,0 +1,32 @@
+{
+  "receipt_version":"0.1",
+  "receipt_type":"AGENTBRIDGE_SELFGRAPH_PUBLICATION",
+  "timestamp":"2026-10-05",
+  "repository":"situaedmilly/ourself-agent-bridge-kernel",
+  "branch":"feat/agentbridge-selfgraph-v0.1",
+  "base_head":"7197f592cff06923b1f9a77fedaaa865b78d1cb4",
+  "graph_contract":"OURSELF-AGENTBRIDGE-SELFGRAPH-001",
+  "standing":{
+    "graph":"MANIFESTED",
+    "source_bindings":"PINNED",
+    "runtime_realization":"NOT_ESTABLISHED",
+    "authority_grant":"NOT_CLAIMED",
+    "effect":"NOT_CLAIMED"
+  },
+  "inventory":{
+    "visible_situaedmilly_repositories":27,
+    "directly_inspected_agentbridge_relevant_repositories":8,
+    "exact_source_bindings":42,
+    "graph_nodes":38,
+    "graph_edges":35
+  },
+  "published_artifacts":[
+    {"path":"specifications/selfgraph-agentbridge/AGENTBRIDGE-SELFGRAPH.v0.1.json","blob_sha":"53a4167f4d94ba120d0a6d82a8efeea18a16d8b2","commit":"f9dc35e7fb4e1e935e32c7aab31f684a15f05d83"},
+    {"path":"specifications/selfgraph-agentbridge/AGENTBRIDGE-SOURCE-MANIFEST.v0.1.tsv","blob_sha":"a7b11d0fad686a12e1abdde20bc10af150d91187","commit":"35996de88338a00636eb14cf425197529e5ed7e2"},
+    {"path":"specifications/selfgraph-agentbridge/README.md","blob_sha":"be04e8a063047a5947f72a2cd088a65e6dbe10db","commit":"6b698e61c36bff6649840b9af434a18b128c927b"},
+    {"path":"runtime/agentbridge-selfgraph.mjs","blob_sha":"348439e2cbb485262153dfb5767e18cf9424351a","commit":"a694923806faa4dc694bf3ae02bb47feebafb8e5"},
+    {"path":"test/agentbridge-selfgraph.test.mjs","blob_sha":"e505d0a985d9e1a152d875b4f3d0f9bf761a19b8","commit":"db578e10a6de4deeb9ba51dc26628c02a655173a8"}
+  ],
+  "verification_scope":"Repository read-back completed. Static manifest structure is represented and source pins are exact-format checked in authored test code. No host-runtime execution is claimed by this receipt.",
+  "constitutional_boundary":"The graph describes and binds evidence-bearing topology; it does not grant authority, execute commands, establish effects, or convert foreign observation into OURSELF authority."
+}
