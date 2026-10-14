@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
-import { startBridge, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
+import { startBridge, tokenHeader, BRIDGE_DIR, REVERSE_ENGINEER_DIR } from './helpers/bridge-process.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from '../tools/reverse-engineer.js';
 import { classifyCommand, evaluateApproval, NON_TERMINAL_CLASSES } from '../tools/execution-classes.js';
 
@@ -81,7 +81,7 @@ test('analyzeTarget also refuses a secret-bearing target (defense in depth)', ()
 
 // ── Structured artifact contract (item 7, primitive level) ───────────────────
 test('analyzeTarget returns the strict structured artifact for an in-boundary repo', () => {
-  const a = analyzeTarget(BRIDGE_DIR, 're-unit');
+  const a = analyzeTarget(REVERSE_ENGINEER_DIR, 're-unit');
   assert.equal(a.class, 'reverse_engineer');
   assert.equal(a.analysis_only, true);
   assert.equal(a.mutation, false);
@@ -117,7 +117,7 @@ test('analyzeTarget returns the strict structured artifact for an in-boundary re
 });
 
 test('analyzeTarget never reads secret file contents — secret files surface as risks only', () => {
-  const a = analyzeTarget(BRIDGE_DIR, 're-secrets');
+  const a = analyzeTarget(REVERSE_ENGINEER_DIR, 're-secrets');
   // .env exists in the bridge repo; it must appear only as an excluded risk,
   // never in the file listing, and its contents are never read.
   assert.ok(!a.structure.files.some(f => /(^|\/)\.env(\.|$)/.test(f)), '.env must not be listed');
@@ -133,7 +133,7 @@ test('POST /reverse-engineer is token-gated (missing → 401, wrong → 401)', a
   assert.equal(r1.status, 401);
   const r2 = await fetch(bridge.baseUrl + '/reverse-engineer', {
     method: 'POST', headers: { 'content-type': 'application/json', ...tokenHeader('nope') },
-    body: JSON.stringify({ target_path: BRIDGE_DIR }),
+    body: JSON.stringify({ target_path: REVERSE_ENGINEER_DIR }),
   });
   assert.equal(r2.status, 401);
 });
@@ -160,7 +160,7 @@ test('reverse_engineer is APPROVAL-GATED: enqueue is pending with no artifact; a
   // 1. enqueue — pending, no analysis yet
   const enq = await fetch(bridge.baseUrl + '/reverse-engineer', {
     method: 'POST', headers: { 'content-type': 'application/json', ...tokenHeader(bridge.token) },
-    body: JSON.stringify({ target_path: BRIDGE_DIR }),
+    body: JSON.stringify({ target_path: REVERSE_ENGINEER_DIR }),
   });
   assert.equal(enq.status, 200);
   const enqBody = await enq.json();

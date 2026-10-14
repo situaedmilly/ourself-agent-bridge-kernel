@@ -64,6 +64,12 @@ export const EXECUTION_CLASSES = Object.freeze({
     class: 'project-mutation', risk: 'high', mutation: true, terminal: true,
     analysisOnly: false, requiresApproval: true,
   }),
+  // Non-terminal, approved data-plane tools are dispatched by their typed
+  // handler and can NEVER fall through to executeCommand/the shell.
+  'data-plane': Object.freeze({
+    class: 'data-plane', risk: 'low', mutation: false, terminal: false,
+    analysisOnly: false, requiresApproval: true,
+  }),
   // First-class schema member — analysis-only, NEVER terminal. (Pass 20C route.)
   reverse_engineer: Object.freeze({
     class: 'reverse_engineer', risk: 'medium', mutation: false, terminal: false,
@@ -268,8 +274,52 @@ export function classifyCommand(action) {
     return verdict('project-mutation', `in-boundary filesystem / project mutation (${first})`);
   }
 
-  // 13 ── Unrecognized ⇒ forbidden (FAIL CLOSED)
+  // 13 ── Data-plane tools (e.g. friendship_lab)
+  if (lc.startsWith('friendship_lab')) {
+    return verdict('data-plane', `data-plane tool execution (${first})`);
+  }
+
+  // 14 ── Unrecognized ⇒ forbidden (FAIL CLOSED)
   return verdict('forbidden', 'unrecognized command — fail closed');
+}
+
+// ── Typed data-plane approval (non-shell) ────────────────────────────────────
+/**
+ * Validate an approved FriendshipLab tool proposal without ever treating it as
+ * a shell command. Only the registered tool name and a bounded JSON query pass.
+ */
+export function evaluateDataPlaneApproval(storedClass, action) {
+  const live = classifyCommand(action);
+  const refuse = (code, reason) => ({ ok: false, code, reason, live });
+
+  if (storedClass !== 'data-plane') {
+    return refuse('wrong_data_plane_class', 'data-plane tool requires the data-plane class');
+  }
+  if (live.class !== 'data-plane') {
+    return refuse('data_plane_class_mismatch', 'live action is not a registered data-plane tool');
+  }
+
+  const match = String(action ?? '').match(/^friendship_lab\s+(\{[\s\S]*\})$/);
+  if (!match) return refuse('invalid_tool_envelope', 'expected friendship_lab with a JSON object');
+  let payload;
+  try {
+    payload = JSON.parse(match[1]);
+  } catch {
+    return refuse('invalid_tool_json', 'tool arguments are not valid JSON');
+  }
+  if (!payload || typeof payload.query !== 'string') {
+    return refuse('invalid_tool_schema', 'friendship_lab requires a string query');
+  }
+
+  const query = payload.query.trim();
+  if (query.length < 3 || query.length > 200 || !/^(get|graph)\s+\S[\s\S]*$/i.test(query)) {
+    return refuse('invalid_tool_query', 'query must be bounded and start with get or graph plus a target');
+  }
+  if (/[\u0000-\u001f\u007f]/.test(query)) {
+    return refuse('invalid_tool_query', 'control characters are not permitted in tool queries');
+  }
+
+  return { ok: true, code: 'ok', reason: 'registered data-plane tool validated', live, query };
 }
 
 // ── Approval evaluation ──────────────────────────────────────────────────────

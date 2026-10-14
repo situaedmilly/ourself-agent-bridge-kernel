@@ -15,6 +15,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { enforceClassPolicy, CLASS_POLICY_TERMINAL_CLASSES } from '../tools/command-firewall.js';
 import { executeCommand } from '../tools/terminal.js';
+import { RUORA_BOUNDARY } from './helpers/bridge-process.js';
 import { BRIDGE_DIR } from './helpers/bridge-process.js';
 
 const allowed = (cmd, klass) => {
@@ -144,7 +145,7 @@ test('14. class mismatch / missing / unknown fail closed', () => {
 // ── Terminal-level enforcement (defense in depth, real executor) ────────────
 test('executor refuses a disallowed shape for its class BEFORE any shell', async () => {
   await assert.rejects(
-    () => executeCommand('git commit -m x', BRIDGE_DIR, 'git-read'),
+    () => executeCommand('git commit -m x', RUORA_BOUNDARY, 'git-read'),
     (err) => {
       assert.equal(err.classPolicyDenied, true, 'class policy denial flagged');
       assert.equal(err.executionClass, 'git-read');
@@ -156,7 +157,7 @@ test('executor refuses a disallowed shape for its class BEFORE any shell', async
 
 test('executor refuses a network git command under git-read before any shell', async () => {
   await assert.rejects(
-    () => executeCommand('git push origin main', BRIDGE_DIR, 'git-read'),
+    () => executeCommand('git push origin main', RUORA_BOUNDARY, 'git-read'),
     (err) => {
       assert.equal(err.classPolicyDenied, true);
       assert.match(err.classPattern, /gitread\.network/);
@@ -169,7 +170,7 @@ test('denylist remains the final backstop even when the class policy allows', as
   // chmod 777 is shape-permitted for project-mutation, but the Pass 18 firewall
   // still blocks it as the always-on final layer.
   await assert.rejects(
-    () => executeCommand('chmod 777 ./x', BRIDGE_DIR, 'project-mutation'),
+    () => executeCommand('chmod 777 ./x', RUORA_BOUNDARY, 'project-mutation'),
     (err) => {
       assert.equal(err.firewallDenied, true, 'firewall is the final guard');
       assert.match(err.message, /perm\.world_writable/);
@@ -179,10 +180,10 @@ test('denylist remains the final backstop even when the class policy allows', as
 });
 
 test('executor runs a correctly-classed read-only command', async () => {
-  const res = await executeCommand('git status --short', BRIDGE_DIR, 'git-read');
+  const res = await executeCommand('git status --short', RUORA_BOUNDARY, 'git-read');
   assert.ok(res.executedAt, 'a verified git-read executes');
-  const res2 = await executeCommand('pwd', BRIDGE_DIR, 'inspect');
-  assert.ok(res2.stdout.includes('agent-bridge'), 'inspect pwd executes');
+  const res2 = await executeCommand('pwd', RUORA_BOUNDARY, 'inspect');
+  assert.ok(res2.stdout.includes('RUORA'), 'inspect pwd executes inside the enforced boundary');
 });
 
 // ── Static wiring ───────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startBridge, startWithoutToken, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
+import { startBridge, startWithoutToken, tokenHeader, BRIDGE_DIR, RUORA_BOUNDARY } from './helpers/bridge-process.js';
 
 test('fail-closed: missing BRIDGE_TOKEN → non-zero exit, never listens', async () => {
   const { code, stderr } = await startWithoutToken();
@@ -53,6 +53,11 @@ test('valid token crosses auth on /ourself/verify → 200', async () => {
   assert.equal(j.authorized, true);
 });
 
+test('legacy GET /profile route is absent and cannot bypass the approval gate', async () => {
+  const r = await fetch(bridge.baseUrl + '/profile/Founder');
+  assert.equal(r.status, 404);
+});
+
 test('valid token + invalid /transmit payload → 400 (crossed auth, NO provider call)', async () => {
   const r = await fetch(bridge.baseUrl + '/transmit', {
     method: 'POST',
@@ -77,7 +82,7 @@ test('valid token /test → 200 queues the FIXED diagnostic (Pass 19B)', async (
   const j = await r.json();
   assert.equal(j.command.status, 'pending');
   assert.equal(j.command.action, 'git status --short', 'server-owned diagnostic');
-  assert.equal(j.command.workingDir, BRIDGE_DIR, 'working dir pinned to the bridge repo');
+  assert.equal(j.command.workingDir, RUORA_BOUNDARY, 'working dir pinned to the enforced RUORA boundary');
 });
 
 test('Pass 19B: malicious /test body cannot inject a command or working dir', async () => {
@@ -89,7 +94,7 @@ test('Pass 19B: malicious /test body cannot inject a command or working dir', as
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.equal(j.command.action, 'git status --short', 'caller action must be ignored');
-  assert.equal(j.command.workingDir, BRIDGE_DIR, 'caller working_dir must be ignored');
+  assert.equal(j.command.workingDir, RUORA_BOUNDARY, 'caller working_dir must be ignored in favor of the enforced RUORA boundary');
   assert.notEqual(j.command.workingDir, '/tmp');
   assert.ok(!j.command.rationale.includes('inject'), 'caller rationale must not be reflected');
   assert.equal(j.command.status, 'pending', 'still requires explicit approval');

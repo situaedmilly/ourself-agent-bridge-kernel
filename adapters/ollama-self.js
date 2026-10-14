@@ -9,7 +9,7 @@ export const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 export const DEFAULT_MODEL = 'qwen2.5-coder:7b';
 
 function normalizeBaseUrl(value) {
-  return String(value || DEFAULT_OLLAMA_URL).replace(/\\/$/, '');
+  return String(value || DEFAULT_OLLAMA_URL).replace(/\/$/, '');
 }
 
 export async function ollamaChat({

@@ -23,7 +23,9 @@ import net from 'node:net';
 import { randomBytes } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-export const BRIDGE_DIR = join(__dirname, '..', '..');     // …/agent-bridge
+export const BRIDGE_DIR = join(__dirname, '..', '..');     // current bridge source under test
+export const RUORA_BOUNDARY = process.env.RUORA_BOUNDARY || '/Users/millysituated/RUORA';
+export const REVERSE_ENGINEER_DIR = join(RUORA_BOUNDARY, 'projects', 'agent-bridge-pass-20');
 const SERVER = join(BRIDGE_DIR, 'server.js');
 const PRODUCTION_PORT = 3001;
 

@@ -6,8 +6,10 @@ import { dirname, join } from 'path';
 import { appendFile, readFile } from 'fs/promises';
 import { callClaude } from './agents/claude-agent.js';
 import { callOpenAI } from './agents/openai-agent.js';
+import { ollamaChat } from './adapters/ollama-self.js';
 import { executeCommand } from './tools/terminal.js';
-import { classifyCommand, evaluateApproval, EXECUTION_CLASSES } from './tools/execution-classes.js';
+import { handleFriendshipQuery } from './tools/friendship_lab.js';
+import { classifyCommand, evaluateApproval, evaluateDataPlaneApproval, EXECUTION_CLASSES, RUORA_BOUNDARY } from './tools/execution-classes.js';
 import { createRealmGate } from './tools/realm-gate.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from './tools/reverse-engineer.js';
 import { reverseEngineerGitHubBlob, compareLocalFileToBlob } from './runtime/blobself.js';
@@ -167,6 +169,7 @@ function logCommandProposed(cmd) {
     workingDir: cmd.workingDir,
     rationale: cmd.rationale,
     proposedAt: cmd.proposedAt,
+    kind: cmd.kind ?? null,
     continuationDepth: cmd.continuationDepth ?? 0,
     parentCmdId: cmd.parentCmdId ?? null,
     // Pass 20A — typed execution class + risk (shape only, never secrets).
@@ -363,6 +366,26 @@ async function continueAgentWithExecutionProof(cmd) {
 
 // ── Routes ─────────────────────────────────────────────────────────────────
 
+const FRIENDSHIP_LAB_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'friendship_lab',
+      description: 'Query FriendshipLab profiles and relationship graphs.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The query string. Use "get <name>" for profiles or "graph <handle>" for relationship labels.',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
+];
+
 // POST /transmit — send a message to an agent  (token-gated)
 app.post('/transmit', requireToken, async (req, res) => {
   const { from = 'user', to, message, context = {} } = req.body;
@@ -370,17 +393,42 @@ app.post('/transmit', requireToken, async (req, res) => {
   if (!to || !message) {
     return res.status(400).json({ error: '"to" and "message" are required.' });
   }
-  if (!['claude', 'openai'].includes(to)) {
-    return res.status(400).json({ error: '"to" must be "claude" or "openai".' });
+  if (!['claude', 'openai', 'ollama'].includes(to)) {
+    return res.status(400).json({ error: '"to" must be "claude", "openai", or "ollama".' });
   }
 
   const txId = generateId('tx');
 
   let agentResult;
   try {
-    agentResult = to === 'claude'
-      ? await callClaude(message, context)
-      : await callOpenAI(message, context);
+    if (to === 'ollama') {
+      const ollamaRes = await ollamaChat({
+        messages: [{ role: 'user', content: message }],
+        model: process.env.OLLAMA_MODEL || 'qwen3.5:4b',
+        tools: FRIENDSHIP_LAB_TOOLS,
+      });
+      agentResult = {
+        response: ollamaRes.message?.content || '(no text response)',
+        commandProposal: null, // Ollama tool calls must be normalized to proposals
+        substrate: ollamaRes.substrate,
+        model: ollamaRes.model,
+        inputTokens: ollamaRes.raw?.prompt_eval_count ?? null,
+        outputTokens: ollamaRes.raw?.eval_count ?? null,
+      };
+      // Normalize Ollama tool calls into the bridge's command proposal format
+      if (ollamaRes.tool_calls && ollamaRes.tool_calls.length > 0) {
+        const tool = ollamaRes.tool_calls[0];
+        agentResult.commandProposal = {
+          action: `${tool.function.name} ${JSON.stringify(tool.function.arguments)}`,
+          working_dir: process.env.RUORA_BOUNDARY || '/Users/millysituated/RUORA',
+          rationale: `Ollama tool call: ${tool.function.name}`,
+        };
+      }
+    } else {
+      agentResult = to === 'claude'
+        ? await callClaude(message, context)
+        : await callOpenAI(message, context);
+    }
   } catch (err) {
     await log({ id: txId, type: 'transmission_error', from, to, message, error: err.message });
     return res.status(500).json({ error: `Agent error: ${err.message}` });
@@ -402,6 +450,7 @@ app.post('/transmit', requireToken, async (req, res) => {
       rationale: commandProposal.rationale || '(no rationale provided)',
       proposedAt: new Date().toISOString(),
       status: 'pending',
+      kind: (to === 'ollama' && commandProposal.action.startsWith('friendship_lab ')) ? 'tool' : undefined,
       continuationDepth: 0,   // Pass 13: depth counter starts at 0 for every new transmission
       // Pass 20A — classify at enqueue; enforced (re-classified) at /approve.
       executionClass: propClass.class,
@@ -420,9 +469,11 @@ app.post('/transmit', requireToken, async (req, res) => {
     to,
     message,
     response,
+    substrate: agentResult.substrate ?? null,
+    model: agentResult.model ?? null,
     command_proposed: pendingEntry?.id ?? null,
     status: pendingEntry ? 'pending_approval' : 'completed',
-    tokens: { input: agentResult.inputTokens ?? agentResult.promptTokens, output: agentResult.outputTokens ?? agentResult.completionTokens },
+    tokens: { input: agentResult.inputTokens ?? agentResult.promptTokens ?? null, output: agentResult.outputTokens ?? agentResult.completionTokens ?? null },
   });
 
   res.json({
@@ -430,6 +481,8 @@ app.post('/transmit', requireToken, async (req, res) => {
     from,
     to,
     response,
+    substrate: agentResult.substrate ?? null,
+    model: agentResult.model ?? null,
     command_proposed: pendingEntry,
     status: pendingEntry ? 'pending_approval' : 'completed',
   });
@@ -555,7 +608,9 @@ app.post('/approve/:id', requireToken, async (req, res) => {
   // matches a fresh live classification of the action. Fail closed: the command
   // is recorded as `failed` and the executor (and its firewall) is never reached.
   // The verdict logs the class/risk/code — never the secret-bearing internals.
-  const gate = evaluateApproval(cmd.executionClass, cmd.action);
+  const gate = cmd.kind === 'tool'
+    ? evaluateDataPlaneApproval(cmd.executionClass, cmd.action)
+    : evaluateApproval(cmd.executionClass, cmd.action);
   if (!gate.ok) {
     cmd.status = 'failed';
     cmd.error = `Execution-class gate refused: ${gate.reason}`;
@@ -596,9 +651,14 @@ app.post('/approve/:id', requireToken, async (req, res) => {
 
   let result;
   try {
-    // Pass 20B — pass the validated execution class into the executor so the
-    // terminal enforces the per-class command-shape policy before any shell runs.
-    result = await executeCommand(cmd.action, cmd.workingDir, cmd.executionClass);
+    // Typed data-plane tools run only after their dedicated approval validator;
+    // they never reach the shell executor.
+    if (cmd.kind === 'tool') {
+      const toolRes = await handleFriendshipQuery(gate.query);
+      result = { stdout: toolRes, stderr: '', status: 'executed', execution_plane: 'friendship_lab' };
+    } else {
+      result = await executeCommand(cmd.action, cmd.workingDir, cmd.executionClass);
+    }
     cmd.status = 'executed';
     cmd.result = result;
     console.log(`✓ EXECUTED: ${cmd.id}  [class=${cmd.executionClass} risk=${cmd.risk ?? gate.live.risk}]`);
@@ -698,9 +758,9 @@ app.get('/log', async (req, res) => {
 const TEST_DIAGNOSTIC = Object.freeze({
   action: 'git status --short',
   // Server-pinned to the bridge's own repository boundary (inside RUORA).
-  workingDir: __dirname,
+  workingDir: RUORA_BOUNDARY,
   rationale:
-    'Pass 19B fixed read-only bridge diagnostic — proves the ' +
+    'Pass 19B fixed read-only RUORA workspace diagnostic — proves the ' +
     'approve → firewall → execute → proof chain without mutation. Caller input is ignored.',
 });
 
@@ -1588,6 +1648,7 @@ async function rehydratePendingQueue() {
       rationale: proposal.rationale,
       proposedAt: proposal.proposedAt,
       status: 'pending',
+      kind: proposal.kind ?? undefined,
       continuationDepth: proposal.continuationDepth ?? 0,
       parentCmdId: proposal.parentCmdId ?? null,
       rehydratedAt: new Date().toISOString(),

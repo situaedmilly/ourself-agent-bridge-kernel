@@ -9,9 +9,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { startBridge, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
+import { startBridge, tokenHeader, BRIDGE_DIR, RUORA_BOUNDARY } from './helpers/bridge-process.js';
 import { executeCommand } from '../tools/terminal.js';
 
 // Queue the fixed server-owned diagnostic (no caller body is honored).
@@ -66,11 +66,51 @@ test('rehydration: pending survives isolated restart as pending-only, then appro
   }
 });
 
+test('rehydration preserves the non-terminal tool kind and rejects malformed tool input before actuation', async () => {
+  let bridge = await startBridge();
+  const { tempDir, token } = bridge;
+  await bridge.stop({ keepTempDir: true });
+
+  const proposal = {
+    type: 'command_proposed',
+    id: 'cmd-data-plane-rehydrate',
+    txId: 'tx-data-plane-rehydrate',
+    from: 'test',
+    to: 'ollama',
+    action: 'friendship_lab {"query":"drop table profiles"}',
+    workingDir: RUORA_BOUNDARY,
+    rationale: 'non-terminal tool validation regression test',
+    proposedAt: new Date().toISOString(),
+    kind: 'tool',
+    continuationDepth: 0,
+    executionClass: 'data-plane',
+    execution_class: 'data-plane',
+    risk: 'low',
+    logged_at: new Date().toISOString(),
+  };
+  await writeFile(join(tempDir, 'queue.jsonl'), JSON.stringify(proposal) + '\n', { mode: 0o600 });
+
+  bridge = await startBridge({ tempDir, token });
+  try {
+    const r = await fetch(bridge.baseUrl + '/approve/cmd-data-plane-rehydrate', {
+      method: 'POST',
+      headers: tokenHeader(token),
+    });
+    const body = await r.json();
+    assert.equal(r.status, 403);
+    assert.equal(body.executionClassDenied, 'invalid_tool_query',
+      'typed data-plane validation must run after rehydration and before the handler');
+    assert.equal(body.status, 'failed');
+  } finally {
+    await bridge.stop();
+  }
+});
+
 test('firewall blocks a dangerous command before any shell (executor-level)', async () => {
   // Proven directly against the executor — stronger and independent of /test,
   // which no longer accepts an arbitrary command (Pass 19B).
   await assert.rejects(
-    () => executeCommand('chmod 777 ./x', BRIDGE_DIR),
+    () => executeCommand('chmod 777 ./x', RUORA_BOUNDARY),
     (err) => {
       assert.match(err.message, /firewall/i, 'error names the firewall');
       assert.match(err.message, /perm\.world_writable/, 'error carries the stable rule id');

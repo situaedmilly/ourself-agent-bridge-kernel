@@ -15,7 +15,7 @@ test("repo.status traverses the full non-collapsed transition chain", async () =
     instance_id: instance.instance_id,
     capability: "repo.status",
     operation: "git_status",
-    target: "OURSELFEREIGNTY"
+    target: "runtime/ourselfd"
   });
 
   assert.equal(receipt.state, "RECEIPTED");
@@ -46,7 +46,7 @@ test("forbidden capabilities cannot cross the membrane", async () => {
       instance_id: instance.instance_id,
       capability: "shell.execute",
       operation: "anything",
-      target: "OURSELFEREIGNTY"
+      target: "runtime/ourselfd"
     }),
     /CAPABILITY_FORBIDDEN/
   );

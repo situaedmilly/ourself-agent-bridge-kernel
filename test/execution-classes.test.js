@@ -21,11 +21,12 @@ import { join } from 'node:path';
 import {
   classifyCommand,
   evaluateApproval,
+  evaluateDataPlaneApproval,
   EXECUTION_CLASSES,
   EXECUTION_CLASS_NAMES,
   NON_TERMINAL_CLASSES,
 } from '../tools/execution-classes.js';
-import { startBridge, makeTempDir, tokenHeader, BRIDGE_DIR } from './helpers/bridge-process.js';
+import { startBridge, makeTempDir, tokenHeader, BRIDGE_DIR, RUORA_BOUNDARY } from './helpers/bridge-process.js';
 
 // ── 1–6, 11–12 · classifier identification ──────────────────────────────────
 test('classifier identifies inspect commands', () => {
@@ -118,11 +119,26 @@ test('reverse_engineer is a non-terminal, non-mutating, analysis-only schema mem
   }
 });
 
-test('schema covers exactly the eight Pass 20A classes', () => {
+test('schema covers the eight frozen Pass 20A classes plus the explicit data-plane extension', () => {
   assert.deepEqual(
     [...EXECUTION_CLASS_NAMES].sort(),
-    ['build', 'forbidden', 'git-read', 'git-write-local', 'inspect', 'project-mutation', 'reverse_engineer', 'test'].sort(),
+    ['build', 'data-plane', 'forbidden', 'git-read', 'git-write-local', 'inspect', 'project-mutation', 'reverse_engineer', 'test'].sort(),
   );
+});
+
+test('data-plane is non-terminal and only its typed validator can admit FriendshipLab calls', () => {
+  const action = 'friendship_lab {"query":"get Founder Milasophahr"}';
+  assert.equal(EXECUTION_CLASSES['data-plane'].terminal, false);
+  assert.ok(NON_TERMINAL_CLASSES.includes('data-plane'));
+  assert.equal(evaluateApproval('data-plane', action).code, 'non_terminal_class');
+
+  const accepted = evaluateDataPlaneApproval('data-plane', action);
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.query, 'get Founder Milasophahr');
+
+  assert.equal(evaluateDataPlaneApproval('git-read', action).ok, false);
+  assert.equal(evaluateDataPlaneApproval('data-plane', 'friendship_lab {"query":"drop table profiles"}').ok, false);
+  assert.equal(evaluateDataPlaneApproval('data-plane', 'friendship_lab not-json').ok, false);
 });
 
 // ── evaluateApproval — the fail-closed gate logic ───────────────────────────
@@ -210,7 +226,7 @@ test('/approve refuses a forbidden action before execution (live reclassificatio
   const bridge = await seedAndStart({
     id: 'cmd-craft-forbidden',
     action: 'git push origin main',
-    workingDir: BRIDGE_DIR,
+    workingDir: RUORA_BOUNDARY,
     executionClass: 'git-read',
     risk: 'low',
   });
@@ -229,7 +245,7 @@ test('/approve fails closed on stored/live class mismatch', async () => {
   const bridge = await seedAndStart({
     id: 'cmd-craft-mismatch',
     action: 'git status --short', // live = git-read
-    workingDir: BRIDGE_DIR,
+    workingDir: RUORA_BOUNDARY,
     executionClass: 'inspect',    // stored lies
     risk: 'low',
   });
@@ -247,7 +263,7 @@ test('/approve executes a correctly-classified read-only command', async () => {
   const bridge = await seedAndStart({
     id: 'cmd-craft-ok',
     action: 'git status --short',
-    workingDir: BRIDGE_DIR,
+    workingDir: RUORA_BOUNDARY,
     executionClass: 'git-read',
     risk: 'low',
   });
