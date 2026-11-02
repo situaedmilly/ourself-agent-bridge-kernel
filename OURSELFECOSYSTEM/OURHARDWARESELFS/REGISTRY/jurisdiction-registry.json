@@ -1,0 +1,8 @@
+{
+  "schema": "ourself.hardware.jurisdictions.v0.1",
+  "jurisdictions": [
+    {"jurisdiction_id":"JUR-MACOS-OURSELFMAC","subject_id":"HW-OURSELFMAC-001","os_instance_id":"OS-OURSELFMAC-MACOS-001","scope":"macOS host operating-system boundary","authority_status":"DECLARED_NOT_VERIFIED","allowed_operations":[],"denied_by_default":["cross-substrate mutation","credential export","unbounded remote execution"]},
+    {"jurisdiction_id":"JUR-DEBIAN-OURSELFPIMAC","subject_id":"HW-OURSELFPIMAC-001","os_instance_id":"OS-OURSELFPIMAC-DEBIAN-001","scope":"Debian host operating-system boundary","authority_status":"DECLARED_NOT_VERIFIED","allowed_operations":[],"denied_by_default":["cross-substrate mutation","credential export","unbounded remote execution"]},
+    {"jurisdiction_id":"JUR-ANDROID-AVD-CANDIDATE","subject_id":"VHW-ANDROID-AVD-CANDIDATE","scope":"Android guest boundary","authority_status":"UNRESOLVED","allowed_operations":[],"denied_by_default":["host privilege inheritance","guest-to-host authority escalation"]}
+  ]
+}

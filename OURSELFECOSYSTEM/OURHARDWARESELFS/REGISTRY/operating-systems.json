@@ -1,0 +1,25 @@
+{
+  "schema": "ourself.hardware.operating-systems.v0.1",
+  "instances": [
+    {
+      "os_instance_id": "OS-OURSELFMAC-MACOS-001",
+      "name": "macOS",
+      "version": "27.0.1",
+      "kernel": "Darwin 27.0.0",
+      "architecture": "arm64",
+      "host_instance_id": "HW-OURSELFMAC-001",
+      "identity_status": "DISCOVERED",
+      "evidence_refs": ["../selfgraph/ourkernelself-lenrek/observations/OURSELFMAC-2026-11-02.json"]
+    },
+    {
+      "os_instance_id": "OS-OURSELFPIMAC-DEBIAN-001",
+      "name": "Debian GNU/Linux",
+      "version": "13.6 (trixie)",
+      "kernel": "6.18.39+rpt-rpi-2712",
+      "architecture": "aarch64",
+      "host_instance_id": "HW-OURSELFPIMAC-001",
+      "identity_status": "DISCOVERED",
+      "evidence_refs": ["/home/selfadmin/ourself-kernelself-lenrek/observations/OURSELFPIMAC-2026-11-02.json"]
+    }
+  ]
+}

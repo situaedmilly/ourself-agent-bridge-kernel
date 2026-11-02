@@ -1,0 +1,12 @@
+{
+  "schema": "ourself.hardware.ecosystem-realities.v0.1",
+  "realities": [
+    {"reality_id":"REALITY-OURSELFMAC","name":"OURSELFMAC","reality_type":"HARDWARE_ECOSYSTEM_IDENTITY","substrate_id":"HW-OURSELFMAC-001","status":"DISCOVERED_NOT_BOUND"},
+    {"reality_id":"REALITY-SELFPI","name":"SELFPI","reality_type":"COMPUTATIONAL_ECOSYSTEM_IDENTITY","substrate_id":"HW-OURSELFPIMAC-001","status":"CANDIDATE_UNBOUND"},
+    {"reality_id":"REALITY-REALISELF","name":"REALISELF","reality_type":"REALIZATION_AND_IDENTITY_BINDING_REALITY","substrate_id":null,"status":"DECLARED"},
+    {"reality_id":"REALITY-AGENTBRIDGE","name":"AGENTBRIDGE","reality_type":"COMMUNICATION_AND_EXECUTION_BRIDGE","substrate_id":null,"status":"DECLARED"},
+    {"reality_id":"REALITY-OURSELF-AGENT","name":"OURSELF Agent / Hermes","reality_type":"COGNITION_AND_ORCHESTRATION","substrate_id":null,"status":"DECLARED_NOT_AUTHORITY"},
+    {"reality_id":"REALITY-LLAMA-CPP","name":"llama.cpp","reality_type":"LOCAL_INFERENCE_RUNTIME","substrate_id":"HW-OURSELFMAC-001","status":"PRIOR_OBSERVATION_REQUIRES_FRESH_VERIFICATION"},
+    {"reality_id":"REALITY-OLLAMA","name":"Ollama","reality_type":"LOCAL_MODEL_SERVING_RUNTIME","substrate_id":"HW-OURSELFPIMAC-001","status":"PRIOR_OBSERVATION_REQUIRES_FRESH_VERIFICATION"}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "schema": "ourself.hardware.access-surfaces.v0.1",
+  "surfaces": [
+    {"surface_id":"ACCESS-RAWMAC","name":"RAWMAC","surface_type":"LOCAL_HOST_ACCESS","target_id":"HW-OURSELFMAC-001","status":"DECLARED","authority_inheritance":"NONE"},
+    {"surface_id":"ACCESS-SSH-SELFPI","name":"SSH","surface_type":"REMOTE_AUTHENTICATED_TRANSPORT","target_id":"HW-OURSELFPIMAC-001","status":"OBSERVED_TRANSPORT_CONFIGURED","authority_inheritance":"NONE"},
+    {"surface_id":"ACCESS-DESKTOP-COMMANDER","name":"Desktop Commander","surface_type":"REMOTE_CONTROL_SURFACE","target_id":"HW-OURSELFMAC-001","status":"CONNECTED_DEVICE_REGISTRY_OBSERVED","authority_inheritance":"NONE"}
+  ]
+}

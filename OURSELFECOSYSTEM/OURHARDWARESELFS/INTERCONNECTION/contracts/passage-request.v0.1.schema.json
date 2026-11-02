@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ourself://contracts/passage-request.v0.1",
+  "title": "OURSELF Governed Passage Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id","source_identity_ref","target_identity_ref","direction","purpose","requested_capabilities","evidence_refs","requested_at","expires_at"],
+  "properties": {
+    "request_id": {"type":"string","minLength":1},
+    "source_identity_ref": {"type":"string","minLength":1},
+    "target_identity_ref": {"type":"string","minLength":1},
+    "direction": {"enum":["SOURCE_TO_TARGET","BIDIRECTIONAL"]},
+    "purpose": {"type":"string","minLength":1},
+    "requested_capabilities": {"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "evidence_refs": {"type":"array","items":{"type":"string","minLength":1}},
+    "authority_grant_ref": {"type":["string","null"]},
+    "requested_at": {"type":"string","format":"date-time"},
+    "expires_at": {"type":"string","format":"date-time"}
+  }
+}

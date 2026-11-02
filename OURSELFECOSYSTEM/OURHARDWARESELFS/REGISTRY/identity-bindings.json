@@ -1,0 +1,32 @@
+{
+  "schema": "ourself.hardware.identity-bindings.v0.1",
+  "bindings": [
+    {
+      "binding_id": "BIND-M4-HOST-ALIAS",
+      "subject_id": "HW-OURSELFMAC-001",
+      "object_id": "M4-HOST",
+      "relation": "ALIAS_OF",
+      "status": "DECLARED",
+      "evidence_refs": [],
+      "note": "M4/HOST is a named architectural alias, not a second physical substrate."
+    },
+    {
+      "binding_id": "BIND-SELFPI-TO-OURSELFPIMAC",
+      "subject_id": "SELFPI",
+      "object_id": "HW-OURSELFPIMAC-001",
+      "relation": "REALIZED_ON_CANDIDATE",
+      "status": "UNRESOLVED",
+      "evidence_refs": [],
+      "note": "Candidate association only. Requires an explicit identity receipt before canonical binding."
+    },
+    {
+      "binding_id": "BIND-OURSELFMAC-REALISELF",
+      "subject_id": "REALISELF",
+      "object_id": "HW-OURSELFMAC-001",
+      "relation": "REALIZATION_PATH",
+      "status": "UNRESOLVED",
+      "evidence_refs": [],
+      "note": "No verified semantic binding established by the current observations."
+    }
+  ]
+}

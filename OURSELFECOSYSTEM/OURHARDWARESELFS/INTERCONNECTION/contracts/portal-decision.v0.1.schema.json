@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ourself://contracts/portal-decision.v0.1",
+  "title": "OURSELF Portal Admission Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision_id","source_identity_ref","target_identity_ref","decision","admitted_capabilities","policy_version","issued_at","expires_at","evidence_refs"],
+  "properties": {
+    "decision_id": {"type":"string","minLength":1},
+    "source_identity_ref": {"type":"string","minLength":1},
+    "target_identity_ref": {"type":"string","minLength":1},
+    "decision": {"enum":["ADMIT","DENY","QUARANTINE"]},
+    "admitted_capabilities": {"type":"array","items":{"type":"string"},"uniqueItems":true},
+    "policy_version": {"type":"string","minLength":1},
+    "issued_at": {"type":"string","format":"date-time"},
+    "expires_at": {"type":"string","format":"date-time"},
+    "authority_grant_ref": {"type":["string","null"]},
+    "evidence_refs": {"type":"array","items":{"type":"string"}}
+  }
+}

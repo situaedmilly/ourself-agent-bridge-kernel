@@ -1,0 +1,402 @@
+{
+  "schema": "ourself.hardware.compiler-assessment.v0.1",
+  "generated_at": "2026-11-02T21:25:52.585Z",
+  "mode": "READ_ONLY_ASSESSMENT",
+  "registry_status": "NOT_ADMITTED_BY_COMPILER",
+  "inventory": {
+    "physical_substrates": 2,
+    "virtual_substrates": 1,
+    "operating_system_instances": 2,
+    "identity_bindings": 3,
+    "unresolved_identity_bindings": 3
+  },
+  "registry_errors": [],
+  "physical_assessments": [
+    {
+      "valid": true,
+      "errors": [],
+      "instance_id": "HW-OURSELFMAC-001",
+      "canonical_name": "OURSELFMAC",
+      "entity_type": "PHYSICAL_SUBSTRATE",
+      "requested_state": "DISCOVERED",
+      "compiler_disposition": "ASSESSMENT_ONLY_NO_AUTOPROMOTION",
+      "moat_matrix": {
+        "IDENTITYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "OSMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "BOOTMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "ACCESSMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "JURISDICTIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "EXECUTIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "COGNITIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "MEMORYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "NETWORKMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RESOURCEPROOFMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "PROVENANCEMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RECEIPTMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "MUTATIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RECOVERYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        }
+      },
+      "moat_gate_satisfied": false,
+      "prerequisite_gates": {
+        "IDENTITY_VERIFIED": false,
+        "BOUND": false,
+        "MOATED": false,
+        "OPERATIONAL": false,
+        "PROVEN": false
+      },
+      "admission_receipt": {
+        "status": "NOT_ISSUED",
+        "reference": null,
+        "reason": "Compiler does not sign or attest hardware state."
+      },
+      "eligible_for_admission_review": true
+    },
+    {
+      "valid": true,
+      "errors": [],
+      "instance_id": "HW-OURSELFPIMAC-001",
+      "canonical_name": "OURSELFPIMAC",
+      "entity_type": "PHYSICAL_SUBSTRATE",
+      "requested_state": "DISCOVERED",
+      "compiler_disposition": "ASSESSMENT_ONLY_NO_AUTOPROMOTION",
+      "moat_matrix": {
+        "IDENTITYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "OSMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "BOOTMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "ACCESSMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "JURISDICTIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "EXECUTIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "COGNITIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "MEMORYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "NETWORKMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RESOURCEPROOFMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "PROVENANCEMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RECEIPTMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "MUTATIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RECOVERYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        }
+      },
+      "moat_gate_satisfied": false,
+      "prerequisite_gates": {
+        "IDENTITY_VERIFIED": false,
+        "BOUND": false,
+        "MOATED": false,
+        "OPERATIONAL": false,
+        "PROVEN": false
+      },
+      "admission_receipt": {
+        "status": "NOT_ISSUED",
+        "reference": null,
+        "reason": "Compiler does not sign or attest hardware state."
+      },
+      "eligible_for_admission_review": true
+    }
+  ],
+  "virtual_assessments": [
+    {
+      "valid": true,
+      "errors": [],
+      "instance_id": "VHW-ANDROID-AVD-CANDIDATE",
+      "canonical_name": "ANDROID-AVD",
+      "entity_type": "VIRTUAL_SUBSTRATE",
+      "requested_state": "DECLARED",
+      "compiler_disposition": "ASSESSMENT_ONLY_NO_AUTOPROMOTION",
+      "moat_matrix": {
+        "IDENTITYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "OSMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "BOOTMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "ACCESSMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "JURISDICTIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "EXECUTIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "COGNITIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "MEMORYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "NETWORKMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RESOURCEPROOFMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "PROVENANCEMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RECEIPTMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "MUTATIONMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        },
+        "RECOVERYMOAT": {
+          "status": "UNASSESSED",
+          "evidence_refs": [],
+          "verification_method": null,
+          "rationale": null,
+          "satisfies_gate": false
+        }
+      },
+      "moat_gate_satisfied": false,
+      "prerequisite_gates": {
+        "IDENTITY_VERIFIED": false,
+        "BOUND": false,
+        "MOATED": false,
+        "OPERATIONAL": false,
+        "PROVEN": false
+      },
+      "admission_receipt": {
+        "status": "NOT_ISSUED",
+        "reference": null,
+        "reason": "Compiler does not sign or attest hardware state."
+      },
+      "eligible_for_admission_review": true
+    }
+  ],
+  "invariants": {
+    "alias_creates_physical_instance": false,
+    "access_surface_inherits_target_authority": false,
+    "ecosystem_identity_auto_binds_to_hardware": false,
+    "observation_equals_attestation": false,
+    "compiler_promotes_admission_state": false
+  },
+  "limitations": [
+    "No hardware attestation performed",
+    "No signatures generated or verified",
+    "No boot measurements collected by this compiler",
+    "No admission or mutation performed",
+    "Registry evidence references are not dereferenced or independently validated"
+  ],
+  "registry_valid": true
+}

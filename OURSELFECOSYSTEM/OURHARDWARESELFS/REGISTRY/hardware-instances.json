@@ -1,0 +1,43 @@
+{
+  "schema": "ourself.hardware.instances.v0.1",
+  "registry_status": "INITIAL_DISCOVERY_NOT_ATTESTED",
+  "physical_substrates": [
+    {
+      "instance_id": "HW-OURSELFMAC-001",
+      "canonical_name": "OURSELFMAC",
+      "entity_type": "PHYSICAL_SUBSTRATE",
+      "vendor": "Apple",
+      "model": "Mac mini",
+      "hardware_identifier": "Mac16,10",
+      "chip": "Apple M4",
+      "architecture": "arm64",
+      "memory_gib": 16,
+      "identity_status": "DISCOVERED",
+      "evidence_refs": ["selfgraph/ourkernelself-lenrek/observations/OURSELFMAC-2026-11-02.json"],
+      "aliases": ["M4-HOST", "M4 / HOST"],
+      "limitations": ["Hardware-backed identity attestation not established"]
+    },
+    {
+      "instance_id": "HW-OURSELFPIMAC-001",
+      "canonical_name": "OURSELFPIMAC",
+      "entity_type": "PHYSICAL_SUBSTRATE",
+      "vendor": "Raspberry Pi",
+      "model": "Raspberry Pi 5 Model B Rev 1.1",
+      "architecture": "aarch64",
+      "identity_status": "DISCOVERED",
+      "evidence_refs": ["/home/selfadmin/ourself-kernelself-lenrek/observations/OURSELFPIMAC-2026-11-02.json"],
+      "aliases": [],
+      "limitations": ["Hardware-backed identity attestation not established"]
+    }
+  ],
+  "virtual_substrates": [
+    {
+      "instance_id": "VHW-ANDROID-AVD-CANDIDATE",
+      "canonical_name": "ANDROID-AVD",
+      "entity_type": "VIRTUAL_SUBSTRATE",
+      "identity_status": "DECLARED",
+      "host_binding": null,
+      "limitations": ["No active AVD identity or guest boot evidence established"]
+    }
+  ]
+}

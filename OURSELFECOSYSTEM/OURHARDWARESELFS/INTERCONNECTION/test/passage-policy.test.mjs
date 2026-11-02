@@ -1,0 +1,13 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {evaluatePortalPolicy,mayConnect,mayExecute} from "../PORTAL/passage-policy.mjs";
+const request={requested_capabilities:["repo.read"],expires_at:"2026-11-02T23:00:00.000Z"};
+const context={sourceIdentityVerified:true,targetIdentityVerified:true,bindingVerified:true,sourceJurisdictionVerified:true,targetJurisdictionVerified:true,authorityGrantVerified:true,requiredMoatsVerified:true,evidenceFresh:true,sourcePermittedCapabilities:["repo.read"],targetPermittedCapabilities:["repo.read"],now:"2026-11-02T22:00:00.000Z"};
+test("policy evaluation never signs admission or grants execution",()=>{const r=evaluatePortalPolicy(request,context);assert.equal(r.decision,"ADMISSION_CANDIDATE");assert.equal(r.signed,false);assert.equal(r.execution_authorized,false);});
+test("unverified identity blocks passage",()=>{const r=evaluatePortalPolicy(request,{...context,targetIdentityVerified:false});assert.equal(r.decision,"DENY");assert.ok(r.reasons.includes("target_identity_not_verified"));});
+test("unresolved jurisdiction blocks passage",()=>{const r=evaluatePortalPolicy(request,{...context,targetJurisdictionVerified:false});assert.equal(r.decision,"DENY");});
+test("capability outside target jurisdiction is denied",()=>{const r=evaluatePortalPolicy({...request,requested_capabilities:["repo.write"]},context);assert.equal(r.decision,"DENY");});
+test("capability outside source jurisdiction is denied",()=>{const r=evaluatePortalPolicy(request,{...context,sourcePermittedCapabilities:[]});assert.equal(r.decision,"DENY");});
+test("transport without signed portal admission is not permitted",()=>{assert.equal(mayConnect({decision:"ADMISSION_CANDIDATE",signed:false},0),false);});
+test("portal admission alone cannot authorize kernel execution",()=>{const d={decision:"ADMIT",signature_verified:true,expires_at:"2099-01-01T00:00:00.000Z",target_identity_ref:"HW-A",admitted_capabilities:["repo.read"]};assert.equal(mayExecute(d,{authorized:false,target_identity_ref:"HW-A",capability:"repo.read"},0),false);});
+test("kernel authorization must match target and capability",()=>{const d={decision:"ADMIT",signature_verified:true,expires_at:"2099-01-01T00:00:00.000Z",target_identity_ref:"HW-A",admitted_capabilities:["repo.read"]};assert.equal(mayExecute(d,{authorized:true,target_identity_ref:"HW-B",capability:"repo.read"},0),false);assert.equal(mayExecute(d,{authorized:true,target_identity_ref:"HW-A",capability:"repo.read"},0),true);});
