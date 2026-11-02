@@ -1,0 +1,705 @@
+{
+  "schema": "ourself.repository-instance-custody-registry.v0.1",
+  "registry_id": "OURSELF-REPOSITORY-INSTANCE-CUSTODY-001",
+  "authority": "Founder-directed Git custody governance",
+  "observed_at": "2026-11-02",
+  "canonical_repository": "situaedmilly/ourself-agent-bridge-kernel",
+  "policy_ref": {
+    "repository": "situaedmilly/ourself-agent-bridge-kernel",
+    "branch": "governance/commit-custody-policy-v1",
+    "path": "GOVERNANCE/GIT-CUSTODY-POLICY-v1.0.md",
+    "commit": "6805d5c4d5016627bc02b865508fc853b86c3001",
+    "state": "REMOTE_REF_VERIFIED"
+  },
+  "lifecycle": [
+    "MANIFEST",
+    "VALIDATE",
+    "STAGE",
+    "COMMIT",
+    "PUSH",
+    "VERIFY_REMOTE"
+  ],
+  "state_model": [
+    "WORKING_TREE_ONLY",
+    "VALIDATED_LOCAL",
+    "COMMITTED_LOCAL",
+    "PUSHED_TO_GITHUB",
+    "REMOTE_REF_VERIFIED",
+    "DEPLOYED",
+    "RUNTIME_EFFECT_VERIFIED"
+  ],
+  "invariants": [
+    "Repository visibility in GitHub does not prove a local clone or runtime binding.",
+    "A local worktree does not establish canonical ownership unless its remote and project jurisdiction are verified.",
+    "A dirty worktree is not eligible for broad staging.",
+    "A repository with failed integrity checks is quarantined from normal commit operations.",
+    "AppleDouble files beginning with ._ are quarantined pending classification and must not be staged.",
+    "A local commit is not a push; a push is not remote-ref verification; remote-ref verification is not deployment or runtime-effect proof.",
+    "Only scoped, reviewed artifacts may be staged and committed."
+  ],
+  "github_inventory": {
+    "account": "situaedmilly",
+    "observed_repository_count": 29,
+    "repositories": [
+      {
+        "repository": "situaedmilly/4allcustomz",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/frekqenci-splash-portal",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ManCav3",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ruora",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/OTS-Rentals",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/mt5TraderJawn",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/onetripsolution",
+        "default_branch": "main",
+        "visibility": "private",
+        "archived": true,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/axiom-aethernet",
+        "default_branch": "main",
+        "visibility": "private",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/getmomentum-cloud",
+        "default_branch": "main",
+        "visibility": "private",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/Friendshiplab",
+        "default_branch": "main",
+        "visibility": "private",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/self-public-source",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ourself-core",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/SELFBull",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ourself-agent-bridge-kernel",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ourself-cloud-server-network",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/self-protocol-suite",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/Bubbleself",
+        "default_branch": "claude/new-session-47gm2u",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/self-communication",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/conscious-conversation",
+        "default_branch": "main",
+        "visibility": "private",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/hbc-html",
+        "default_branch": "main",
+        "visibility": "private",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ALTONUMBUSELF",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/SELFCOMM-SIMPLE-V0.1",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/ourself-agent-bridge",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/hermes-agent",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/GOLDSELFSCAN",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/OURPROCESSORSELF",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/SELFVEREIGN-ADDRESSELF",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/FLOWACTIONSELFWORK",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      },
+      {
+        "repository": "situaedmilly/Cognitive-Transmutation-Core",
+        "default_branch": "main",
+        "visibility": "public",
+        "archived": false,
+        "push_permission_observed": true,
+        "canonical_owner": "UNRESOLVED_PENDING_PROJECT_JURISDICTION",
+        "local_instance": "NOT_ESTABLISHED_BY_GITHUB_INVENTORY_ALONE",
+        "custody_state": "GITHUB_REPOSITORY_DISCOVERED"
+      }
+    ]
+  },
+  "machine_instances": [
+    {
+      "machine": "OURSELFMAC.local",
+      "device_id": "6aa04271-1f06-4c6b-a774-71d64812dc7c",
+      "connection_state": "ONLINE_OBSERVED",
+      "inventory_scope": [
+        "/Users/millysituated/Projects/ourself-core",
+        "/Users/millysituated/OURSELF"
+      ],
+      "worktrees": [
+        {
+          "path": "/Users/millysituated/Projects/ourself-core",
+          "repository": "situaedmilly/ourself-core",
+          "branch": "proof/pipeportal-telegram-custody-20261011",
+          "head": "ca5cecd",
+          "dirty": true,
+          "notes": "Nested worktree references include OURPROCESSORSELF and ourself-agent-bridge-kernel modifications; several untracked receipts and alchemy artifacts. Preserve all unrelated changes."
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/ourself-agent-bridge-kernel",
+          "repository": "situaedmilly/ourself-agent-bridge-kernel",
+          "branch": "main",
+          "head": "b66e2f1",
+          "dirty": true,
+          "notes": "Registry, evidence, PIPE|PORTAL conformance, FOUNDERGPT and LENREK artifacts plus unrelated tracked changes. git fsck reported dangling objects; integrity needs scoped follow-up before commit."
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/OURPROCESSORSELF",
+          "repository": "situaedmilly/OURPROCESSORSELF",
+          "branch": "main",
+          "head": "fdff32b",
+          "dirty": true,
+          "notes": "Multiple source, contract, evidence and test manifestations. Scoped review required."
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/self-protocol-suite",
+          "repository": "situaedmilly/self-protocol-suite",
+          "branch": "main",
+          "head": "ff64723",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/self-communication",
+          "repository": "situaedmilly/self-communication",
+          "branch": "main",
+          "head": "8940aab",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/ALTONUMBUSELF",
+          "repository": "situaedmilly/ALTONUMBUSELF",
+          "branch": "main",
+          "head": "9aa80ab",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/mt5TraderJawn",
+          "repository": "situaedmilly/mt5TraderJawn",
+          "branch": "main",
+          "head": "31f180b",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/GOLDSELFSCAN",
+          "repository": "situaedmilly/GOLDSELFSCAN",
+          "branch": "main",
+          "head": "3aed55b",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/SELFBull",
+          "repository": "situaedmilly/SELFBull",
+          "branch": "main",
+          "head": "4e6d970",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/ourself-core",
+          "repository": "situaedmilly/ourself-core",
+          "branch": "alchemy/mergecer-self-20261007174434",
+          "head": "dd87450",
+          "dirty": true,
+          "notes": "AetherBridge v0.2 implementation and receipts/logs; ahead 1 of origin/main; sensitive runtime data and logs require classification before staging."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/ourself-agent-bridge-kernel",
+          "repository": "situaedmilly/ourself-agent-bridge-kernel",
+          "branch": "main",
+          "head": "c6274a3",
+          "dirty": true,
+          "notes": "Separate worktree from Projects path; many modified/untracked files including logs and backup files; scoped classification required."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/OURPROCESSORSELF",
+          "repository": "situaedmilly/OURPROCESSORSELF",
+          "branch": "v0.8-sovereign-runtime",
+          "head": "9bab50e",
+          "dirty": true,
+          "notes": "Ahead 4; multiple modified and untracked artifacts. Preserve and review individually."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/SELFVEREIGN-ADDRESSELF",
+          "repository": "situaedmilly/SELFVEREIGN-ADDRESSELF",
+          "branch": "main",
+          "head": "a64e632",
+          "dirty": true,
+          "notes": "One tracked runtime registry modification."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/self-communication",
+          "repository": "situaedmilly/self-communication",
+          "branch": "main",
+          "head": "26c9cdb",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/ALTONUMBUSELF",
+          "repository": "situaedmilly/ALTONUMBUSELF",
+          "branch": "main",
+          "head": "9aa80ab",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/ourself-cloud-server-network",
+          "repository": "situaedmilly/ourself-cloud-server-network",
+          "branch": "main",
+          "head": "6c67dcb",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/FLOWACTIONSELFWORK",
+          "repository": "situaedmilly/FLOWACTIONSELFWORK",
+          "branch": "feat/ourself-mcp-model-launch-v0.1",
+          "head": "4c23c3f",
+          "dirty": true,
+          "notes": "Ahead 1 and behind 18; reconcile branch divergence before any push."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/Cognitive-Transmutation-Core",
+          "repository": "situaedmilly/Cognitive-Transmutation-Core",
+          "branch": "alchemy/realself-runtime-v0.1",
+          "head": "93e4761",
+          "dirty": true,
+          "notes": "Tracked runtime witness/binding modifications and untracked launch artifacts."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/.worktrees/proc-selgate",
+          "repository": "situaedmilly/OURPROCESSORSELF",
+          "branch": "DETACHED_HEAD",
+          "head": "b05b1cd",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/.worktrees/cog-selgate",
+          "repository": "situaedmilly/Cognitive-Transmutation-Core",
+          "branch": "DETACHED_HEAD",
+          "head": "b37584d",
+          "dirty": false
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/.worktrees/core-selgate",
+          "repository": "situaedmilly/ourself-core",
+          "branch": "DETACHED_HEAD",
+          "head": "e4f354b",
+          "dirty": true,
+          "notes": "Untracked selfgateway directory; detached worktree; do not commit until ownership and branch custody are resolved."
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/llama.cpp",
+          "repository": "EXTERNAL:ggerganov/llama.cpp",
+          "branch": "master",
+          "head": "6c73b3e12",
+          "dirty": false,
+          "notes": "Third-party upstream, not OURSELF-owned repository."
+        }
+      ],
+      "integrity_observations": [
+        {
+          "path": "/Users/millysituated/Projects/ourself-core/ourself-agent-bridge-kernel",
+          "result": "GIT_FSCK_DANGLING_OBJECTS",
+          "disposition": "REVIEW_REQUIRED_NOT_AUTOMATICALLY_CORRUPT"
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/ourself-core",
+          "result": "GIT_FSCK_DANGLING_COMMIT",
+          "disposition": "REVIEW_REQUIRED"
+        },
+        {
+          "path": "/Users/millysituated/OURSELF/ourself-agent-bridge-kernel",
+          "result": "GIT_FSCK_DANGLING_COMMIT_AND_TREE",
+          "disposition": "REVIEW_REQUIRED"
+        }
+      ]
+    },
+    {
+      "machine": "OURSELFPIMAC",
+      "device_id": "467525bc-205d-4c33-91e8-5adddd43bf09",
+      "connection_state": "ONLINE_OBSERVED",
+      "inventory_scope": [
+        "/home/selfadmin"
+      ],
+      "worktrees": [
+        {
+          "path": "/home/selfadmin/ourself-agent-bridge-kernel",
+          "repository": "situaedmilly/ourself-agent-bridge-kernel",
+          "branch": "main",
+          "head": "7197f59",
+          "dirty": true,
+          "integrity": "QUARANTINED_GIT_PACK_INDEX_ERROR",
+          "notes": "git fsck fails: index file .git/objects/pack/._pack-bd6691dcec21ebb23417580699bebc50ff618a87.idx is too small. Numerous AppleDouble ._ files. No commit/push operations."
+        },
+        {
+          "path": "/home/selfadmin/SELFSERVER-2",
+          "repository": "SELFIENCY/SELFSERVER-2",
+          "branch": "deployment/local-live-service-dry-run",
+          "head": "3c397c1",
+          "dirty": false,
+          "integrity": "CONNECTIVITY_CHECK_PASSED",
+          "notes": "Remote is git@github.com:SELFIENCY/SELFSERVER-2.git; separate owner/repository."
+        },
+        {
+          "path": "/home/selfadmin/ourself-agent-bridge-control-plane",
+          "repository": "situaedmilly/ourself-agent-bridge",
+          "branch": "main",
+          "head": "900b058",
+          "dirty": true,
+          "integrity": "CONNECTIVITY_CHECK_PASSED",
+          "notes": "Remote resolves to local mirror /home/selfadmin/mirrors/ourself-agent-bridge.git; several tracked changes."
+        },
+        {
+          "path": "/home/selfadmin/ourself-control-plane",
+          "repository": "situaedmilly/ourself-agent-bridge-kernel",
+          "branch": "DETACHED_HEAD",
+          "head": "d5fea86",
+          "dirty": true,
+          "integrity": "BLOCKED_BY_SHARED_PACK_INDEX_ERROR",
+          "notes": "Uses damaged shared Git object database path; many untracked files. Quarantine with damaged sibling repository."
+        },
+        {
+          "path": "/home/selfadmin/projects/hbc-html",
+          "repository": "situaedmilly/hbc-html",
+          "branch": "main",
+          "head": "af52f5f",
+          "dirty": true,
+          "integrity": "CONNECTIVITY_CHECK_PASSED",
+          "notes": "Tracked and untracked UXSELFUI changes; scoped review required."
+        },
+        {
+          "path": "/home/selfadmin/gh-webhook",
+          "repository": "EXTERNAL:cli/gh-webhook",
+          "branch": "main",
+          "head": "115d4d6",
+          "dirty": true,
+          "integrity": "CONNECTIVITY_CHECK_PASSED",
+          "notes": "Third-party upstream; do not classify as OURSELF-owned."
+        },
+        {
+          "path": "/home/selfadmin/recovery-rehearsals",
+          "repository": "LOCAL_RECOVERY_COPIES",
+          "branch": "MULTIPLE",
+          "dirty": false,
+          "integrity": "CONNECTIVITY_CHECK_PASSED",
+          "notes": "Historical recovery rehearsal copies and local mirrors; archival custody, not canonical source repositories."
+        },
+        {
+          "path": "/home/selfadmin/abr001-specimens",
+          "repository": "FORENSIC_SPECIMENS",
+          "branch": "MULTIPLE",
+          "dirty": true,
+          "integrity": "MIXED_UNCOMMITTED_SPECIMENS",
+          "notes": "Evidence/specimen repositories without remotes; not canonical production repositories."
+        },
+        {
+          "path": "/home/selfadmin/selfcomm-crossing-audit",
+          "repository": "FORENSIC_SPECIMENS",
+          "branch": "MULTIPLE",
+          "dirty": false,
+          "integrity": "CONNECTIVITY_CHECK_PASSED",
+          "notes": "Local evidence worktrees without remotes."
+        },
+        {
+          "path": "/home/selfadmin/selfcomm-manifestation",
+          "repository": "FORENSIC_SPECIMENS",
+          "branch": "MULTIPLE",
+          "dirty": true,
+          "integrity": "MIXED_UNCOMMITTED_SPECIMENS",
+          "notes": "Local evidence worktree without remote."
+        },
+        {
+          "path": "/home/selfadmin/launch-check-20260909",
+          "repository": "FORENSIC_SPECIMENS",
+          "branch": "MULTIPLE",
+          "dirty": true,
+          "integrity": "NO_CANONICAL_REMOTE",
+          "notes": "Local evidence workspace without remote."
+        }
+      ],
+      "integrity_observations": [
+        {
+          "path": "/home/selfadmin/ourself-agent-bridge-kernel",
+          "result": "PACK_INDEX_TOO_SMALL",
+          "disposition": "QUARANTINED_NO_GIT_MUTATION"
+        },
+        {
+          "path": "/home/selfadmin/ourself-control-plane",
+          "result": "SHARED_PACK_INDEX_ERROR",
+          "disposition": "QUARANTINED_NO_GIT_MUTATION"
+        }
+      ],
+      "apple_double_policy": "All ._ prefixed files are quarantined from staging pending provenance and classification; no deletion performed."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "CUSTODY-EX-001",
+      "subject": "OURSELFPIMAC /home/selfadmin/ourself-agent-bridge-kernel",
+      "state": "QUARANTINED",
+      "reason": "Git pack index too small; AppleDouble metadata artifacts present.",
+      "next_action": "Preserve repository; make verified backup; inspect pack/index/object integrity; repair only on a protected copy and verify before restoring normal operations."
+    },
+    {
+      "id": "CUSTODY-EX-002",
+      "subject": "OURSELFPIMAC /home/selfadmin/ourself-control-plane",
+      "state": "QUARANTINED",
+      "reason": "Shared Git object database integrity error.",
+      "next_action": "Resolve shared object database custody before any commit."
+    },
+    {
+      "id": "CUSTODY-EX-003",
+      "subject": "OURSELFMAC multiple dirty worktrees",
+      "state": "REVIEW_REQUIRED",
+      "reason": "Mixed scoped and unrelated changes across canonical and detached worktrees.",
+      "next_action": "Classify diff per worktree; commit only reviewed manifestation files."
+    },
+    {
+      "id": "CUSTODY-EX-004",
+      "subject": "OURSELFMAC FLOWACTIONSELFWORK",
+      "state": "PUSH_BLOCKED_PENDING_RECONCILIATION",
+      "reason": "Local branch ahead 1 and behind 18.",
+      "next_action": "Fetch and compare ancestry; do not force push."
+    },
+    {
+      "id": "CUSTODY-EX-005",
+      "subject": "Detached worktrees",
+      "state": "BRANCH_CUSTODY_UNRESOLVED",
+      "reason": "Detached HEAD worktrees contain potentially relevant changes.",
+      "next_action": "Identify originating branch and worktree owner before any commit."
+    },
+    {
+      "id": "CUSTODY-EX-006",
+      "subject": "GitHub repositories without observed local worktree",
+      "state": "REMOTE_ONLY_DISCOVERED",
+      "reason": "GitHub inventory alone does not establish local machine binding or artifact jurisdiction.",
+      "next_action": "Map canonical owner, purpose, machine/worktree, and authority for each repository."
+    }
+  ],
+  "adoption_status": {
+    "policy_artifact": "REMOTE_REF_VERIFIED",
+    "canonical_registry": "INITIAL_BASELINE_MANIFESTED",
+    "ecosystem_adoption": "PARTIAL_EVIDENCE_ONLY",
+    "universal_enforcement": "NOT_ESTABLISHED",
+    "next_gates": [
+      "Complete project jurisdiction and owner assignment for all 29 GitHub repositories.",
+      "Commit scoped OURSELFMAC manifestations after per-file review and validation.",
+      "Repair OURSELFPIMAC Git integrity on a protected copy; verify before normal Git use.",
+      "Install repository-level hooks and CI enforcement with bypass-resistant evidence.",
+      "Continuously verify local/remote parity and publish exceptions."
+    ]
+  }
+}
