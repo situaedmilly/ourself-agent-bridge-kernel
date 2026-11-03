@@ -66,7 +66,7 @@ Evidence labels:
 | `self-communication` | SELFCOMMUNICATION / communication and handoff organ | README identifies transmission channel, immutable INSELFACTION archive, and bootstrap contract | `OURSELFMAC: ~/Projects/ourself-core/self-communication`; `OURSELFMAC: ~/OURSELF/self-communication` | README-VERIFIED; duplicate Mac worktrees, canonical writer unresolved |
 | `conscious-conversation` | ConsciousConversation / SELF Journey cognition layer | README identifies SELF Journey Runtime and ConsciousConversation cognition kernel | None in 22/11 registry | README-VERIFIED candidate owner; canonical path unresolved |
 | `hbc-html` | HBC HTML / Hyperbolic Build Chamber compiler | README describes compiler and sealed Realm Packet to HTML realm process | `OURSELFPIMAC: /home/selfadmin/projects/hbc-html` | README-VERIFIED candidate owner; Pi path observed dirty |
-| `ALTONUMBUSELF` | ALTONUMBUSELF / bounded OURSELF memory and storage instance | README explicitly designates bounded memory/storage instance and points to instance contracts | `OURSELFMAC: ~/Projects/ourself-core/ALTONUMBUSELF`; `OURSELFMAC: ~/OURSELF/ALTONUMBUSELF` | README-VERIFIED; duplicate Mac worktrees, canonical writer unresolved |
+| `ALTONUMBUSELF` | ALTONUMBUSELF / bounded OURSELF memory-storage instance; REVERSELF is its memory-boundary controller, not a separate GitHub repository | README + `OURSELF_INSTANCE.md` + `runtime/reverself/REVERSELF-0001.json`; purpose, jurisdiction, algorithm, and non-mutating boundary are explicit | `OURSELFMAC: /Users/millysituated/Projects/ALTONUMBUSELF` (active REVERSELF task binding, branch `morph-xi/selfmoat-proving`, local HEAD `6d981a525e530bf0ed64615a6632838d71458c96`); `OURSELFMAC: /Users/millysituated/Projects/ourself-core/ALTONUMBUSELF` (clean `main`, `9aa80ab`); `OURSELFMAC: /Users/millysituated/OURSELF/ALTONUMBUSELF` (clean `main`, `9aa80ab`) | OWNER/PURPOSE VERIFIED; active REVERSELF binding verified; permanent canonical writer unresolved because three worktrees remain and local task branch is behind/unreconciled with live remote head `3fdde73c099f9b99814d72dc224c638965be27e9` |
 | `SELFCOMM-SIMPLE-V0.1` | SELFCOMM simple webhook / integration surface | Prior ecosystem context identifies GitHub webhook SELFCOMM-SIMPLE-V0.1; README.md not found | No path in 22/11 registry | CONTEXT CANDIDATE; verify webhook contract and runtime binding |
 | `ourself-agent-bridge` | OURSELF Agent Bridge control plane | Prior registry maps Pi control-plane checkout to this remote through a local mirror; README.md not found | `OURSELFPIMAC: /home/selfadmin/ourself-agent-bridge-control-plane` | CANDIDATE OWNER; remote mirror and write-through authority must be verified |
 | `hermes-agent` | EXTERNAL / NousResearch upstream or derivative | README identifies Hermes Agent as built by Nous Research; local environment has a Hermes checkout but prior canonical worktree registry does not designate it OURSELF-owned | No canonical path in 22/11 registry | EXTERNAL CANDIDATE; classify fork/vendor relationship and exclude from OURSELF ownership unless proven |
@@ -77,6 +77,35 @@ Evidence labels:
 | `Cognitive-Transmutation-Core` | Cognitive Transmutation Core / cognition and SELFTHOUGHT event runtime | README identifies cognitive kernel and immutable SELFTHOUGHT message/event runtime | `OURSELFMAC: ~/OURSELF/Cognitive-Transmutation-Core`; detached cognition selgate worktree | README-VERIFIED; multiple Mac instances, canonical writer unresolved |
 
 ## 4. Machine and instance interpretation
+
+### REVERSELF / ALTONUMBUSELF — purpose, binding, and authority evidence (live recontact 2026-11-03)
+
+**Repository identity:** `situaedmilly/ALTONUMBUSELF`; origin `https://github.com/situaedmilly/ALTONUMBUSELF.git`.
+
+**Owning jurisdiction:** `OURSELFECOSYSTEM`; instance `ALTONUMBUSELF`; class `MEMORY_STORAGE`; substrate `GitHub`. This is supported by `OURSELF_INSTANCE.md` and the repository README.
+
+**REVERSELF purpose:** `runtime/reverself/REVERSELF-0001.json` defines `REVERSELF-0001` as `MEMORY_BOUNDARY_CONTROLLER`, distinct from `MATTER-0001`. Its stated function is bounded, non-mutating claim scanning, comparison of externally observed bytes against receipts, and recording refusal/quarantine evidence without repairing state. Its invariants explicitly prohibit upgrading a receipt into future authority and prohibit setting `REALISELF` or the migration gate. Jurisdiction is OURSELFECOSYSTEM / ALTONUMBUSELF / GitHub.
+
+**Active task binding, directly revalidated on OURSELFMAC:**
+- Path: `/Users/millysituated/Projects/ALTONUMBUSELF`
+- Origin: `https://github.com/situaedmilly/ALTONUMBUSELF.git`
+- Branch: `morph-xi/selfmoat-proving`
+- Local HEAD: `6d981a525e530bf0ed64615a6632838d71458c96`
+- Tracked worktree changes: none observed; two untracked files are preserved: `runtime/reverself/recontact_harness.py` and `runtime/reverself/test_recontact_harness.py`.
+- Live remote ref from `git ls-remote`: `3fdde73c099f9b99814d72dc224c638965be27e9`. The local `origin/morph-xi/selfmoat-proving` tracking ref remains at local HEAD `6d981a5...`; therefore the reported local `0/0` tracking status is stale and is not evidence of parity. No fetch, reset, merge, rebase, or worktree mutation was performed.
+
+**Other observed local instances of the same repository:**
+- `/Users/millysituated/Projects/ourself-core/ALTONUMBUSELF`: branch `main`, HEAD `9aa80ab53d034b36c3fae4474d1bdc9b2f0c3c9b`, clean.
+- `/Users/millysituated/OURSELF/ALTONUMBUSELF`: branch `main`, same HEAD `9aa80ab53d034b36c3fae4474d1bdc9b2f0c3c9b`, clean.
+- These three paths are separate worktrees/clones with the same GitHub origin. The Phase C evidence binds the REVERSELF task to the first path and branch; it does not by itself designate that path as the permanent sole canonical writer.
+
+**Authority evidence and limits:**
+- `evidence/morph-xiii/REVERSELF-PROOF-ADMISSION-001.json` records a finite admission based on explicit user instruction for MORPH-XIII Phase C, naming the repository, branch, exact artifact pack, and expected preimage `e71dde1ffc7fcacc3e8a879d25cc21f188575567`. It explicitly sets `standing_authority=false`.
+- `runtime/reverself/REVERSELF-0001.json` records `SCOPED_BY_CURRENT_PHASE_C_DIRECTIVE`, `CURRENT_PREIMAGE_SCOPED`, and `NON_MUTATING_SCAN_AND_EVALUATION`; it also records the independent witness as `BLOCKED` and states that the Matter does not set REALISELF.
+- Earlier `REVERSELF-001` / `REVERSELF-002` evidence is scoped to bounded memory-object continuity and isolated boundary-policy fixtures. It expressly does not establish standing repository memory authority, actual cloud drift, persistent quarantine, or cloud write-path enforcement.
+- The current founder instruction authorizes completion of this ownership-map record. It does not refresh the older Phase C admission or grant blanket authority to modify ALTONUMBUSELF source, memory objects, graph, schema, or runtime state.
+
+**Disposition:** repository purpose and owning reality VERIFIED; REVERSELF task-to-worktree binding VERIFIED; historical finite authority evidence VERIFIED as recorded; permanent canonical writer UNRESOLVED; live remote parity UNRESOLVED; independent witness BLOCKED; `REALISELF=false` and migration gate CLOSED per the cited REVERSELF evidence. Preserve the two untracked files and all three worktrees. Do not stage, commit, push, reset, or reconcile the ALTONUMBUSELF task branch until a fresh preimage-bound admission and branch-lineage reconciliation exist.
 
 ### OURSELFMAC
 
