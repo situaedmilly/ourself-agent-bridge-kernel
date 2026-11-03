@@ -92,7 +92,7 @@ The reviewer must have a separately evidenced trust-domain identity and administ
 6. audit-log origin, integrity, retention, and access controls;
 7. independent recontact through a channel not controlled by the candidate or either endpoint.
 
-The reviewer records its own trust-domain ID, identity evidence, separation evidence, independent recontact reference, and signature envelope. A reviewer assertion alone is not proof: the evidence must be independently retrievable and checked.
+The reviewer records its own trust-domain ID, identity evidence, separation evidence, independent recontact reference, and signature envelope. Every review decision carries a dedicated reviewerEvidenceDigests manifest covering all three categories. The admission verifier retrieves each byte independently, recomputes its digest, validates provenance/freshness/revocation, and passes the verified records to the identity resolver. The resolver must return exact evidenceBindings (reference + digest); a reviewer assertion or reference alone is not proof.
 
 A reviewer whose identity or trust-domain ID equals the recorded submitter, candidate administrator, either endpoint domain ID, or the PORTAL issuer domain ID must be rejected. The verifier must compare actual identifiers against independently retrieved identity evidence; a self-declared boolean is insufficient.
 
@@ -111,7 +111,7 @@ BOUND is permitted only when all are true:
 - evidence digests recompute against retrieved bytes;
 - no unresolved contradiction, revocation, or quarantine condition remains.
 
-JSON Schema enforces structure and state-dependent required fields. The admission verifier must additionally perform cryptographic signature verification, digest recomputation, evidence retrieval, source authentication, reviewer-domain comparison, revocation checks, and cross-record consistency. A schema-valid record is not proof of evidence truth.
+JSON Schema enforces structure and state-dependent required fields. The admission verifier must additionally perform cryptographic signature verification, digest recomputation, evidence retrieval, source authentication, reviewer-domain comparison, revocation checks, and cross-record consistency. It must also verify an externally signed runtime measurement binding the verifier implementation and every security-sensitive adapter/verifier executable to pinned artifact, version, configuration, and administrative-custody identities. A callback-returned verifier ID is not executable identity. A schema-valid record is not proof of evidence truth.
 
 ## 7. Immutable records and receipts
 
