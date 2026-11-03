@@ -112,8 +112,8 @@ Default branch is not equivalent to a protected branch. Branch protection, rules
 
 | Resolution class | Count |
 |---|---:|
-| README-VERIFIED candidate owner | 16 |
-| CONTEXT-CANDIDATE / partial-purpose candidate | 6 |
+| README-VERIFIED candidate owner | 15 |
+| ARCHITECTURE-VERIFIED candidate owner | 1 |\n| CONTEXT-CANDIDATE / partial-purpose candidate | 6 |
 | UNRESOLVED | 6 |
 | EXTERNAL-CANDIDATE | 1 |
 | **Total** | **29** |
@@ -133,7 +133,7 @@ Counts classify evidence strength, not adoption. Even README-VERIFIED rows remai
 ## 8. Current governing state
 
 `GITHUB_INVENTORY = 29 VERIFIED`  
-`OWNERSHIP = 16 README-VERIFIED CANDIDATES / 6 CONTEXT CANDIDATES / 6 UNRESOLVED / 1 EXTERNAL CANDIDATE`  
+`OWNERSHIP = 15 README-VERIFIED CANDIDATES / 1 ARCHITECTURE-VERIFIED CANDIDATE / 6 CONTEXT CANDIDATES / 6 UNRESOLVED / 1 EXTERNAL CANDIDATE`  
 `CANONICAL_WORKTREE = UNRESOLVED WHERE MULTIPLE OR NOT OBSERVED`  
 `MACHINE_BINDING = PRIOR BASELINE EVIDENCE; LIVE REVALIDATION PENDING`  
 `BRANCH_AUTHORITY = DEFAULT BRANCH OBSERVED; PROTECTION UNVERIFIED`  
