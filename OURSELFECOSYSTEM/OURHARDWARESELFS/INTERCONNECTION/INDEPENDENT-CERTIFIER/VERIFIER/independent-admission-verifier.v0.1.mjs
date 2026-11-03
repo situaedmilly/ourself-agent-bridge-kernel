@@ -4,6 +4,7 @@ const DOMAINS = ['reviewerIndependence','substrateIdentity','administrativeSepar
 const EVIDENCE_DOMAINS = DOMAINS.filter(x => x !== 'reviewerIndependence');
 const STATES = ['EVIDENCE_REVIEW','IDENTITY_VERIFIED','BOUND'];
 const fail = (code, message) => { const e = new Error(message); e.name = 'AdmissionVerificationError'; e.code = code; throw e; };
+const deepFreeze = value => { if(value && typeof value === 'object' && !Object.isFrozen(value)){Object.freeze(value);for(const child of Object.values(value))deepFreeze(child);}return value; };
 const need = (ok, code, message) => { if (!ok) fail(code, message); };
 export function canonicalize(v) {
   if (v === null || typeof v !== 'object') return JSON.stringify(v);
@@ -158,7 +159,7 @@ export function createIndependentAdmissionVerifier(deps) {
     need(deps?.[k],'VERIFIER_NOT_CONFIGURED','Missing adapter: ' + k);
   need(typeof deps.runtimeAttestationResolver.resolve === 'function','VERIFIER_NOT_CONFIGURED','Runtime attestation resolver must expose resolve()');
   for (const k of [...EVIDENCE_DOMAINS,'reviewerIndependence']) need(typeof deps.domainVerifiers[k] === 'function','VERIFIER_NOT_CONFIGURED','Missing trusted domain verifier: ' + k);
-  const p=deps.policy;
+  const p=deepFreeze(JSON.parse(JSON.stringify(deps.policy)));
   need(p && typeof p.policyVersion === 'string','POLICY_NOT_CONFIGURED','Versioned policy is required');
   need(Array.isArray(p.endpointTrustDomainIds) && p.endpointTrustDomainIds.length >= 2,'POLICY_NOT_CONFIGURED','Both endpoint trust domains must be pinned');
   need(Array.isArray(p.portalTrustDomainIds) && p.portalTrustDomainIds.length,'POLICY_NOT_CONFIGURED','PORTAL issuer trust domain must be pinned');
