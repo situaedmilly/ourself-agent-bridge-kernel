@@ -15,41 +15,32 @@
     "status"
   ],
   "properties": {
-    "certifierId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "trustDomainId": {
-      "type": "string",
-      "minLength": 1
-    },
+    "certifierId": { "type": "string", "minLength": 1 },
+    "trustDomainId": { "type": "string", "minLength": 1 },
     "substrateType": {
-      "enum": [
-        "PHYSICAL_DEVICE",
-        "HARDWARE_BACKED_SIGNING_SERVICE"
-      ]
+      "enum": ["PHYSICAL_DEVICE", "HARDWARE_BACKED_SIGNING_SERVICE"]
     },
     "substrateIdentity": {
-      "type": [
-        "object",
-        "null"
-      ]
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["immutableIdentity", "identityType", "evidenceRef"],
+      "properties": {
+        "immutableIdentity": { "type": "string", "minLength": 1 },
+        "identityType": {
+          "enum": ["HARDWARE_ATTESTED_ID", "PROVIDER_RESOURCE_ID", "SERVICE_TENANT_ID"]
+        },
+        "evidenceRef": { "type": "string", "minLength": 1 }
+      }
     },
     "identityEvidenceRefs": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "items": { "type": "string", "minLength": 1 }
     },
     "jurisdictionEvidenceRefs": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "items": { "type": "string", "minLength": 1 }
     },
     "custodyBoundary": {
       "type": "object",
@@ -61,76 +52,31 @@
         "recoveryOwner"
       ],
       "properties": {
-        "rootCustodianRole": {
-          "type": "string",
-          "minLength": 1
-        },
-        "operationalSignerRole": {
-          "type": "string",
-          "minLength": 1
-        },
-        "privateKeyNonExportableOrOffline": {
-          "type": "boolean",
-          "const": true
-        },
-        "recoveryOwner": {
-          "type": "string",
-          "minLength": 1
-        }
+        "rootCustodianRole": { "type": "string", "minLength": 1 },
+        "operationalSignerRole": { "type": "string", "minLength": 1 },
+        "privateKeyNonExportableOrOffline": { "type": "boolean", "const": true },
+        "recoveryOwner": { "type": "string", "minLength": 1 }
       }
     },
     "auditRecontact": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "auditEvidenceRef",
-        "independentRecontactMethod"
-      ],
+      "required": ["auditEvidenceRef", "independentRecontactMethod"],
       "properties": {
-        "auditEvidenceRef": {
-          "type": "string",
-          "minLength": 1
-        },
-        "independentRecontactMethod": {
-          "type": "string",
-          "minLength": 1
-        }
+        "auditEvidenceRef": { "type": "string", "minLength": 1 },
+        "independentRecontactMethod": { "type": "string", "minLength": 1 }
       }
     },
     "status": {
-      "enum": [
-        "DECLARED",
-        "DISCOVERED",
-        "IDENTITY_VERIFIED",
-        "BOUND"
-      ]
+      "enum": ["DECLARED", "DISCOVERED", "IDENTITY_VERIFIED", "BOUND"]
     },
-    "rootKeyId": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "publicKeyFingerprint": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "privateKeyMaterial": {
-      "const": null
-    },
+    "privateKeyMaterial": { "const": null },
     "endpointHostIds": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
+      "items": { "type": "string", "minLength": 1 },
       "not": {
         "contains": {
-          "enum": [
-            "HW-OURSELFMAC-001",
-            "HW-OURSELFPIMAC-001"
-          ]
+          "enum": ["HW-OURSELFMAC-001", "HW-OURSELFPIMAC-001"]
         }
       }
     }
@@ -139,18 +85,11 @@
     {
       "if": {
         "properties": {
-          "status": {
-            "const": "BOUND"
-          }
-        }
+          "status": { "enum": ["IDENTITY_VERIFIED", "BOUND"] }
+        },
+        "required": ["status"]
       },
-      "then": {
-        "required": [
-          "substrateIdentity",
-          "rootKeyId",
-          "publicKeyFingerprint"
-        ]
-      }
+      "then": { "required": ["substrateIdentity"] }
     }
   ]
 }
