@@ -122,6 +122,13 @@
                     "const": "VERIFIED"
                   }
                 }
+              },
+              "reviewerIndependence": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
               }
             }
           }
@@ -189,6 +196,13 @@
                 }
               },
               "independentRecontact": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "reviewerIndependence": {
                 "properties": {
                   "status": {
                     "const": "VERIFIED"
@@ -287,6 +301,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "reviewerIndependence",
         "substrateIdentity",
         "administrativeSeparation",
         "jurisdiction",
@@ -315,6 +330,9 @@
           "$ref": "#/$defs/check"
         },
         "independentRecontact": {
+          "$ref": "#/$defs/check"
+        },
+        "reviewerIndependence": {
           "$ref": "#/$defs/check"
         }
       }

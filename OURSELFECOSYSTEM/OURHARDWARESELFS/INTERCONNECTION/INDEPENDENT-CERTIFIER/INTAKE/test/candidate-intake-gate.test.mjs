@@ -34,7 +34,7 @@ test('BOUND requires a reviewer signature and every independent verification dom
   const gate = review.allOf.find(x => x.if?.properties?.admissionStatus?.const === 'BOUND');
   assert.ok(gate);
   assert.ok(gate.then.required.includes('reviewerSignature'));
-  for (const field of ['substrateIdentity','administrativeSeparation','jurisdiction','custody','recovery','auditIntegrity','independentRecontact']) {
+  for (const field of ['reviewerIndependence','substrateIdentity','administrativeSeparation','jurisdiction','custody','recovery','auditIntegrity','independentRecontact']) {
     assert.equal(gate.then.properties.verification.properties[field].properties.status.const, 'VERIFIED', field);
   }
 });
@@ -63,4 +63,13 @@ test('every review decision is signed and refusal cannot be null', () => {
   assert.ok(review.required.includes('reviewerSignature'));
   const gate = review.allOf.find(x => x.if?.properties?.admissionStatus?.enum?.includes('REFUSED_MISSING_EVIDENCE'));
   assert.ok(gate.then.properties.refusal.$ref.endsWith('/refusal'));
+});
+
+test('reviewer independence is a verified gate before identity verification and BOUND', () => {
+  assert.ok(review.$defs.verification.required.includes('reviewerIndependence'));
+  for (const status of ['IDENTITY_VERIFIED', 'BOUND']) {
+    const gate = review.allOf.find(x => x.if?.properties?.admissionStatus?.const === status);
+    assert.equal(gate.then.properties.verification.properties.reviewerIndependence.properties.status.const, 'VERIFIED');
+  }
+  assert.ok(review.$defs.reviewer.required.includes('portalIssuerTrustDomainId'));
 });
