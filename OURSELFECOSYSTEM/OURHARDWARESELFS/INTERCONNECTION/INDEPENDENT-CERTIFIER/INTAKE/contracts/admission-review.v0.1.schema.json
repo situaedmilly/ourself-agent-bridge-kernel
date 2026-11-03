@@ -1,0 +1,416 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ourself.invalid/schemas/independent-certifier-admission-review.v0.1.schema.json",
+  "title": "OURSELF Independent Certifier Admission Review Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reviewId",
+    "intakeReceiptId",
+    "intakeEnvelopeDigest",
+    "candidateId",
+    "trustDomainId",
+    "reviewer",
+    "admissionStatus",
+    "verification",
+    "decisionEvidenceRefs",
+    "policyVersion",
+    "issuedAt",
+    "reviewerSignature"
+  ],
+  "properties": {
+    "reviewId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intakeReceiptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intakeEnvelopeDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "priorDecisionDigest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trustDomainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer": {
+      "$ref": "#/$defs/reviewer"
+    },
+    "admissionStatus": {
+      "enum": [
+        "EVIDENCE_REVIEW",
+        "IDENTITY_VERIFIED",
+        "BOUND",
+        "REFUSED_MISSING_EVIDENCE",
+        "REFUSED_CONTRADICTORY_EVIDENCE",
+        "REFUSED_UNVERIFIABLE_EVIDENCE",
+        "QUARANTINED"
+      ]
+    },
+    "verification": {
+      "$ref": "#/$defs/verification"
+    },
+    "decisionEvidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "refusal": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/refusal"
+        }
+      ]
+    },
+    "policyVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reviewerSignature": {
+      "$ref": "#/$defs/signatureEnvelope"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "admissionStatus": {
+            "const": "IDENTITY_VERIFIED"
+          }
+        },
+        "required": [
+          "admissionStatus"
+        ]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "substrateIdentity": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "administrativeSeparation": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "admissionStatus": {
+            "const": "BOUND"
+          }
+        },
+        "required": [
+          "admissionStatus"
+        ]
+      },
+      "then": {
+        "required": [
+          "reviewerSignature"
+        ],
+        "properties": {
+          "verification": {
+            "properties": {
+              "substrateIdentity": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "administrativeSeparation": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "jurisdiction": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "custody": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "recovery": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "auditIntegrity": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              },
+              "independentRecontact": {
+                "properties": {
+                  "status": {
+                    "const": "VERIFIED"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "admissionStatus": {
+            "enum": [
+              "REFUSED_MISSING_EVIDENCE",
+              "REFUSED_CONTRADICTORY_EVIDENCE",
+              "REFUSED_UNVERIFIABLE_EVIDENCE",
+              "QUARANTINED"
+            ]
+          }
+        },
+        "required": [
+          "admissionStatus"
+        ]
+      },
+      "then": {
+        "required": [
+          "refusal"
+        ],
+        "properties": {
+          "refusal": {
+            "$ref": "#/$defs/refusal"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewerTrustDomainId",
+        "reviewerIdentityEvidenceRefs",
+        "administrativeSeparationEvidenceRefs",
+        "portalIssuerTrustDomainId",
+        "independentRecontactRef",
+        "reviewerRole"
+      ],
+      "properties": {
+        "reviewerTrustDomainId": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "HW-OURSELFMAC-001",
+              "HW-OURSELFPIMAC-001"
+            ]
+          }
+        },
+        "reviewerIdentityEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "administrativeSeparationEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "portalIssuerTrustDomainId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independentRecontactRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewerRole": {
+          "enum": [
+            "INDEPENDENT_ADMISSION_REVIEWER",
+            "INDEPENDENT_REVIEW_PANEL"
+          ]
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "substrateIdentity",
+        "administrativeSeparation",
+        "jurisdiction",
+        "custody",
+        "recovery",
+        "auditIntegrity",
+        "independentRecontact"
+      ],
+      "properties": {
+        "substrateIdentity": {
+          "$ref": "#/$defs/check"
+        },
+        "administrativeSeparation": {
+          "$ref": "#/$defs/check"
+        },
+        "jurisdiction": {
+          "$ref": "#/$defs/check"
+        },
+        "custody": {
+          "$ref": "#/$defs/check"
+        },
+        "recovery": {
+          "$ref": "#/$defs/check"
+        },
+        "auditIntegrity": {
+          "$ref": "#/$defs/check"
+        },
+        "independentRecontact": {
+          "$ref": "#/$defs/check"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_REVIEWED",
+            "PENDING",
+            "VERIFIED",
+            "MISSING",
+            "CONTRADICTORY",
+            "UNVERIFIABLE"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reviewerFinding": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "refusal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode",
+        "finding",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "reasonCode": {
+          "enum": [
+            "REQUIRED_EVIDENCE_MISSING",
+            "EVIDENCE_CONTRADICTORY",
+            "EVIDENCE_UNVERIFIABLE",
+            "INTEGRITY_CONCERN",
+            "REVIEWER_NOT_INDEPENDENT",
+            "PROVENANCE_UNRESOLVED"
+          ]
+        },
+        "finding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "signatureEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "keyId",
+        "signedPayloadDigest",
+        "signatureRef"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keyId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signedPayloadDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "signatureRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

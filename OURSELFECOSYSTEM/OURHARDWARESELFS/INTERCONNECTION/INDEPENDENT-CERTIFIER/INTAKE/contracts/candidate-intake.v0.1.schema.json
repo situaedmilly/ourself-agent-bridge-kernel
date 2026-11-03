@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ourself.invalid/schemas/independent-certifier-candidate-intake.v0.1.schema.json",
+  "title": "OURSELF Independent Certifier Candidate Intake Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidateId",
+    "trustDomainId",
+    "substrateIdentity",
+    "administrativeControlEvidence",
+    "jurisdictionEvidence",
+    "custodyEvidence",
+    "auditEvidence",
+    "independentRecontact",
+    "evidenceDigests",
+    "admissionStatus"
+  ],
+  "properties": {
+    "candidateId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trustDomainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "substrateIdentity": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/substrateIdentity"
+        }
+      ]
+    },
+    "administrativeControlEvidence": {
+      "$ref": "#/$defs/submissionEvidence"
+    },
+    "jurisdictionEvidence": {
+      "$ref": "#/$defs/submissionEvidence"
+    },
+    "custodyEvidence": {
+      "$ref": "#/$defs/submissionEvidence"
+    },
+    "auditEvidence": {
+      "$ref": "#/$defs/submissionEvidence"
+    },
+    "independentRecontact": {
+      "$ref": "#/$defs/submissionEvidence"
+    },
+    "evidenceDigests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceDigest"
+      }
+    },
+    "admissionStatus": {
+      "const": "RECEIVED"
+    }
+  },
+  "$defs": {
+    "substrateIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "immutableIdentity",
+        "identityType",
+        "evidenceRef"
+      ],
+      "properties": {
+        "immutableIdentity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identityType": {
+          "enum": [
+            "HARDWARE_ATTESTED_ID",
+            "PROVIDER_RESOURCE_ID",
+            "SERVICE_TENANT_ID"
+          ]
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "submissionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "submissionState",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "submissionState": {
+          "enum": [
+            "MISSING",
+            "SUBMITTED"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "submitterStatement": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceOwner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidenceDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRef",
+        "algorithm",
+        "digest",
+        "mediaType",
+        "observedAt",
+        "sourceIdentity"
+      ],
+      "properties": {
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm": {
+          "const": "SHA-256"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceIdentity": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
