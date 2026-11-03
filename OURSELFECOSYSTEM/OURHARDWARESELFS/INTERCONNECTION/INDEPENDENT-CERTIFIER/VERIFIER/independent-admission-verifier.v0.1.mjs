@@ -159,6 +159,7 @@ export function createIndependentAdmissionVerifier(deps) {
     need(deps?.[k],'VERIFIER_NOT_CONFIGURED','Missing adapter: ' + k);
   need(typeof deps.runtimeAttestationResolver.resolve === 'function','VERIFIER_NOT_CONFIGURED','Runtime attestation resolver must expose resolve()');
   for (const k of [...EVIDENCE_DOMAINS,'reviewerIndependence']) need(typeof deps.domainVerifiers[k] === 'function','VERIFIER_NOT_CONFIGURED','Missing trusted domain verifier: ' + k);
+  need(deps.policy && typeof deps.policy === 'object' && !Array.isArray(deps.policy),'POLICY_NOT_CONFIGURED','Versioned policy object is required');
   const p=deepFreeze(JSON.parse(JSON.stringify(deps.policy)));
   need(p && typeof p.policyVersion === 'string','POLICY_NOT_CONFIGURED','Versioned policy is required');
   need(Array.isArray(p.endpointTrustDomainIds) && p.endpointTrustDomainIds.length >= 2,'POLICY_NOT_CONFIGURED','Both endpoint trust domains must be pinned');
