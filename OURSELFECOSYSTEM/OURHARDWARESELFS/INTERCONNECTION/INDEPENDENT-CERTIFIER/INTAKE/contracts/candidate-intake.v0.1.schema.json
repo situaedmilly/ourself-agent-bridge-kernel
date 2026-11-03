@@ -11,6 +11,7 @@
     "administrativeControlEvidence",
     "jurisdictionEvidence",
     "custodyEvidence",
+    "recoveryEvidence",
     "auditEvidence",
     "independentRecontact",
     "evidenceDigests",
@@ -42,6 +43,9 @@
       "$ref": "#/$defs/submissionEvidence"
     },
     "custodyEvidence": {
+      "$ref": "#/$defs/submissionEvidence"
+    },
+    "recoveryEvidence": {
       "$ref": "#/$defs/submissionEvidence"
     },
     "auditEvidence": {
