@@ -31,6 +31,9 @@ The reviewer must also operate outside all three excluded domains. The reviewer 
 The immutable intake envelope contains these fields:
 - candidateId;
 - trustDomainId;
+- submitterIdentity;
+- submitterTrustDomainId;
+- submitterIdentityEvidenceRefs;
 - substrateIdentity;
 - administrativeControlEvidence;
 - jurisdictionEvidence;
@@ -91,7 +94,7 @@ The reviewer must have a separately evidenced trust-domain identity and administ
 
 The reviewer records its own trust-domain ID, identity evidence, separation evidence, independent recontact reference, and signature envelope. A reviewer assertion alone is not proof: the evidence must be independently retrievable and checked.
 
-A reviewer whose domain ID equals either endpoint domain ID or the PORTAL issuer domain ID must be rejected. The verifier must compare actual identifiers; a self-declared boolean is insufficient.
+A reviewer whose identity or trust-domain ID equals the recorded submitter, candidate administrator, either endpoint domain ID, or the PORTAL issuer domain ID must be rejected. The verifier must compare actual identifiers against independently retrieved identity evidence; a self-declared boolean is insufficient.
 
 ## 6. BOUND admission predicate
 
@@ -104,7 +107,7 @@ BOUND is permitted only when all are true:
 - audit integrity is verified;
 - independent recontact succeeds;
 - reviewer identity and reviewer-domain independence are verified;
-- reviewer is not the candidate, candidate administrator, either endpoint, or PORTAL decision authority;
+- reviewer is not the submitter, candidate, candidate administrator, either endpoint, or PORTAL decision authority;
 - evidence digests recompute against retrieved bytes;
 - no unresolved contradiction, revocation, or quarantine condition remains.
 
@@ -116,6 +119,7 @@ The intake envelope is append-only. Review decisions are separate append-only re
 - intakeReceiptId and intakeEnvelopeDigest;
 - priorDecisionDigest, if any;
 - reviewId and candidateId;
+- submitter identity and trust-domain identity, bound to the intake receipt;
 - reviewer trust-domain identity and evidence references;
 - per-domain verification outcomes and evidence references;
 - decision state and reason code;
