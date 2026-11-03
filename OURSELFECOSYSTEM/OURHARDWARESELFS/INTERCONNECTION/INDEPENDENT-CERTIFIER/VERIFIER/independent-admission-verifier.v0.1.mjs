@@ -116,6 +116,17 @@ const identityRecord = (r,label,requireKey=false) => {
   if (requireKey) need(typeof r.keyId === 'string' && r.keyId.length && r.publicKey,'REVIEWER_KEY_BINDING_MISSING','Reviewer signing key is not bound to resolved identity');
 };
 const clearRevocation = (r,label) => need(r === false || r?.revoked === false,'REVOCATION_UNRESOLVED',label + ' revocation status is not affirmatively clear');
+const verifyIdentityEvidenceBindings = (identity, evidenceRecords, label) => {
+  need(Array.isArray(identity?.evidenceBindings),'IDENTITY_EVIDENCE_BINDING_MISSING',label+' identity resolver did not bind its result to retrieved evidence digests');
+  const expected=[...evidenceRecords].map(([evidenceRef,record])=>({evidenceRef,digest:sha256(record.bytes)}));
+  const actual=identity.evidenceBindings;
+  need(actual.length===expected.length && sameSet(actual.map(x=>x.evidenceRef),expected.map(x=>x.evidenceRef)),
+    'IDENTITY_EVIDENCE_BINDING_SCOPE_MISMATCH',label+' identity evidence binding scope differs from retrieved evidence');
+  for(const binding of actual){
+    const match=expected.find(x=>x.evidenceRef===binding.evidenceRef);
+    need(match && binding.digest===match.digest,'IDENTITY_EVIDENCE_BINDING_DIGEST_MISMATCH',label+' identity resolver did not bind exact retrieved bytes: '+binding.evidenceRef);
+  }
+};
 const verifyRuntimeAttestation = async (deps, p, nowMs) => {
   const x=p.verifierRuntime;
   need(x && ['runtimeId','version','artifactDigest','configDigest','adminBoundaryId','attestationKeyId','attestationPublicKey'].every(k=>typeof x[k]==='string'&&x[k].length) &&
@@ -144,6 +155,7 @@ const verifyRuntimeAttestation = async (deps, p, nowMs) => {
 export function createIndependentAdmissionVerifier(deps) {
   for (const k of ['intakeStore','decisionStore','evidenceResolver','signatureResolver','identityResolver','domainVerifiers','revocationChecker','receiptStore','runtimeAttestationResolver'])
     need(deps?.[k],'VERIFIER_NOT_CONFIGURED','Missing adapter: ' + k);
+  need(typeof deps.runtimeAttestationResolver.resolve === 'function','VERIFIER_NOT_CONFIGURED','Runtime attestation resolver must expose resolve()');
   for (const k of [...EVIDENCE_DOMAINS,'reviewerIndependence']) need(typeof deps.domainVerifiers[k] === 'function','VERIFIER_NOT_CONFIGURED','Missing trusted domain verifier: ' + k);
   const p=deps.policy;
   need(p && typeof p.policyVersion === 'string','POLICY_NOT_CONFIGURED','Versioned policy is required');
@@ -273,6 +285,7 @@ export function createIndependentAdmissionVerifier(deps) {
       for(const [ref,record] of reviewerEvidenceRecords)need(record?.independentlyRetrieved===true&&record?.sourceAuthenticated===true&&Buffer.isBuffer(record.bytes),'REVIEWER_EVIDENCE_NOT_RETRIEVED','Reviewer evidence bytes were not independently retrieved: '+ref);
       const reviewer=await deps.identityResolver.resolve({identityEvidenceRefs:reviewerClaim.reviewerIdentityEvidenceRefs,administrativeEvidenceRefs:reviewerClaim.administrativeSeparationEvidenceRefs,independentRecontactRef:reviewerClaim.independentRecontactRef,evidenceRecords:reviewerEvidenceRecords,purpose:'INDEPENDENT_ADMISSION_REVIEWER'});
       identityRecord(reviewer,'Reviewer',true);
+      verifyIdentityEvidenceBindings(reviewer,reviewerEvidenceRecords,'Reviewer');
       need(reviewer.trustDomainId === reviewerClaim.reviewerTrustDomainId,'REVIEWER_DOMAIN_MISMATCH','Resolved reviewer trust domain differs from claim');
       need(reviewer.identityId !== intake.submitterIdentity,'REVIEWER_IS_SUBMITTER','Reviewer is the submitter');
       need(reviewer.trustDomainId !== intake.trustDomainId && reviewer.trustDomainId !== intake.submitterTrustDomainId,
@@ -287,8 +300,12 @@ export function createIndependentAdmissionVerifier(deps) {
       clearRevocation(await deps.revocationChecker.check({type:'TRUST_DOMAIN',id:reviewer.trustDomainId}),'Reviewer trust domain');
       clearRevocation(await deps.revocationChecker.check({type:'SIGNING_KEY',id:reviewer.keyId}),'Reviewer signing key');
 
-      const submitter=await deps.identityResolver.resolve({identityEvidenceRefs:intake.submitterIdentityEvidenceRefs,purpose:'INTAKE_SUBMITTER'});
+      const submitterEvidenceRecords=new Map(intake.submitterIdentityEvidenceRefs.map(ref=>[ref,records.get(ref)]));
+      for(const [ref,record] of submitterEvidenceRecords)need(record?.independentlyRetrieved===true&&record?.sourceAuthenticated===true&&Buffer.isBuffer(record.bytes),
+        'SUBMITTER_EVIDENCE_NOT_RETRIEVED','Submitter identity evidence bytes were not independently retrieved: '+ref);
+      const submitter=await deps.identityResolver.resolve({identityEvidenceRefs:intake.submitterIdentityEvidenceRefs,evidenceRecords:submitterEvidenceRecords,purpose:'INTAKE_SUBMITTER'});
       identityRecord(submitter,'Submitter');
+      verifyIdentityEvidenceBindings(submitter,submitterEvidenceRecords,'Submitter');
       need(submitter.identityId === intake.submitterIdentity && submitter.trustDomainId === intake.submitterTrustDomainId,
         'SUBMITTER_IDENTITY_MISMATCH','Resolved submitter identity differs from intake');
       need(submitter.adminBoundaryId !== reviewer.adminBoundaryId,'REVIEWER_SHARES_SUBMITTER_ADMIN','Reviewer and submitter share admin boundary');
