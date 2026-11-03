@@ -9,6 +9,7 @@ const policy = () => ({
   policyVersion:'candidate-intake-v0.1',
   endpointTrustDomainIds:['mac-domain','pi-domain'],
   portalTrustDomainIds:['portal-domain'],
+  domainVerifierIds:{substrateIdentity:'trusted:substrateIdentity',administrativeSeparation:'trusted:administrativeSeparation',jurisdiction:'trusted:jurisdiction',custody:'trusted:custody',recovery:'trusted:recovery',auditIntegrity:'trusted:auditIntegrity',independentRecontact:'trusted:independentRecontact',reviewerIndependence:'trusted:reviewer-independence'},
   forbiddenAdminBoundaryIds:['mac-admin','pi-admin','portal-admin'],
   maxEvidenceAgeMs:7*24*60*60*1000,
   maxDecisionAgeMs:7*24*60*60*1000,
@@ -320,4 +321,37 @@ test('rejects a review decision without its own evidence digest manifest', async
   const sig=signDecision(bound), raw=jsonBytes(bound), h=sha256(raw);
   f.decisions.set(h,{bytes:raw}); f.signatures.set('sig:review-3',{bytes:sig});
   await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:h}),e=>e.code==='DECISION_FIELD_MISSING');
+});
+
+test('rejects an evidence verifier whose runtime identity differs from pinned policy', async () => {
+  const f=await fixture();
+  f.deps.domainVerifiers.custody=async ({evidenceRefs})=>({status:'VERIFIED',evidenceRefs,verifierId:'unapproved:substitute'});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='DOMAIN_EVIDENCE_NOT_VERIFIED');
+});
+
+test('rejects duplicate evidence references in the candidate intake', async () => {
+  const f=await fixture();
+  const intake={...f.intake,administrativeControlEvidence:{submissionState:'SUBMITTED',evidenceRefs:['ev:admin','ev:admin']}};
+  f.deps.intakeStore.getById=async()=>({receiptId:'intake-receipt-001',bytes:jsonBytes(intake)});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='EVIDENCE_REFERENCE_DUPLICATE');
+});
+
+test('rejects evidence manifests without authenticated source metadata', async () => {
+  const f=await fixture();
+  const intake={...f.intake,evidenceDigests:f.intake.evidenceDigests.map((x,i)=>i===0?{...x,sourceIdentity:null}:x)};
+  f.deps.intakeStore.getById=async()=>({receiptId:'intake-receipt-001',bytes:jsonBytes(intake)});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='EVIDENCE_DIGEST_METADATA_INVALID');
+});
+
+test('rejects non-ISO timestamps before freshness evaluation', async () => {
+  const f=await fixture();
+  const intake={...f.intake,evidenceDigests:f.intake.evidenceDigests.map((x,i)=>i===0?{...x,observedAt:'yesterday'}:x)};
+  f.deps.intakeStore.getById=async()=>({receiptId:'intake-receipt-001',bytes:jsonBytes(intake)});
+  f.deps.evidenceResolver.resolve=async ref=>ref==='ev:substrate'?{...f.evidence.get(ref),observedAt:'yesterday'}:f.evidence.get(ref);
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='INVALID_TIMESTAMP');
+});
+
+test('rejects a revoked reviewer trust domain even when identity and key are otherwise valid', async () => {
+  const f=await fixture({revoked:(type,id)=>type==='TRUST_DOMAIN'&&id==='reviewer-domain'});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='REVOCATION_UNRESOLVED');
 });

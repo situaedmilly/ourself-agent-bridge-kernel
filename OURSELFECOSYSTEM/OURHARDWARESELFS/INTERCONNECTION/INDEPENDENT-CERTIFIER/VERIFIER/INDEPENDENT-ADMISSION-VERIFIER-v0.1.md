@@ -30,7 +30,7 @@ Input: intakeReceiptId and the content digest of the proposed BOUND decision.
 5. Bind every decision to the same intake receipt, intake digest, candidate, trust domain, submitter identity, submitter trust domain, submitter evidence, policy version, and reviewer identity/recontact/admin-separation bindings. Reject skipped states and substituted subjects.
 6. Resolve reviewer identity and submitter identity independently. Compare resolved identity and trust-domain values against the intake/review claims. Reject a reviewer who is the submitter, belongs to the candidate or submitter trust domain, belongs to either endpoint or PORTAL trust domain, or shares an excluded administrative boundary.
 7. Verify Ed25519 signatures for every review decision. The signed payload is deterministic canonical JSON of the complete decision with reviewerSignature omitted. Verify signedPayloadDigest and require the signing key ID to match the key independently resolved for the reviewer. Check reviewer, submitter, candidate, evidence-source, endpoint, PORTAL, substrate, and signing-key revocation state. Unknown revocation state fails closed.
-8. Invoke trusted evidence-domain verifiers for substrate identity, administrative separation, jurisdiction, custody, recovery, audit integrity, candidate independent recontact, and reviewer independence/recontact. Each verifier must independently inspect its exact evidence-reference set and return VERIFIED. Candidate substrate and administrative identities are compared against the reviewer and pinned endpoint/PORTAL boundaries.
+8. Invoke trusted evidence-domain verifiers for substrate identity, administrative separation, jurisdiction, custody, recovery, audit integrity, candidate independent recontact, and reviewer independence/recontact. Each verifier must independently inspect its exact evidence-reference set and return VERIFIED with the exact verifier ID pinned in policy. A verifier callback with an unapproved or missing ID is rejected. Candidate substrate and administrative identities are compared against the reviewer and pinned endpoint/PORTAL boundaries.
 9. Confirm that the IDENTITY_VERIFIED and BOUND decisions mark the required checks VERIFIED and reference the exact evidence sets independently checked by the verifier.
 10. Construct a deterministic BOUND_VERIFIED receipt, append it with appendIfAbsent, then retrieve it by digest and recompute its digest. A missing, altered, or non-retrievable receipt fails the operation.
 
@@ -57,6 +57,7 @@ A versioned policy must pin:
 - both endpoint trust-domain IDs;
 - the PORTAL issuer trust-domain ID(s);
 - forbidden endpoint/PORTAL administrative-boundary IDs;
+- exact versioned verifier IDs for all seven evidence domains and reviewer independence;
 - maximum evidence age;
 - maximum decision age;
 - maximum permitted clock skew.
@@ -96,7 +97,15 @@ Any missing adapter, missing predecessor, digest mismatch, invalid signature, id
 
 Refusal and quarantine decisions are not converted to BOUND. They remain distinct dispositions for a separate review workflow.
 
-## 8. Current realization state
+## 8. Validation record
+
+Validation ran in an isolated temporary directory, outside the canonical local checkout:
+- Node syntax check: PASS.
+- Targeted Node test suites: 45/45 PASS (14 intake-contract assertions and 31 verifier tests).
+- Draft 2020-12 schema meta-validation: 2/2 PASS.
+- Synthetic Ed25519 keypairs and synthetic adapter fixtures only; no production trust material was used.
+
+## 9. Current realization state
 
 - Verifier library: IMPLEMENTED.
 - Unit tests: synthetic fixtures only.
