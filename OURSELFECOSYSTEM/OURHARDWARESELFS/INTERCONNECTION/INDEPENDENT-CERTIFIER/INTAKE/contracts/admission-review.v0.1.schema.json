@@ -20,7 +20,8 @@
     "policyVersion",
     "issuedAt",
     "reviewerSignature",
-    "decisionEvidenceDigests"
+    "decisionEvidenceDigests",
+    "reviewerEvidenceDigests"
   ],
   "properties": {
     "reviewId": {
@@ -115,6 +116,13 @@
     "decisionEvidenceDigests": {
       "type": "array",
       "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidenceDigest"
+      }
+    },
+    "reviewerEvidenceDigests": {
+      "type": "array",
+      "minItems": 3,
       "items": {
         "$ref": "#/$defs/evidenceDigest"
       }
