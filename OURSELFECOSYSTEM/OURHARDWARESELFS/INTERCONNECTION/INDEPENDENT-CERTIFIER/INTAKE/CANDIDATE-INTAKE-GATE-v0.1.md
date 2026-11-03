@@ -60,7 +60,7 @@ Refusal/containment outcomes:
 - REFUSED_UNVERIFIABLE_EVIDENCE
 - QUARANTINED
 
-No state is inferred from a previous state, a file's presence, a digest match, a provider product claim, or a candidate's self-attestation. A transition requires a new review decision referencing the prior intake receipt digest.
+No state is inferred from a previous state, a file's presence, a digest match, a provider product claim, or a candidate's self-attestation. A transition requires a new review decision referencing the prior intake receipt digest. IDENTITY_VERIFIED must reference the preceding EVIDENCE_REVIEW decision; BOUND must reference the preceding IDENTITY_VERIFIED decision. The admission verifier must retrieve and verify that prior decision, enforce the exact adjacent transition, and compare candidateId, trustDomainId, reviewer identity, policy version, and evidence lineage across the chain. Skipped states, mismatched subjects, missing prior decisions, or broken digest links are rejected.
 
 ### RECEIVED
 The intake envelope has been accepted as bytes and assigned an immutable receipt ID. No evidence is endorsed.

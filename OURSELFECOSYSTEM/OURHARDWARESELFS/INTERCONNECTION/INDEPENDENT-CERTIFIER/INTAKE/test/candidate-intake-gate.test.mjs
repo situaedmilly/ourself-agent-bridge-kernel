@@ -73,3 +73,12 @@ test('reviewer independence is a verified gate before identity verification and 
   }
   assert.ok(review.$defs.reviewer.required.includes('portalIssuerTrustDomainId'));
 });
+
+test('identity verification and BOUND require a preceding review decision digest', () => {
+  const gate = review.allOf.find(x => x.if?.properties?.admissionStatus?.enum?.includes('IDENTITY_VERIFIED') &&
+    x.if.properties.admissionStatus.enum.includes('BOUND'));
+  assert.ok(gate);
+  assert.ok(gate.then.required.includes('priorDecisionDigest'));
+  assert.equal(gate.then.properties.priorDecisionDigest.type, 'string');
+  assert.match(gate.then.properties.priorDecisionDigest.pattern, /64/);
+});

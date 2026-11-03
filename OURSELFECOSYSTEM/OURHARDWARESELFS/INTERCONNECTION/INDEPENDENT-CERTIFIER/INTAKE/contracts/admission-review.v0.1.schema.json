@@ -240,6 +240,32 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "admissionStatus": {
+            "enum": [
+              "IDENTITY_VERIFIED",
+              "BOUND"
+            ]
+          }
+        },
+        "required": [
+          "admissionStatus"
+        ]
+      },
+      "then": {
+        "required": [
+          "priorDecisionDigest"
+        ],
+        "properties": {
+          "priorDecisionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
     }
   ],
   "$defs": {
