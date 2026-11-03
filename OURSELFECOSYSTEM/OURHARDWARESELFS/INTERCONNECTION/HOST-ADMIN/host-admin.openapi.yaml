@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: OURSELF PIPE|PORTAL Host Administration
+  version: 0.1.0
+  description: >-
+    Typed, fail-closed host-administration request surface. This contract does
+    not provide a shell, grant root, or bypass local OS policy.
+servers:
+  - url: http://127.0.0.1:49320
+    description: Existing AetherBridge loopback ingress; route is not yet implemented.
+security:
+  - BearerAuth: []
+paths:
+  /portal/v1/host-admin/requests:
+    post:
+      operationId: submitHostAdminRequest
+      summary: Submit a typed, operation-specific host-administration request
+      description: >-
+        Requires caller authentication and a valid signed PORTAL admission
+        envelope. The envelope must admit the exact operation capability,
+        source, target, authority grant, and expiry. Request acceptance is not
+        dispatch or execution.
+      parameters:
+        - in: header
+          name: X-OURSELF-PORTAL-ADMISSION
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../contracts/host-admin-request.v0.1.schema.json'
+      responses:
+        '202':
+          description: Request durably queued; no execution claim.
+        '400':
+          description: Invalid typed request.
+        '401':
+          description: Caller identity not authenticated.
+        '403':
+          description: PORTAL admission missing, invalid, expired, or insufficient.
+        '409':
+          description: Replay or idempotency conflict.
+        '503':
+          description: Host-admin capability not configured or target unavailable.
+  /portal/v1/host-admin/requests/{request_id}:
+    get:
+      operationId: readHostAdminRequest
+      summary: Read the state of a previously admitted request
+      parameters:
+        - in: path
+          name: request_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current request and receipt state; no mutation.
+        '404':
+          description: Request not found.
+        '503':
+          description: Host-admin capability unavailable.
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer

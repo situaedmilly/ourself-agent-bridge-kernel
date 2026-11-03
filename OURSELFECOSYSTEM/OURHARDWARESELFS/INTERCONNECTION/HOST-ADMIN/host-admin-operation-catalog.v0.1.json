@@ -1,0 +1,111 @@
+{
+  "schema_version": "ourself.host-admin-operation-catalog.v0.1",
+  "policy_id": "OURSELF-HOST-ADMIN-C10-WITNESS-001",
+  "target_identity_ref": "OURSELFPIMAC",
+  "workload_profile": "OURSELF-C10-WITNESS-v0.1",
+  "default_decision": "DENY",
+  "shell_execution": false,
+  "arbitrary_paths": false,
+  "arbitrary_executables": false,
+  "operations": [
+    {
+      "id": "c10.witness.preflight",
+      "capability": "host.admin.c10.witness.preflight",
+      "effect": "READ_ONLY",
+      "requires_local_admin": false
+    },
+    {
+      "id": "c10.witness.identity.generate",
+      "capability": "host.admin.c10.witness.identity.generate",
+      "effect": "HOST_MUTATION",
+      "requires_local_admin": true,
+      "private_key_export": false
+    },
+    {
+      "id": "c10.witness.csr.export",
+      "capability": "host.admin.c10.witness.csr.export",
+      "effect": "READ_ONLY",
+      "requires_local_admin": false,
+      "export": "PUBLIC_CSR_ONLY"
+    },
+    {
+      "id": "c10.witness.certificate.install",
+      "capability": "host.admin.c10.witness.certificate.install",
+      "effect": "HOST_MUTATION",
+      "requires_local_admin": true,
+      "inputs": [
+        "CERTIFICATE_CHAIN",
+        "TRUST_BUNDLE_REFERENCE"
+      ],
+      "fixed_paths": true
+    },
+    {
+      "id": "c10.witness.service.install",
+      "capability": "host.admin.c10.witness.service.install",
+      "effect": "HOST_MUTATION",
+      "requires_local_admin": true,
+      "artifact_digest_required": true,
+      "fixed_paths": true
+    },
+    {
+      "id": "c10.witness.service.start",
+      "capability": "host.admin.c10.witness.service.start",
+      "effect": "PROCESS_EXECUTION",
+      "requires_local_admin": true,
+      "fixed_unit": "ourself-c10-witness.service"
+    },
+    {
+      "id": "c10.witness.service.status",
+      "capability": "host.admin.c10.witness.service.status",
+      "effect": "READ_ONLY",
+      "requires_local_admin": false
+    },
+    {
+      "id": "c10.witness.subject.observe",
+      "capability": "host.admin.c10.witness.subject.observe",
+      "effect": "READ_ONLY_EXTERNAL_IO",
+      "requires_local_admin": false,
+      "network_scope": [
+        "github.com",
+        "api.github.com"
+      ],
+      "subject_pinned": true
+    },
+    {
+      "id": "c10.witness.evidence.export",
+      "capability": "host.admin.c10.witness.evidence.export",
+      "effect": "READ_ONLY",
+      "requires_local_admin": false,
+      "private_key_export": false
+    }
+  ],
+  "host_controls": {
+    "broker_socket": "/run/ourself-host-admin/broker.sock",
+    "broker_owner": "root",
+    "broker_mode": "0660",
+    "witness_user": "ourself-witness",
+    "witness_unit": "ourself-c10-witness.service",
+    "witness_bind": "loopback-only-by-default",
+    "transport": "TLS1.3_MUTUAL_AUTH",
+    "admission_max_ttl_seconds": 300,
+    "nonce_single_use": true,
+    "replay_store": "root-owned-durable",
+    "receipt_store": "/var/lib/ourself-host-admin/receipts"
+  },
+  "prohibited": {
+    "shell": true,
+    "ssh_shell": true,
+    "sudo_proxy": true,
+    "arbitrary_argv": true,
+    "arbitrary_environment": true,
+    "arbitrary_file_path": true,
+    "package_url_install": true,
+    "selfserver2_mutation": true,
+    "kernel_policy_bypass": true
+  },
+  "non_claims": [
+    "No broker or service implementation exists yet.",
+    "No root trust, PORTAL trust bundle, endpoint certificates, or local admin bootstrap has been provisioned.",
+    "Catalog presence is not admission or execution authority."
+  ]
+}

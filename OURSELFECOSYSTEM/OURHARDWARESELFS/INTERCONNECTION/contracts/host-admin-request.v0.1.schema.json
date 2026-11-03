@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ourself://contracts/host-admin-request.v0.1",
+  "title": "OURSELF PIPE|PORTAL Host Administration Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "idempotency_key",
+    "source_identity_ref",
+    "target_identity_ref",
+    "operation_id",
+    "capability",
+    "workload_profile",
+    "purpose",
+    "authority_grant_ref",
+    "policy_version",
+    "nonce",
+    "issued_at",
+    "expires_at",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ourself.host-admin-request.v0.1"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "source_identity_ref": {
+      "const": "OURSELFMAC"
+    },
+    "target_identity_ref": {
+      "const": "OURSELFPIMAC"
+    },
+    "operation_id": {
+      "enum": [
+        "c10.witness.preflight",
+        "c10.witness.identity.generate",
+        "c10.witness.csr.export",
+        "c10.witness.certificate.install",
+        "c10.witness.service.install",
+        "c10.witness.service.start",
+        "c10.witness.service.status",
+        "c10.witness.subject.observe",
+        "c10.witness.evidence.export"
+      ]
+    },
+    "capability": {
+      "type": "string",
+      "pattern": "^host\\.admin\\.c10\\.witness\\.(preflight|identity\\.generate|csr\\.export|certificate\\.install|service\\.install|service\\.start|service\\.status|subject\\.observe|evidence\\.export)$"
+    },
+    "workload_profile": {
+      "const": "OURSELF-C10-WITNESS-v0.1"
+    },
+    "artifact_digests": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 512
+    },
+    "authority_grant_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_version": {
+      "const": "ourself.host-admin-policy.v0.1"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,128}$"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "subject_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "branch",
+        "commit",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "repository": {
+          "const": "situaedmilly/ALTONUMBUSELF"
+        },
+        "branch": {
+          "const": "morph-xi/selfmoat-proving"
+        },
+        "commit": {
+          "const": "3fdde73c099f9b99814d72dc224c638965be27e9"
+        },
+        "path": {
+          "const": "evidence/morph-xiii/FINAL-PROOF-001.json"
+        },
+        "sha256": {
+          "const": "22a4228da535aab04fb653b19f07d71fc81d3305fc9a0db398a2e6acfc717c5f"
+        }
+      }
+    }
+  }
+}
