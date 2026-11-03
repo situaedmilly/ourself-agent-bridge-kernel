@@ -22,15 +22,15 @@ Input: intakeReceiptId and the content digest of the proposed BOUND decision.
 
 1. Retrieve the intake receipt by ID. Recompute SHA-256 over the exact stored bytes. Parse and structurally validate the intake envelope. Require admissionStatus=RECEIVED.
 2. Resolve every candidate evidence reference, including submitter identity evidence, through the authenticated evidence resolver. Recompute SHA-256 over retrieved bytes; compare source identity, media type, and observedAt against the intake digest manifest; enforce freshness and source revocation checks. Submitter identity references are part of the exact intake manifest scope. Reject missing, duplicate, orphaned, stale, unauthenticated, or mismatched evidence.
-3. For every review decision, require a decisionEvidenceDigests manifest that exactly matches decisionEvidenceRefs. Every manifest entry must bind a non-empty source identity, media type, timezone-qualified ISO 8601 observation timestamp, and SHA-256 digest. Retrieve every review-evidence byte independently and recompute its SHA-256, source identity, media type, observation time, freshness, and revocation status. Review evidence is separately scoped from candidate-submitted evidence.
+3. For every review decision, require a decisionEvidenceDigests manifest that exactly matches decisionEvidenceRefs, plus a reviewerEvidenceDigests manifest that exactly matches reviewerIdentityEvidenceRefs, administrativeSeparationEvidenceRefs, and independentRecontactRef. Retrieve each reviewer evidence object through the authenticated resolver. Recompute SHA-256, validate source identity/media type/observation time, enforce freshness and revocation checks, and reject any reference without a retrieved record. The reviewer manifest is mandatory on every decision in the three-stage chain.
 4. Retrieve the proposed BOUND decision by digest and recompute the digest over its exact bytes. Retrieve its predecessor by priorDecisionDigest. Require the exact chain:
    - EVIDENCE_REVIEW.priorDecisionDigest = SHA-256(intake envelope bytes)
    - IDENTITY_VERIFIED.priorDecisionDigest = SHA-256(EVIDENCE_REVIEW bytes)
    - BOUND.priorDecisionDigest = SHA-256(IDENTITY_VERIFIED bytes)
 5. Bind every decision to the same intake receipt, intake digest, candidate, trust domain, submitter identity, submitter trust domain, submitter evidence, policy version, and reviewer identity/recontact/admin-separation bindings. Reject skipped states and substituted subjects.
-6. Resolve reviewer identity and submitter identity independently. Compare resolved identity and trust-domain values against the intake/review claims. Reject a reviewer who is the submitter, belongs to the candidate or submitter trust domain, belongs to either endpoint or PORTAL trust domain, or shares an excluded administrative boundary.
+6. Resolve reviewer identity and submitter identity independently using the exact retrieved evidence-record maps. Require each resolver result to return evidenceBindings that enumerate every supplied evidence reference and the exact SHA-256 digest of its retrieved bytes. Compare resolved identity and trust-domain values against the intake/review claims. Reject a reviewer who is the submitter, belongs to the candidate or submitter trust domain, belongs to either endpoint or PORTAL trust domain, or shares an excluded administrative boundary.
 7. Verify Ed25519 signatures for every review decision. The signed payload is deterministic canonical JSON of the complete decision with reviewerSignature omitted. Verify signedPayloadDigest and require the signing key ID to match the key independently resolved for the reviewer. Check reviewer, submitter, candidate, evidence-source, endpoint, PORTAL, substrate, and signing-key revocation state. Unknown revocation state fails closed.
-8. Invoke trusted evidence-domain verifiers for substrate identity, administrative separation, jurisdiction, custody, recovery, audit integrity, candidate independent recontact, and reviewer independence/recontact. Each verifier must independently inspect its exact evidence-reference set and return VERIFIED with the exact verifier ID pinned in policy. A verifier callback with an unapproved or missing ID is rejected. Candidate substrate and administrative identities are compared against the reviewer and pinned endpoint/PORTAL boundaries.
+8. Before evidence evaluation, verify a fresh Ed25519 runtime attestation signed by an externally pinned attestation authority. The attestation must bind the verifier runtime artifact/version/configuration/administrative boundary and exact measured component identities for the admission verifier, identity resolver, evidence resolver, signature resolver, revocation checker, receipt store, and every domain verifier. Callback-returned verifier IDs remain descriptive only; they are not executable identity. Invoke the measured evidence-domain verifiers for substrate identity, administrative separation, jurisdiction, custody, recovery, audit integrity, candidate independent recontact, and reviewer independence/recontact. Candidate substrate and administrative identities are compared against the reviewer and pinned endpoint/PORTAL boundaries.
 9. Confirm that the IDENTITY_VERIFIED and BOUND decisions mark the required checks VERIFIED and reference the exact evidence sets independently checked by the verifier.
 10. Construct a deterministic BOUND_VERIFIED receipt, append it with appendIfAbsent, then retrieve it by digest and recompute its digest. A missing, altered, or non-retrievable receipt fails the operation.
 
@@ -44,10 +44,11 @@ All adapters are mandatory. There are no permissive defaults.
 | decisionStore | getByDigest(sha256) | Returns immutable original decision bytes by content digest |
 | evidenceResolver | resolve(evidenceRef) | Authenticated independent retrieval; returns bytes, source identity, media type, observation time |
 | signatureResolver | resolve(signatureRef) | Retrieves raw Ed25519 signature bytes |
-| identityResolver | resolve(identityEvidenceRefs, purpose) | Independently establishes identity ID, trust-domain ID, administrative boundary, and reviewer public key/key ID |
-| domainVerifiers | seven evidence-domain verifiers plus reviewerIndependence | Trusted, versioned verification code; candidate-controlled callbacks are forbidden |
+| identityResolver | resolve(identityEvidenceRefs, evidenceRecords, purpose) | Independently establishes identity ID, trust-domain ID, administrative boundary, reviewer public key/key ID, and returns exact evidenceBindings (reference + SHA-256) |
+| domainVerifiers | seven evidence-domain verifiers plus reviewerIndependence | Trusted, versioned verification code whose measured executable identity is pinned by the external runtime attestation |
 | revocationChecker | check(type, id) | Returns an affirmative non-revoked result; unknown/error fails closed |
 | receiptStore | appendIfAbsent(digest, bytes), getByDigest(digest) | Append-only, immutable, content-addressed storage with independent recontact |
+| runtimeAttestationResolver | resolve() | Retrieves canonical signed runtime measurement from an independent attestation authority |
 
 The verifier cannot prove that an adapter is trustworthy merely because it implements the interface. Production deployment must pin adapter code identity, version, configuration digest, trust roots, jurisdiction, and administrative owner. Adapter substitution is a security-sensitive mutation and requires a separate admission/release process.
 
@@ -58,6 +59,10 @@ A versioned policy must pin:
 - the PORTAL issuer trust-domain ID(s);
 - forbidden endpoint/PORTAL administrative-boundary IDs;
 - exact versioned verifier IDs for all seven evidence domains and reviewer independence;
+- external runtime-attestation trust-anchor key ID and public key;
+- verifier runtime artifact/version/configuration digest and administrative boundary;
+- artifact/version/configuration digest and administrative boundary for every security-sensitive resolver and verifier component;
+- maximum runtime-attestation age;
 - maximum evidence age;
 - maximum decision age;
 - maximum permitted clock skew.
@@ -89,7 +94,7 @@ The receipt includes:
 - policy version and verification time;
 - explicit false values for root-key generation, certificate issuance, trust-bundle signing, PORTAL trust mutation, and C10 dispatch.
 
-The verifier does not sign the receipt. Its integrity is content-addressed and its immutability depends on the injected receipt store's append-only guarantees. The verifier confirms write/read digest equality; it does not independently certify the storage provider's immutability.
+The verifier receipt includes the external runtime-attestation digest and reviewer evidence manifest digests. The verifier does not sign the receipt. Its integrity is content-addressed and its immutability depends on the injected receipt store's append-only guarantees. The verifier confirms write/read digest equality; it does not independently certify the storage provider's immutability.
 
 ## 7. Fail-closed behavior
 
@@ -114,6 +119,11 @@ Post-hardening verification performed against re-fetched remote blobs:
 The 45/45 baseline result is historical and is not represented as execution of the current 33-case verifier suite.
 
 ## 9. Current realization state
+
+Current hardening branch: hardening/reviewer-evidence-boundary-v0.2.
+The hardening branch adds mandatory reviewer evidence manifests, authenticated retrieval and byte/provenance/freshness/revocation checks, identity-resolver evidenceBindings, and externally signed runtime measurement. The attestation authority and measured component policy remain deployment trust inputs; synthetic test keys are not production trust anchors.
+
+## 10. Current realization state
 
 - Verifier library: IMPLEMENTED.
 - Unit tests: synthetic fixtures only.
