@@ -73,7 +73,7 @@ const validateIntake = i => {
 };
 const validateDecision = d => {
   need(d && typeof d === 'object' && !Array.isArray(d),'INVALID_DECISION','Review decision must be an object');
-  for (const k of ['reviewId','intakeReceiptId','intakeEnvelopeDigest','candidateId','trustDomainId','submitterIdentity','submitterTrustDomainId','submitterIdentityEvidenceRefs','reviewer','admissionStatus','verification','decisionEvidenceRefs','decisionEvidenceDigests','policyVersion','issuedAt','reviewerSignature'])
+  for (const k of ['reviewId','intakeReceiptId','intakeEnvelopeDigest','candidateId','trustDomainId','submitterIdentity','submitterTrustDomainId','submitterIdentityEvidenceRefs','reviewer','admissionStatus','verification','decisionEvidenceRefs','decisionEvidenceDigests','reviewerEvidenceDigests','policyVersion','issuedAt','reviewerSignature'])
     need(Object.hasOwn(d,k),'DECISION_FIELD_MISSING','Decision is missing ' + k);
   digest(d.intakeEnvelopeDigest,'intakeEnvelopeDigest');
   need(STATES.includes(d.admissionStatus),'DECISION_NOT_ADMISSIBLE','Decision state is not an admission progression state');
@@ -83,6 +83,10 @@ const validateDecision = d => {
   need(Array.isArray(d.reviewer.reviewerIdentityEvidenceRefs) && d.reviewer.reviewerIdentityEvidenceRefs.length && Array.isArray(d.reviewer.administrativeSeparationEvidenceRefs) && d.reviewer.administrativeSeparationEvidenceRefs.length,'REVIEWER_EVIDENCE_MISSING','Reviewer identity and administrative-separation evidence are required');
   for (const k of DOMAINS) need(Object.hasOwn(d.verification ?? {},k),'VERIFICATION_FIELD_MISSING','Missing verification domain ' + k);
   need(Array.isArray(d.decisionEvidenceRefs) && d.decisionEvidenceRefs.length && unique(d.decisionEvidenceRefs).length === d.decisionEvidenceRefs.length && Array.isArray(d.decisionEvidenceDigests), 'DECISION_EVIDENCE_MANIFEST_MISSING', 'Decision evidence references must be unique and have a digest manifest');
+  need(Array.isArray(d.reviewerEvidenceDigests),'REVIEWER_EVIDENCE_MANIFEST_MISSING','Reviewer evidence requires a dedicated digest manifest');
+  const reviewerRefs=unique([...d.reviewer.reviewerIdentityEvidenceRefs,...d.reviewer.administrativeSeparationEvidenceRefs,d.reviewer.independentRecontactRef]);
+  need(reviewerRefs.length===d.reviewer.reviewerIdentityEvidenceRefs.length+d.reviewer.administrativeSeparationEvidenceRefs.length+1,
+    'REVIEWER_EVIDENCE_REFERENCE_DUPLICATE','Reviewer evidence references must be unique across identity, administration, and recontact');
   for (const k of ['reviewId','intakeReceiptId','candidateId','trustDomainId','submitterIdentity','submitterTrustDomainId','policyVersion']) need(typeof d[k] === 'string' && d[k].length,'DECISION_FIELD_INVALID','Decision field must be a non-empty string: ' + k);
   need(d.reviewerSignature && d.reviewerSignature.algorithm === 'Ed25519' && typeof d.reviewerSignature.signatureRef === 'string' && d.reviewerSignature.signatureRef.length,'SIGNATURE_MISSING','Ed25519 reviewer signature reference is required');
   need(typeof d.reviewerSignature.keyId === 'string' && d.reviewerSignature.keyId.length,'SIGNING_KEY_ID_MISSING','Reviewer signing key ID is required');
@@ -112,9 +116,33 @@ const identityRecord = (r,label,requireKey=false) => {
   if (requireKey) need(typeof r.keyId === 'string' && r.keyId.length && r.publicKey,'REVIEWER_KEY_BINDING_MISSING','Reviewer signing key is not bound to resolved identity');
 };
 const clearRevocation = (r,label) => need(r === false || r?.revoked === false,'REVOCATION_UNRESOLVED',label + ' revocation status is not affirmatively clear');
+const verifyRuntimeAttestation = async (deps, p, nowMs) => {
+  const x=p.verifierRuntime;
+  need(x && ['runtimeId','version','artifactDigest','configDigest','adminBoundaryId','attestationKeyId','attestationPublicKey'].every(k=>typeof x[k]==='string'&&x[k].length) &&
+    Number.isFinite(x.maxAttestationAgeMs)&&x.maxAttestationAgeMs>0&&x.components&&typeof x.components==='object',
+    'VERIFIER_RUNTIME_POLICY_MISSING','Externally pinned runtime identity and attestation authority are required');
+  digest(x.artifactDigest,'runtime artifact digest'); digest(x.configDigest,'runtime configuration digest');
+  const required=['admissionVerifier','evidenceResolver','identityResolver','signatureResolver','revocationChecker','receiptStore',
+    ...[...EVIDENCE_DOMAINS,'reviewerIndependence'].map(k=>'domainVerifier:'+k)];
+  for(const id of required){const q=x.components[id];need(q&&typeof q.version==='string'&&q.version.length&&typeof q.adminBoundaryId==='string'&&q.adminBoundaryId.length&&typeof q.artifactDigest==='string'&&typeof q.configDigest==='string','VERIFIER_COMPONENT_POLICY_MISSING','Missing pinned component identity: '+id);digest(q.artifactDigest,id+' artifact digest');digest(q.configDigest,id+' config digest');}
+  const e=await deps.runtimeAttestationResolver.resolve();
+  need(e&&e.signerKeyId===x.attestationKeyId,'VERIFIER_ATTESTATION_SIGNER_MISMATCH','Runtime attestation signer is not pinned');
+  const raw=bytes(e.bytes,'runtimeAttestationResolver'), payload=parse(raw,'runtime attestation');
+  need(Buffer.from(canonicalize(payload)).equals(raw),'VERIFIER_ATTESTATION_NONCANONICAL','Runtime attestation must use canonical bytes');
+  let ok=false;try{ok=cryptoVerify(null,raw,x.attestationPublicKey,bytes(e.signature,'runtime attestation signature'));}catch{}
+  need(ok,'VERIFIER_ATTESTATION_SIGNATURE_INVALID','Runtime attestation signature is invalid');
+  need(payload.schema==='ourself.verifier-runtime-attestation.v0.1','VERIFIER_ATTESTATION_SCHEMA_INVALID','Unsupported runtime attestation schema');
+  for(const k of ['runtimeId','version','artifactDigest','configDigest','adminBoundaryId'])need(payload[k]===x[k],'VERIFIER_RUNTIME_IDENTITY_MISMATCH','Runtime identity differs from pinned policy: '+k);
+  digest(payload.artifactDigest,'measured runtime artifact digest');digest(payload.configDigest,'measured runtime config digest');
+  fresh(payload.measuredAt,nowMs,x.maxAttestationAgeMs,p.maxClockSkewMs,'Runtime attestation');
+  need(payload.components&&typeof payload.components==='object','VERIFIER_COMPONENTS_MISSING','Measured component set missing');
+  for(const id of required)need(payload.components[id]&&canonicalize(payload.components[id])===canonicalize(x.components[id]),'VERIFIER_COMPONENT_IDENTITY_MISMATCH','Measured executable identity/version/configuration/custody differs from pinned policy: '+id);
+  need(sameSet(Object.keys(payload.components),required),'VERIFIER_COMPONENT_SCOPE_MISMATCH','Measured component set is incomplete or contains unpinned components');
+  return {digest:sha256(raw),runtimeId:payload.runtimeId,version:payload.version,artifactDigest:payload.artifactDigest,configDigest:payload.configDigest,adminBoundaryId:payload.adminBoundaryId,measuredAt:payload.measuredAt};
+};
 
 export function createIndependentAdmissionVerifier(deps) {
-  for (const k of ['intakeStore','decisionStore','evidenceResolver','signatureResolver','identityResolver','domainVerifiers','revocationChecker','receiptStore'])
+  for (const k of ['intakeStore','decisionStore','evidenceResolver','signatureResolver','identityResolver','domainVerifiers','revocationChecker','receiptStore','runtimeAttestationResolver'])
     need(deps?.[k],'VERIFIER_NOT_CONFIGURED','Missing adapter: ' + k);
   for (const k of [...EVIDENCE_DOMAINS,'reviewerIndependence']) need(typeof deps.domainVerifiers[k] === 'function','VERIFIER_NOT_CONFIGURED','Missing trusted domain verifier: ' + k);
   const p=deps.policy;
@@ -123,6 +151,7 @@ export function createIndependentAdmissionVerifier(deps) {
   need(Array.isArray(p.portalTrustDomainIds) && p.portalTrustDomainIds.length,'POLICY_NOT_CONFIGURED','PORTAL issuer trust domain must be pinned');
   need(Array.isArray(p.forbiddenAdminBoundaryIds) && p.forbiddenAdminBoundaryIds.length,'POLICY_NOT_CONFIGURED','Excluded admin boundaries must be pinned');
   need(p.domainVerifierIds && [...EVIDENCE_DOMAINS,'reviewerIndependence'].every(k=>typeof p.domainVerifierIds[k] === 'string' && p.domainVerifierIds[k].length),'POLICY_NOT_CONFIGURED','Every trusted evidence verifier ID must be pinned in policy');
+  need(p.verifierRuntime && typeof p.verifierRuntime === 'object','VERIFIER_RUNTIME_POLICY_MISSING','Externally pinned executable identity policy is required');
   for (const k of ['maxEvidenceAgeMs','maxDecisionAgeMs']) need(Number.isFinite(p[k]) && p[k] > 0,'POLICY_NOT_CONFIGURED','Freshness policy missing: ' + k);
   need(Number.isFinite(p.maxClockSkewMs) && p.maxClockSkewMs >= 0,'POLICY_NOT_CONFIGURED','Clock skew policy missing');
 
@@ -134,6 +163,7 @@ export function createIndependentAdmissionVerifier(deps) {
       const nowMs=now instanceof Date ? now.getTime() : Number(now);
       need(Number.isFinite(nowMs),'CLOCK_INVALID','Verifier clock invalid');
 
+      const runtimeAttestation=await verifyRuntimeAttestation(deps,p,nowMs);
       const ir=await deps.intakeStore.getById(intakeReceiptId);
       need(ir,'INTAKE_NOT_FOUND','Intake receipt not found');
       const intakeBytes=bytes(ir.bytes,'intakeStore.getById');
@@ -191,6 +221,7 @@ export function createIndependentAdmissionVerifier(deps) {
       need(chain.length === 3,'INCOMPLETE_REVIEW_CHAIN','Exact EVIDENCE_REVIEW → IDENTITY_VERIFIED → BOUND chain required');
       const ordered=chain.reverse();
       const reviewEvidenceDigests=[];
+      const reviewerEvidenceDigests=[];
       for (const item of ordered) {
         const d=item.decision;
         const manifest=new Map();
@@ -212,6 +243,20 @@ export function createIndependentAdmissionVerifier(deps) {
           records.set('decision:' + d.reviewId + ':' + ref,{...r,bytes:raw});
           reviewEvidenceDigests.push({scope:'REVIEW_DECISION',reviewId:d.reviewId,evidenceRef:ref,digest:declared.digest});
         }
+        const reviewerRefs=unique([...d.reviewer.reviewerIdentityEvidenceRefs,...d.reviewer.administrativeSeparationEvidenceRefs,d.reviewer.independentRecontactRef]);
+        const reviewerManifest=new Map();
+        for(const entry of d.reviewerEvidenceDigests){need(entry&&typeof entry.evidenceRef==='string'&&!reviewerManifest.has(entry.evidenceRef),'REVIEWER_EVIDENCE_DIGEST_DUPLICATE','Reviewer evidence digest is missing or duplicated');validateEvidenceDigest(entry,'Reviewer evidence '+entry.evidenceRef);reviewerManifest.set(entry.evidenceRef,entry);}
+        need(sameSet([...reviewerManifest.keys()],reviewerRefs),'REVIEWER_EVIDENCE_SCOPE_MISMATCH','Reviewer identity, administrative-separation, and recontact references must each have digest-bound evidence');
+        for(const ref of reviewerRefs){
+          const declared=reviewerManifest.get(ref),r=await deps.evidenceResolver.resolve(ref);
+          need(r?.independentlyRetrieved===true&&r?.sourceAuthenticated===true,'REVIEWER_EVIDENCE_SOURCE_UNAUTHENTICATED','Reviewer evidence source is not independently authenticated: '+ref);
+          const raw=bytes(r.bytes,'reviewer evidence resolver');
+          need(sha256(raw)===declared.digest&&r.sourceIdentity===declared.sourceIdentity&&r.mediaType===declared.mediaType&&r.observedAt===declared.observedAt,'REVIEWER_EVIDENCE_INTEGRITY_FAILED','Reviewer evidence digest or provenance mismatch: '+ref);
+          fresh(r.observedAt,nowMs,p.maxEvidenceAgeMs,p.maxClockSkewMs,'Reviewer evidence '+ref);
+          clearRevocation(await deps.revocationChecker.check({type:'EVIDENCE_SOURCE',id:r.sourceIdentity}),'Reviewer evidence source');
+          records.set(ref,{...r,bytes:raw});
+          reviewerEvidenceDigests.push({scope:'REVIEWER_IDENTITY_AND_INDEPENDENCE',reviewId:d.reviewId,evidenceRef:ref,digest:declared.digest});
+        }
       }
       const reviewerClaim=ordered[0].decision.reviewer;
       for (const x of ordered) {
@@ -224,7 +269,9 @@ export function createIndependentAdmissionVerifier(deps) {
           'REVIEWER_CHANGED_IN_CHAIN','Reviewer identity, administrative evidence, role, or recontact changed in the chain');
       }
 
-      const reviewer=await deps.identityResolver.resolve({identityEvidenceRefs:reviewerClaim.reviewerIdentityEvidenceRefs,administrativeEvidenceRefs:reviewerClaim.administrativeSeparationEvidenceRefs,purpose:'INDEPENDENT_ADMISSION_REVIEWER'});
+      const reviewerEvidenceRecords=new Map(unique([...reviewerClaim.reviewerIdentityEvidenceRefs,...reviewerClaim.administrativeSeparationEvidenceRefs,reviewerClaim.independentRecontactRef]).map(ref=>[ref,records.get(ref)]));
+      for(const [ref,record] of reviewerEvidenceRecords)need(record?.independentlyRetrieved===true&&record?.sourceAuthenticated===true&&Buffer.isBuffer(record.bytes),'REVIEWER_EVIDENCE_NOT_RETRIEVED','Reviewer evidence bytes were not independently retrieved: '+ref);
+      const reviewer=await deps.identityResolver.resolve({identityEvidenceRefs:reviewerClaim.reviewerIdentityEvidenceRefs,administrativeEvidenceRefs:reviewerClaim.administrativeSeparationEvidenceRefs,independentRecontactRef:reviewerClaim.independentRecontactRef,evidenceRecords:reviewerEvidenceRecords,purpose:'INDEPENDENT_ADMISSION_REVIEWER'});
       identityRecord(reviewer,'Reviewer',true);
       need(reviewer.trustDomainId === reviewerClaim.reviewerTrustDomainId,'REVIEWER_DOMAIN_MISMATCH','Resolved reviewer trust domain differs from claim');
       need(reviewer.identityId !== intake.submitterIdentity,'REVIEWER_IS_SUBMITTER','Reviewer is the submitter');
@@ -294,7 +341,7 @@ export function createIndependentAdmissionVerifier(deps) {
       ]);
       const reviewerCheck=await deps.domainVerifiers.reviewerIndependence(Object.freeze({
         intake,evidenceRecords:records,reviewerIdentity:reviewer,submitterIdentity:submitter,
-        reviewerEvidenceRefs:reviewerEvidence,policy:p,now:new Date(nowMs)
+        reviewerEvidenceRefs:reviewerEvidence,evidenceRecords:reviewerEvidenceRecords,policy:p,now:new Date(nowMs)
       }));
       need(reviewerCheck?.status === 'VERIFIED' && reviewerCheck.verifierId === p.domainVerifierIds.reviewerIndependence && sameSet(reviewerCheck.evidenceRefs,reviewerEvidence),
         'REVIEWER_INDEPENDENCE_UNVERIFIED','Independent reviewer identity, separation, and recontact were not verified as a complete evidence set');
@@ -325,7 +372,8 @@ export function createIndependentAdmissionVerifier(deps) {
         reviewer:{identityId:reviewer.identityId,trustDomainId:reviewer.trustDomainId,signingKeyId:reviewer.keyId},
         reviewChain:ordered.map(x=>({reviewId:x.decision.reviewId,state:x.decision.admissionStatus,digest:x.digest})),
         signatures:sigReceipts,
-        evidenceDigests:[...allRefs.map(ref=>({scope:'INTAKE',evidenceRef:ref,digest:digests.get(ref).digest})),...reviewEvidenceDigests],
+        evidenceDigests:[...allRefs.map(ref=>({scope:'INTAKE',evidenceRef:ref,digest:digests.get(ref).digest})),...reviewEvidenceDigests,...reviewerEvidenceDigests],
+        verifierRuntime:runtimeAttestation,
         verification:actual,
         policyVersion:p.policyVersion,
         verifiedAt:new Date(nowMs).toISOString(),
