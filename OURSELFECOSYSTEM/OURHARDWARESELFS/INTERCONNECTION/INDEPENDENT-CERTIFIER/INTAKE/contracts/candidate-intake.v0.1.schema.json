@@ -7,6 +7,9 @@
   "required": [
     "candidateId",
     "trustDomainId",
+    "submitterIdentity",
+    "submitterTrustDomainId",
+    "submitterIdentityEvidenceRefs",
     "substrateIdentity",
     "administrativeControlEvidence",
     "jurisdictionEvidence",
@@ -25,6 +28,22 @@
     "trustDomainId": {
       "type": "string",
       "minLength": 1
+    },
+    "submitterIdentity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "submitterTrustDomainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "submitterIdentityEvidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "substrateIdentity": {
       "oneOf": [
