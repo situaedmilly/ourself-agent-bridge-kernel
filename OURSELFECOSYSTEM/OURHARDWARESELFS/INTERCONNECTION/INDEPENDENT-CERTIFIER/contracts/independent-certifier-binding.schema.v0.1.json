@@ -4,16 +4,7 @@
   "title": "OURSELF Independent Certifier Trust-Domain Binding",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "certifierId",
-    "trustDomainId",
-    "substrateType",
-    "identityEvidenceRefs",
-    "jurisdictionEvidenceRefs",
-    "custodyBoundary",
-    "auditRecontact",
-    "status"
-  ],
+  "required": ["certifierId", "trustDomainId", "substrateType", "status"],
   "properties": {
     "certifierId": { "type": "string", "minLength": 1 },
     "trustDomainId": { "type": "string", "minLength": 1 },
@@ -84,12 +75,26 @@
   "allOf": [
     {
       "if": {
-        "properties": {
-          "status": { "enum": ["IDENTITY_VERIFIED", "BOUND"] }
-        },
+        "properties": { "status": { "enum": ["DISCOVERED", "IDENTITY_VERIFIED", "BOUND"] } },
+        "required": ["status"]
+      },
+      "then": { "required": ["identityEvidenceRefs"] }
+    },
+    {
+      "if": {
+        "properties": { "status": { "enum": ["IDENTITY_VERIFIED", "BOUND"] } },
         "required": ["status"]
       },
       "then": { "required": ["substrateIdentity"] }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "BOUND" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["jurisdictionEvidenceRefs", "custodyBoundary", "auditRecontact"]
+      }
     }
   ]
 }
