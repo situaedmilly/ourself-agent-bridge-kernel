@@ -99,11 +99,19 @@ Refusal and quarantine decisions are not converted to BOUND. They remain distinc
 
 ## 8. Validation record
 
-Validation ran in an isolated temporary directory, outside the canonical local checkout:
+Historical baseline validation at the pre-hardening verifier revision:
 - Node syntax check: PASS.
 - Targeted Node test suites: 45/45 PASS (14 intake-contract assertions and 31 verifier tests).
 - Draft 2020-12 schema meta-validation: 2/2 PASS.
 - Synthetic Ed25519 keypairs and synthetic adapter fixtures only; no production trust material was used.
+
+Post-hardening verification performed against re-fetched remote blobs:
+- Remote source/contract assertions: 10/10 PASS.
+- Verifier test cases present: 33 (two new regression cases cover submitter-evidence substitution and reviewer-decision provenance metadata).
+- Node test execution after these latest changes: NOT RUN.
+- Full Draft 2020-12 meta-validation after these latest code/test changes: NOT RUN; the schema files were not modified in this hardening delta.
+
+The 45/45 baseline result is historical and is not represented as execution of the current 33-case verifier suite.
 
 ## 9. Current realization state
 
