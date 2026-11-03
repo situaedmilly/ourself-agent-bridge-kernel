@@ -133,9 +133,10 @@ const verifyRuntimeAttestation = async (deps, p, nowMs) => {
     Number.isFinite(x.maxAttestationAgeMs)&&x.maxAttestationAgeMs>0&&x.components&&typeof x.components==='object',
     'VERIFIER_RUNTIME_POLICY_MISSING','Externally pinned runtime identity and attestation authority are required');
   digest(x.artifactDigest,'runtime artifact digest'); digest(x.configDigest,'runtime configuration digest');
+  need(!p.forbiddenAdminBoundaryIds.includes(x.adminBoundaryId),'VERIFIER_RUNTIME_ADMIN_BOUNDARY_FORBIDDEN','Verifier runtime shares a forbidden endpoint or PORTAL administrative boundary');
   const required=['admissionVerifier','evidenceResolver','identityResolver','signatureResolver','revocationChecker','receiptStore',
     ...[...EVIDENCE_DOMAINS,'reviewerIndependence'].map(k=>'domainVerifier:'+k)];
-  for(const id of required){const q=x.components[id];need(q&&typeof q.version==='string'&&q.version.length&&typeof q.adminBoundaryId==='string'&&q.adminBoundaryId.length&&typeof q.artifactDigest==='string'&&typeof q.configDigest==='string','VERIFIER_COMPONENT_POLICY_MISSING','Missing pinned component identity: '+id);digest(q.artifactDigest,id+' artifact digest');digest(q.configDigest,id+' config digest');}
+  for(const id of required){const q=x.components[id];need(q&&typeof q.version==='string'&&q.version.length&&typeof q.adminBoundaryId==='string'&&q.adminBoundaryId.length&&typeof q.artifactDigest==='string'&&typeof q.configDigest==='string','VERIFIER_COMPONENT_POLICY_MISSING','Missing pinned component identity: '+id);digest(q.artifactDigest,id+' artifact digest');digest(q.configDigest,id+' config digest');need(!p.forbiddenAdminBoundaryIds.includes(q.adminBoundaryId),'VERIFIER_COMPONENT_ADMIN_BOUNDARY_FORBIDDEN','Verifier component shares a forbidden endpoint or PORTAL administrative boundary: '+id);}
   const e=await deps.runtimeAttestationResolver.resolve();
   need(e&&e.signerKeyId===x.attestationKeyId,'VERIFIER_ATTESTATION_SIGNER_MISMATCH','Runtime attestation signer is not pinned');
   const raw=bytes(e.bytes,'runtimeAttestationResolver'), payload=parse(raw,'runtime attestation');
@@ -339,9 +340,12 @@ export function createIndependentAdmissionVerifier(deps) {
       clearRevocation(await deps.revocationChecker.check({type:'SUBSTRATE_IDENTITY',id:substrate.immutableIdentity}),'Candidate substrate');
 
       const admin=results.administrativeSeparation;
+      const verifierAdminBoundaries=unique([runtimeAttestation.adminBoundaryId,...Object.values(p.verifierRuntime.components).map(x=>x.adminBoundaryId)]);
+      need(!verifierAdminBoundaries.includes(reviewer.adminBoundaryId),'REVIEWER_SHARES_VERIFIER_ADMIN','Reviewer shares the verifier runtime administrative boundary');
       need(Array.isArray(admin.candidateAdminBoundaryIds) && admin.candidateAdminBoundaryIds.length &&
         Array.isArray(admin.candidateAdminPrincipalIds) && admin.candidateAdminPrincipalIds.length,
         'CANDIDATE_ADMIN_BOUNDARIES_MISSING','Candidate administrator boundaries and principals were not independently identified');
+      need(!admin.candidateAdminBoundaryIds.some(x=>verifierAdminBoundaries.includes(x)),'VERIFIER_SHARES_CANDIDATE_ADMIN','Verifier runtime or a security-sensitive component shares candidate administrative control');
       need(!admin.candidateAdminBoundaryIds.includes(reviewer.adminBoundaryId) &&
         !admin.candidateAdminBoundaryIds.some(x => p.forbiddenAdminBoundaryIds.includes(x)) &&
         !admin.candidateAdminPrincipalIds?.includes(reviewer.identityId),
