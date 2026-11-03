@@ -21,7 +21,7 @@ A passing synthetic test proves implementation behavior against test adapters. I
 Input: intakeReceiptId and the content digest of the proposed BOUND decision.
 
 1. Retrieve the intake receipt by ID. Recompute SHA-256 over the exact stored bytes. Parse and structurally validate the intake envelope. Require admissionStatus=RECEIVED.
-2. Resolve every candidate evidence reference through the authenticated evidence resolver. Recompute SHA-256 over retrieved bytes; compare source identity, media type, and observedAt against the intake digest manifest; enforce freshness and source revocation checks. Reject missing, duplicate, orphaned, stale, unauthenticated, or mismatched evidence.
+2. Resolve every candidate evidence reference, including submitter identity evidence, through the authenticated evidence resolver. Recompute SHA-256 over retrieved bytes; compare source identity, media type, and observedAt against the intake digest manifest; enforce freshness and source revocation checks. Submitter identity references are part of the exact intake manifest scope. Reject missing, duplicate, orphaned, stale, unauthenticated, or mismatched evidence.
 3. For every review decision, require a decisionEvidenceDigests manifest that exactly matches decisionEvidenceRefs. Retrieve every review-evidence byte independently and recompute its SHA-256, source identity, media type, observation time, freshness, and revocation status. Review evidence is separately scoped from candidate-submitted evidence.
 4. Retrieve the proposed BOUND decision by digest and recompute the digest over its exact bytes. Retrieve its predecessor by priorDecisionDigest. Require the exact chain:
    - EVIDENCE_REVIEW.priorDecisionDigest = SHA-256(intake envelope bytes)
