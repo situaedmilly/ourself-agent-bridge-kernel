@@ -19,7 +19,8 @@
     "decisionEvidenceRefs",
     "policyVersion",
     "issuedAt",
-    "reviewerSignature"
+    "reviewerSignature",
+    "decisionEvidenceDigests"
   ],
   "properties": {
     "reviewId": {
@@ -110,6 +111,13 @@
     },
     "reviewerSignature": {
       "$ref": "#/$defs/signatureEnvelope"
+    },
+    "decisionEvidenceDigests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidenceDigest"
+      }
     }
   },
   "allOf": [
@@ -268,6 +276,29 @@
               "IDENTITY_VERIFIED",
               "BOUND"
             ]
+          }
+        },
+        "required": [
+          "admissionStatus"
+        ]
+      },
+      "then": {
+        "required": [
+          "priorDecisionDigest"
+        ],
+        "properties": {
+          "priorDecisionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "admissionStatus": {
+            "const": "EVIDENCE_REVIEW"
           }
         },
         "required": [
@@ -458,8 +489,7 @@
       ],
       "properties": {
         "algorithm": {
-          "type": "string",
-          "minLength": 1
+          "const": "Ed25519"
         },
         "keyId": {
           "type": "string",
@@ -470,6 +500,43 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "signatureRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidenceDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRef",
+        "algorithm",
+        "digest",
+        "mediaType",
+        "observedAt",
+        "sourceIdentity"
+      ],
+      "properties": {
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm": {
+          "const": "SHA-256"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceIdentity": {
           "type": "string",
           "minLength": 1
         }

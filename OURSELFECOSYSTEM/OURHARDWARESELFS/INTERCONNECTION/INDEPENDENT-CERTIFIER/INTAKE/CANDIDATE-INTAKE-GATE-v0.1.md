@@ -120,6 +120,7 @@ The intake envelope is append-only. Review decisions are separate append-only re
 - priorDecisionDigest, if any;
 - reviewId and candidateId;
 - submitter identity and trust-domain identity, bound to the intake receipt;
+- submitter identity, submitter trust-domain identity, and submitter identity evidence references bound to the intake receipt;
 - reviewer trust-domain identity and evidence references;
 - per-domain verification outcomes and evidence references;
 - decision state and reason code;

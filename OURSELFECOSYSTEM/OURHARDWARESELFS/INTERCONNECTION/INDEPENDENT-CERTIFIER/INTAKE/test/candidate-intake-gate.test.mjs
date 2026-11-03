@@ -91,3 +91,21 @@ test('submitter identity is captured at intake and bound into every review decis
   }
   assert.match(doc, /reviewer whose identity or trust-domain ID equals the recorded submitter/i);
 });
+
+test('EVIDENCE_REVIEW must bind the exact intake receipt digest as predecessor', () => {
+  const gate = review.allOf.find(x => x.if?.properties?.admissionStatus?.const === 'EVIDENCE_REVIEW');
+  assert.ok(gate);
+  assert.ok(gate.then.required.includes('priorDecisionDigest'));
+  assert.equal(gate.then.properties.priorDecisionDigest.pattern, '^[a-f0-9]{64}$');
+});
+
+test('reviewer signature algorithm is pinned to Ed25519', () => {
+  assert.deepEqual(review.$defs.signatureEnvelope.properties.algorithm, { const: 'Ed25519' });
+});
+
+test('review decisions carry a digest manifest for their own evidence references', () => {
+  assert.ok(review.required.includes('decisionEvidenceDigests'));
+  assert.equal(review.properties.decisionEvidenceDigests.items.$ref, '#/$defs/evidenceDigest');
+  assert.ok(review.$defs.evidenceDigest.required.includes('evidenceRef'));
+  assert.ok(review.$defs.evidenceDigest.required.includes('digest'));
+});
