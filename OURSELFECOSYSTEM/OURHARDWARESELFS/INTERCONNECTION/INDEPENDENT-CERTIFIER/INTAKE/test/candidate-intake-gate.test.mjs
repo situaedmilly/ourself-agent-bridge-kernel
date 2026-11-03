@@ -103,6 +103,13 @@ test('reviewer signature algorithm is pinned to Ed25519', () => {
   assert.deepEqual(review.$defs.signatureEnvelope.properties.algorithm, { const: 'Ed25519' });
 });
 
+test('every review decision requires a separate digest manifest for reviewer identity, separation, and recontact evidence', () => {
+  assert.ok(review.required.includes('reviewerEvidenceDigests'));
+  assert.equal(review.properties.reviewerEvidenceDigests.minItems, 3);
+  assert.equal(review.properties.reviewerEvidenceDigests.items.$ref, '#/$defs/evidenceDigest');
+  assert.match(doc, /dedicated reviewerEvidenceDigests manifest/i);
+});
+
 test('review decisions carry a digest manifest for their own evidence references', () => {
   assert.ok(review.required.includes('decisionEvidenceDigests'));
   assert.equal(review.properties.decisionEvidenceDigests.items.$ref, '#/$defs/evidenceDigest');
