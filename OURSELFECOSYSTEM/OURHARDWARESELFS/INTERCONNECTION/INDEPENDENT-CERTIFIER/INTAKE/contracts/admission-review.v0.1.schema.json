@@ -10,6 +10,9 @@
     "intakeEnvelopeDigest",
     "candidateId",
     "trustDomainId",
+    "submitterIdentity",
+    "submitterTrustDomainId",
+    "submitterIdentityEvidenceRefs",
     "reviewer",
     "admissionStatus",
     "verification",
@@ -45,6 +48,22 @@
     "trustDomainId": {
       "type": "string",
       "minLength": 1
+    },
+    "submitterIdentity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "submitterTrustDomainId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "submitterIdentityEvidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "reviewer": {
       "$ref": "#/$defs/reviewer"
