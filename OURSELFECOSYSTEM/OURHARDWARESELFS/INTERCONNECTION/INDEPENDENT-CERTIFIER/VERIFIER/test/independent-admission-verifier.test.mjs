@@ -115,15 +115,15 @@ async function fixture(options = {}) {
   const third=createDecision('BOUND',second.digest,'review-3');
 
   const identityResolver={
-    async resolve({purpose}) {
+    async resolve({purpose,evidenceRecords}) {
       if (purpose === 'INDEPENDENT_ADMISSION_REVIEWER') return {
-        verified:true,identityId:options.reviewerIdentityId ?? 'reviewer-001',
+        verified:true,evidenceBindings:[...evidenceRecords].map(([evidenceRef,record])=>({evidenceRef,digest:sha256(record.bytes)})),identityId:options.reviewerIdentityId ?? 'reviewer-001',
         trustDomainId:options.reviewerTrustDomainId ?? 'reviewer-domain',
         adminBoundaryId:options.reviewerAdminBoundaryId ?? 'reviewer-admin',
         keyId:'review-key-001',publicKey
       };
       return {
-        verified:true,identityId:'submitter-001',trustDomainId:'submitter-domain',adminBoundaryId:'submitter-admin'
+        verified:true,evidenceBindings:[...evidenceRecords].map(([evidenceRef,record])=>({evidenceRef,digest:sha256(record.bytes)})),identityId:'submitter-001',trustDomainId:'submitter-domain',adminBoundaryId:'submitter-admin'
       };
     }
   };
