@@ -44,8 +44,8 @@ test('identity-verified and bound states require a non-null structured substrate
   for (const field of ['immutableIdentity', 'identityType', 'evidenceRef']) {
     assert.ok(identity.required.includes(field));
   }
-  const gate = schema.allOf.find(x => x.if?.properties?.status?.enum?.includes('BOUND') &&
-    x.if.properties.status.enum.includes('IDENTITY_VERIFIED'));
+  const gate = schema.allOf.find(x => x.if?.properties?.status?.enum?.includes('IDENTITY_VERIFIED') &&
+    x.if.properties.status.enum.length === 2);
   assert.ok(gate);
   assert.ok(gate.if.required.includes('status'));
   assert.ok(gate.then.required.includes('substrateIdentity'));
