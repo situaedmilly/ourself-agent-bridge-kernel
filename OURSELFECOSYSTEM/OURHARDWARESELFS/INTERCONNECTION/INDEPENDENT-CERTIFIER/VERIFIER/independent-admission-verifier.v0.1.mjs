@@ -149,7 +149,7 @@ const verifyRuntimeAttestation = async (deps, p, nowMs) => {
   need(payload.components&&typeof payload.components==='object','VERIFIER_COMPONENTS_MISSING','Measured component set missing');
   for(const id of required)need(payload.components[id]&&canonicalize(payload.components[id])===canonicalize(x.components[id]),'VERIFIER_COMPONENT_IDENTITY_MISMATCH','Measured executable identity/version/configuration/custody differs from pinned policy: '+id);
   need(sameSet(Object.keys(payload.components),required),'VERIFIER_COMPONENT_SCOPE_MISMATCH','Measured component set is incomplete or contains unpinned components');
-  return {digest:sha256(raw),runtimeId:payload.runtimeId,version:payload.version,artifactDigest:payload.artifactDigest,configDigest:payload.configDigest,adminBoundaryId:payload.adminBoundaryId,measuredAt:payload.measuredAt};
+  return {digest:sha256(raw),runtimeId:payload.runtimeId,version:payload.version,artifactDigest:payload.artifactDigest,configDigest:payload.configDigest,adminBoundaryId:payload.adminBoundaryId,measuredAt:payload.measuredAt,attestationSignerKeyId:e.signerKeyId,attestationBytes:raw.toString('base64'),attestationSignature:bytes(e.signature,'runtime attestation signature').toString('base64')};
 };
 
 export function createIndependentAdmissionVerifier(deps) {
