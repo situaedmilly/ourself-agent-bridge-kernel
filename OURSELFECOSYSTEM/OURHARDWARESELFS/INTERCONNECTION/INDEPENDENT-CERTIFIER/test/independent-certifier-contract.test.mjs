@@ -44,7 +44,8 @@ test('identity-verified and bound states require a non-null structured substrate
   for (const field of ['immutableIdentity', 'identityType', 'evidenceRef']) {
     assert.ok(identity.required.includes(field));
   }
-  const gate = schema.allOf.find(x => x.if?.properties?.status?.enum?.includes('BOUND'));
+  const gate = schema.allOf.find(x => x.if?.properties?.status?.enum?.includes('BOUND') &&
+    x.if.properties.status.enum.includes('IDENTITY_VERIFIED'));
   assert.ok(gate);
   assert.ok(gate.if.required.includes('status'));
   assert.ok(gate.then.required.includes('substrateIdentity'));
@@ -53,18 +54,24 @@ test('identity-verified and bound states require a non-null structured substrate
 test('BOUND does not demand a root key before KEY_GENERATED', () => {
   assert.equal(schema.properties.rootKeyId, undefined);
   assert.equal(schema.properties.publicKeyFingerprint, undefined);
-  const boundGate = schema.allOf.find(x => x.if?.properties?.status?.enum?.includes('BOUND'));
-  assert.deepEqual(boundGate.then.required, ['substrateIdentity']);
-});
-
-test('binding requires identity, jurisdiction, custody and independent recontact evidence', () => {
-  for (const field of [
-    'identityEvidenceRefs',
+  const boundGate = schema.allOf.find(x => x.if?.properties?.status?.const === 'BOUND');
+  assert.deepEqual(boundGate.then.required, [
     'jurisdictionEvidenceRefs',
     'custodyBoundary',
-    'auditRecontact',
-    'status'
-  ]) {
-    assert.ok(schema.required.includes(field));
-  }
+    'auditRecontact'
+  ]);
+});
+
+test('evidence requirements advance with the binding state', () => {
+  assert.deepEqual(schema.required, ['certifierId', 'trustDomainId', 'substrateType', 'status']);
+  const discoveredGate = schema.allOf.find(x =>
+    x.if?.properties?.status?.enum?.includes('DISCOVERED') &&
+    x.if.properties.status.enum.includes('BOUND'));
+  assert.ok(discoveredGate);
+  assert.deepEqual(discoveredGate.then.required, ['identityEvidenceRefs']);
+  const verifiedGate = schema.allOf.find(x =>
+    x.if?.properties?.status?.enum?.includes('IDENTITY_VERIFIED') &&
+    x.if.properties.status.enum.length === 2);
+  assert.ok(verifiedGate);
+  assert.deepEqual(verifiedGate.then.required, ['substrateIdentity']);
 });
