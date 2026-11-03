@@ -5,6 +5,9 @@ import { createIndependentAdmissionVerifier, canonicalize, sha256 } from '../ind
 
 const NOW = Date.parse('2026-11-03T20:00:00.000Z');
 const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+const runtimeKeys=generateKeyPairSync('ed25519');
+const runtimeComponents=()=>Object.fromEntries(['admissionVerifier','evidenceResolver','identityResolver','signatureResolver','revocationChecker','receiptStore',
+  ...[...keys,'reviewerIndependence'].map(x=>'domainVerifier:'+x)].map(id=>[id,{version:'0.1.0',artifactDigest:sha256('artifact:'+id),configDigest:sha256('config:'+id),adminBoundaryId:'verifier-admin'}]));
 const policy = () => ({
   policyVersion:'candidate-intake-v0.1',
   endpointTrustDomainIds:['mac-domain','pi-domain'],
@@ -13,7 +16,10 @@ const policy = () => ({
   forbiddenAdminBoundaryIds:['mac-admin','pi-admin','portal-admin'],
   maxEvidenceAgeMs:7*24*60*60*1000,
   maxDecisionAgeMs:7*24*60*60*1000,
-  maxClockSkewMs:30_000
+  maxClockSkewMs:30_000,
+  verifierRuntime:{runtimeId:'independent-admission-verifier-runtime',version:'0.1.0',artifactDigest:sha256('artifact:runtime'),
+    configDigest:sha256('config:runtime'),adminBoundaryId:'verifier-admin',attestationKeyId:'runtime-attestor-001',
+    attestationPublicKey:runtimeKeys.publicKey.export({type:'spki',format:'pem'}),maxAttestationAgeMs:60_000,components:runtimeComponents()}
 });
 const keys = ['substrateIdentity','administrativeSeparation','jurisdiction','custody','recovery','auditIntegrity','independentRecontact'];
 const reviewerEvidence = ['id:reviewer','admin:reviewer','recontact:reviewer','id:submitter','ev:admin'].sort();
@@ -67,6 +73,10 @@ async function fixture(options = {}) {
     independentRecontactRef:'recontact:reviewer',
     reviewerRole:'INDEPENDENT_ADMISSION_REVIEWER'
   };
+  for(const ref of ['id:reviewer','admin:reviewer','recontact:reviewer']){
+    const b=Buffer.from('evidence-bytes:'+ref),sourceIdentity='source:'+ref,mediaType='application/octet-stream';
+    evidence.set(ref,{bytes:b,sourceIdentity,mediaType,observedAt,independentlyRetrieved:true,sourceAuthenticated:true});
+  }
   const makeChecks = state => {
     const result={};
     for (const key of ['reviewerIndependence',...keys]) {
@@ -89,7 +99,9 @@ async function fixture(options = {}) {
       submitterIdentity:intake.submitterIdentity,submitterTrustDomainId:intake.submitterTrustDomainId,
       submitterIdentityEvidenceRefs:intake.submitterIdentityEvidenceRefs,
       reviewer,admissionStatus:state,verification:makeChecks(state),
-      decisionEvidenceRefs:[decisionRef],decisionEvidenceDigests:[{evidenceRef:decisionRef,algorithm:'SHA-256',digest:sha256(decisionEvidenceBytes),mediaType:decisionMedia,observedAt,sourceIdentity:decisionSource}],policyVersion:'candidate-intake-v0.1',
+      decisionEvidenceRefs:[decisionRef],decisionEvidenceDigests:[{evidenceRef:decisionRef,algorithm:'SHA-256',digest:sha256(decisionEvidenceBytes),mediaType:decisionMedia,observedAt,sourceIdentity:decisionSource}],
+      reviewerEvidenceDigests:['id:reviewer','admin:reviewer','recontact:reviewer'].map(ref=>{const e=evidence.get(ref);return {evidenceRef:ref,algorithm:'SHA-256',digest:sha256(e.bytes),mediaType:e.mediaType,observedAt:e.observedAt,sourceIdentity:e.sourceIdentity};}),
+      policyVersion:'candidate-intake-v0.1',
       issuedAt:new Date(NOW-30_000).toISOString(),
       reviewerSignature:{algorithm:'Ed25519',keyId:'review-key-001',signedPayloadDigest:'0'.repeat(64),signatureRef:'sig:'+id}
     };
@@ -133,6 +145,13 @@ async function fixture(options = {}) {
   const storedReceipts=new Map();
   const deps={
     policy:options.policy ?? policy(),
+    runtimeAttestationResolver:{async resolve(){
+      const x=policy().verifierRuntime;
+      const payload={schema:'ourself.verifier-runtime-attestation.v0.1',runtimeId:x.runtimeId,version:x.version,artifactDigest:x.artifactDigest,
+        configDigest:x.configDigest,adminBoundaryId:x.adminBoundaryId,measuredAt:new Date(NOW-1000).toISOString(),components:x.components};
+      const raw=Buffer.from(canonicalize(payload));
+      return {bytes:raw,signature:sign(null,raw,runtimeKeys.privateKey),signerKeyId:x.attestationKeyId};
+    }},
     clock:()=>new Date(NOW),
     intakeStore:{async getById(){return {receiptId:'intake-receipt-001',bytes:intakeBytes};}},
     decisionStore:{async getByDigest(h){return decisions.get(h) ?? null;}},
@@ -346,7 +365,7 @@ test('rejects evidence manifests without authenticated source metadata', async (
 
 test('rejects non-ISO timestamps before freshness evaluation', async () => {
   const f=await fixture();
-  const intake={...f.intake,evidenceDigests:f.intake.evidenceDigests.map((x,i)=>i===0?{...x,observedAt:'yesterday'}:x)};
+  const intake={...f.intake,evidenceDigests:f.intake.evidenceDigests.map(x=>x.evidenceRef==='ev:substrate'?{...x,observedAt:'yesterday'}:x)};
   f.deps.intakeStore.getById=async()=>({receiptId:'intake-receipt-001',bytes:jsonBytes(intake)});
   f.deps.evidenceResolver.resolve=async ref=>ref==='ev:substrate'?{...f.evidence.get(ref),observedAt:'yesterday'}:f.evidence.get(ref);
   await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='INVALID_TIMESTAMP');
@@ -362,6 +381,33 @@ test('retrieves and verifies submitter identity evidence bytes against the intak
   const f=await fixture();
   f.deps.evidenceResolver.resolve=async ref=>ref==='id:submitter'?{...f.evidence.get(ref),bytes:Buffer.from('substituted-submitter-evidence')}:f.evidence.get(ref);
   await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='EVIDENCE_DIGEST_MISMATCH');
+});
+
+test('rejects reviewer evidence when a reviewer identity reference is absent from its mandatory manifest', async () => {
+  const f=await fixture(),changed={...f.third.decision,reviewerEvidenceDigests:f.third.decision.reviewerEvidenceDigests.filter(x=>x.evidenceRef!=='id:reviewer')};
+  const sig=signDecision(changed),raw=jsonBytes(changed),h=sha256(raw);f.decisions.set(h,{bytes:raw});f.signatures.set('sig:review-3',{bytes:sig});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:h}),e=>e.code==='REVIEWER_EVIDENCE_SCOPE_MISMATCH');
+});
+
+test('rejects substituted reviewer evidence bytes even when the reviewer adapter claims VERIFIED', async () => {
+  const f=await fixture();f.deps.evidenceResolver.resolve=async ref=>ref==='id:reviewer'?{...f.evidence.get(ref),bytes:Buffer.from('substituted-reviewer-identity')}:f.evidence.get(ref);
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='REVIEWER_EVIDENCE_INTEGRITY_FAILED');
+});
+
+test('rejects a substituted verifier executable measured by the external attestation authority', async () => {
+  const f=await fixture(),x=f.deps.policy.verifierRuntime;
+  f.deps.runtimeAttestationResolver.resolve=async()=>{
+    const components={...x.components,'domainVerifier:custody':{...x.components['domainVerifier:custody'],artifactDigest:sha256('substituted-executable')}};
+    const payload={schema:'ourself.verifier-runtime-attestation.v0.1',runtimeId:x.runtimeId,version:x.version,artifactDigest:x.artifactDigest,
+      configDigest:x.configDigest,adminBoundaryId:x.adminBoundaryId,measuredAt:new Date(NOW-1000).toISOString(),components};
+    const raw=Buffer.from(canonicalize(payload));return {bytes:raw,signature:sign(null,raw,runtimeKeys.privateKey),signerKeyId:x.attestationKeyId};
+  };
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='VERIFIER_COMPONENT_IDENTITY_MISMATCH');
+});
+
+test('rejects an unpinned runtime-attestation signing authority',async()=>{
+  const f=await fixture();f.deps.runtimeAttestationResolver.resolve=async()=>({bytes:Buffer.from('{}'),signature:Buffer.from('bad'),signerKeyId:'substituted-attestor'});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='VERIFIER_ATTESTATION_SIGNER_MISMATCH');
 });
 
 test('rejects reviewer-decision digest manifests without authenticated provenance metadata', async () => {
