@@ -18,6 +18,7 @@ const policy = () => ({
 const keys = ['substrateIdentity','administrativeSeparation','jurisdiction','custody','recovery','auditIntegrity','independentRecontact'];
 const reviewerEvidence = ['id:reviewer','admin:reviewer','recontact:reviewer','id:submitter','ev:admin'].sort();
 const refs = {
+  submitterIdentity:['id:submitter'],
   substrateIdentity:['ev:substrate'],
   administrativeSeparation:['ev:admin'],
   jurisdiction:['ev:jurisdiction'],
@@ -354,4 +355,19 @@ test('rejects non-ISO timestamps before freshness evaluation', async () => {
 test('rejects a revoked reviewer trust domain even when identity and key are otherwise valid', async () => {
   const f=await fixture({revoked:(type,id)=>type==='TRUST_DOMAIN'&&id==='reviewer-domain'});
   await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='REVOCATION_UNRESOLVED');
+});
+
+
+test('retrieves and verifies submitter identity evidence bytes against the intake manifest', async () => {
+  const f=await fixture();
+  f.deps.evidenceResolver.resolve=async ref=>ref==='id:submitter'?{...f.evidence.get(ref),bytes:Buffer.from('substituted-submitter-evidence')}:f.evidence.get(ref);
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='EVIDENCE_DIGEST_MISMATCH');
+});
+
+test('rejects reviewer-decision digest manifests without authenticated provenance metadata', async () => {
+  const f=await fixture();
+  const changed={...f.third.decision,decisionEvidenceDigests:f.third.decision.decisionEvidenceDigests.map(x=>({...x,sourceIdentity:null}))};
+  const sig=signDecision(changed), raw=jsonBytes(changed), h=sha256(raw);
+  f.decisions.set(h,{bytes:raw}); f.signatures.set('sig:review-3',{bytes:sig});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:h}),e=>e.code==='EVIDENCE_DIGEST_METADATA_INVALID');
 });
