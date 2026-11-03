@@ -35,6 +35,7 @@ test('catalog denies generic command execution and protects SELFSERVER-2', async
 
 test('C10 subject is pinned to the admitted commit, path, and digest', async () => {
   const schema = await readJson('contracts/host-admin-request.v0.1.schema.json');
+  assert.ok(schema.required.includes('subject_binding'));
   const binding = schema.properties.subject_binding.properties;
   assert.equal(binding.repository.const, 'situaedmilly/ALTONUMBUSELF');
   assert.equal(binding.branch.const, 'morph-xi/selfmoat-proving');

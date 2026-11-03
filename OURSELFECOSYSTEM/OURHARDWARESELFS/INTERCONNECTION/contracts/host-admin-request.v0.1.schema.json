@@ -19,7 +19,8 @@
     "nonce",
     "issued_at",
     "expires_at",
-    "evidence_refs"
+    "evidence_refs",
+    "subject_binding"
   ],
   "properties": {
     "schema_version": {
