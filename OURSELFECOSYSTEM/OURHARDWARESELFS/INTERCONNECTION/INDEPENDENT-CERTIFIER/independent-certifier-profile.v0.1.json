@@ -1,0 +1,62 @@
+{
+  "profileId": "ourself.independent-certifier.c10.v0.1",
+  "status": "ENGINEERED_HOST_BINDING_UNRESOLVED",
+  "purpose": "C10_WITNESS_ENDPOINT_CERTIFICATION_AND_INPUTSELFTRUSTSELF_BUNDLE_SIGNATURE",
+  "selectedTrustDomain": null,
+  "rootKey": {
+    "exists": false,
+    "generated": false,
+    "privateMaterialLocation": null,
+    "algorithm": null,
+    "keyId": null,
+    "publicKeyFingerprint": null
+  },
+  "separation": {
+    "rootDistinctFromPortalIssuer": true,
+    "rootDistinctFromMacEndpoint": true,
+    "rootDistinctFromPiEndpoint": true,
+    "rootDistinctFromWitness": true
+  },
+  "permittedSigningPurposes": [
+    "ENDPOINT_CERTIFICATE_ISSUANCE",
+    "INPUTSELFTRUSTSELF_BUNDLE_SIGNATURE"
+  ],
+  "prohibitedSigningPurposes": [
+    "PORTAL_OPERATION_ADMISSION",
+    "HOST_ADMIN_REQUEST",
+    "WITNESS_OBSERVATION"
+  ],
+  "endpointScope": [
+    "HW-OURSELFMAC-001",
+    "HW-OURSELFPIMAC-001"
+  ],
+  "workloadScope": {
+    "repository": "situaedmilly/ALTONUMBUSELF",
+    "branch": "morph-xi/selfmoat-proving",
+    "commit": "3fdde73c099f9b99814d72dc224c638965be27e9",
+    "path": "evidence/morph-xiii/FINAL-PROOF-001.json",
+    "sha256": "22a4228da535aab04fb653b19f07d71fc81d3305fc9a0db398a2e6acfc717c5f"
+  },
+  "activationGates": [
+    "THIRD_TRUST_DOMAIN_SELECTED",
+    "IDENTITY_EVIDENCE_VERIFIED",
+    "JURISDICTION_BOUND",
+    "CUSTODY_ROLES_ASSIGNED",
+    "ROOT_KEY_CEREMONY_REVIEWED",
+    "ROOT_PUBLIC_KEY_INDEPENDENTLY_RECONTACTED",
+    "REVOCATION_AND_RECOVERY_DEFINED"
+  ],
+  "currentDisposition": {
+    "certifierOperational": false,
+    "rootProvisioned": false,
+    "endpointCertificatesIssued": false,
+    "trustBundleSigned": false,
+    "portalTrustConfigured": false
+  },
+  "exclusions": [
+    "SELFSERVER-2",
+    "GENERAL_REMOTE_SHELL",
+    "ARBITRARY_SIGNING",
+    "AUTONOMOUS_ROOT_ROTATION"
+  ]
+}
