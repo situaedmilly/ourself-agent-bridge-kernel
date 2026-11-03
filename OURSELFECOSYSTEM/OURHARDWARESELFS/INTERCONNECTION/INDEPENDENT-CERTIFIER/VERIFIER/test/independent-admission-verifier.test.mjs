@@ -146,7 +146,7 @@ async function fixture(options = {}) {
   const deps={
     policy:options.policy ?? policy(),
     runtimeAttestationResolver:{async resolve(){
-      const x=policy().verifierRuntime;
+      const x=(options.policy ?? policy()).verifierRuntime;
       const payload={schema:'ourself.verifier-runtime-attestation.v0.1',runtimeId:x.runtimeId,version:x.version,artifactDigest:x.artifactDigest,
         configDigest:x.configDigest,adminBoundaryId:x.adminBoundaryId,measuredAt:new Date(NOW-1000).toISOString(),components:x.components};
       const raw=Buffer.from(canonicalize(payload));
@@ -413,6 +413,18 @@ test('rejects reviewer identity resolution that binds the wrong evidence digest'
 test('rejects substituted reviewer evidence bytes even when the reviewer adapter claims VERIFIED', async () => {
   const f=await fixture();f.deps.evidenceResolver.resolve=async ref=>ref==='id:reviewer'?{...f.evidence.get(ref),bytes:Buffer.from('substituted-reviewer-identity')}:f.evidence.get(ref);
   await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='REVIEWER_EVIDENCE_INTEGRITY_FAILED');
+});
+
+test('rejects a verifier runtime on a forbidden endpoint or PORTAL administrative boundary', async () => {
+  const p=policy();p.verifierRuntime.adminBoundaryId='mac-admin';
+  const f=await fixture({policy:p});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='VERIFIER_RUNTIME_ADMIN_BOUNDARY_FORBIDDEN');
+});
+
+test('rejects a security-sensitive verifier component on a forbidden administrative boundary', async () => {
+  const p=policy();p.verifierRuntime.components['domainVerifier:custody'].adminBoundaryId='pi-admin';
+  const f=await fixture({policy:p});
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='VERIFIER_COMPONENT_ADMIN_BOUNDARY_FORBIDDEN');
 });
 
 test('rejects a substituted verifier executable measured by the external attestation authority', async () => {
