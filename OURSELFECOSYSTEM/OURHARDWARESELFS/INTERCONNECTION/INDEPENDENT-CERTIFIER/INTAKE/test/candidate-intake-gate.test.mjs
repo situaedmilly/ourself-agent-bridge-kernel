@@ -8,14 +8,14 @@ const review = JSON.parse(readFileSync(new URL('contracts/admission-review.v0.1.
 const doc = readFileSync(new URL('CANDIDATE-INTAKE-GATE-v0.1.md', root), 'utf8');
 
 test('intake envelope requires every candidate evidence domain and is RECEIVED-only', () => {
-  for (const field of ['candidateId','trustDomainId','substrateIdentity','administrativeControlEvidence','jurisdictionEvidence','custodyEvidence','auditEvidence','independentRecontact','evidenceDigests','admissionStatus']) {
+  for (const field of ['candidateId','trustDomainId','substrateIdentity','administrativeControlEvidence','jurisdictionEvidence','custodyEvidence','recoveryEvidence','auditEvidence','independentRecontact','evidenceDigests','admissionStatus']) {
     assert.ok(intake.required.includes(field), field);
   }
   assert.deepEqual(intake.properties.admissionStatus, { const: 'RECEIVED' });
 });
 
 test('candidate submission cannot self-assert verified or bound evidence', () => {
-  for (const field of ['administrativeControlEvidence','jurisdictionEvidence','custodyEvidence','auditEvidence','independentRecontact']) {
+  for (const field of ['administrativeControlEvidence','jurisdictionEvidence','custodyEvidence','recoveryEvidence','auditEvidence','independentRecontact']) {
     assert.deepEqual(intake.$defs.submissionEvidence.properties.submissionState.enum, ['MISSING','SUBMITTED']);
   }
   assert.equal(intake.$defs.evidenceDigest.properties.algorithm.const, 'SHA-256');
