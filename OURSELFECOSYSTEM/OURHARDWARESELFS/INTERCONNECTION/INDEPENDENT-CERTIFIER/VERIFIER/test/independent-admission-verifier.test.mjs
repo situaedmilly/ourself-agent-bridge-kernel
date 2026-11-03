@@ -182,6 +182,8 @@ test('verifies complete signed review chain and emits content-addressed BOUND re
   const receipt=JSON.parse(out.bytes.toString());
   assert.deepEqual(receipt.reviewChain.map(x=>x.state),['EVIDENCE_REVIEW','IDENTITY_VERIFIED','BOUND']);
   assert.equal(receipt.verification.recovery.status,'VERIFIED');
+  assert.equal(receipt.verifierRuntime.attestationSignerKeyId,'runtime-attestor-001');
+  assert.ok(receipt.verifierRuntime.attestationBytes && receipt.verifierRuntime.attestationSignature);
   assert.equal(receipt.authority.rootKeyGeneration,false);
   assert.equal(f.storedReceipts.size,1);
 });
@@ -387,6 +389,25 @@ test('rejects reviewer evidence when a reviewer identity reference is absent fro
   const f=await fixture(),changed={...f.third.decision,reviewerEvidenceDigests:f.third.decision.reviewerEvidenceDigests.filter(x=>x.evidenceRef!=='id:reviewer')};
   const sig=signDecision(changed),raw=jsonBytes(changed),h=sha256(raw);f.decisions.set(h,{bytes:raw});f.signatures.set('sig:review-3',{bytes:sig});
   await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:h}),e=>e.code==='REVIEWER_EVIDENCE_SCOPE_MISMATCH');
+});
+
+test('retrieves reviewer identity, administrative-separation, and independent-recontact evidence bytes', async () => {
+  const f=await fixture(),seen=new Set(),resolve=f.deps.evidenceResolver.resolve;
+  f.deps.evidenceResolver.resolve=async ref=>{seen.add(ref);return resolve(ref);};
+  await f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest});
+  for(const ref of ['id:reviewer','admin:reviewer','recontact:reviewer'])assert.ok(seen.has(ref),ref);
+});
+
+test('rejects reviewer identity resolution without evidence digest bindings', async () => {
+  const f=await fixture(),resolve=f.deps.identityResolver.resolve;
+  f.deps.identityResolver.resolve=async args=>{const result=await resolve(args);return args.purpose==='INDEPENDENT_ADMISSION_REVIEWER'?{...result,evidenceBindings:[]}:result;};
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='IDENTITY_EVIDENCE_BINDING_SCOPE_MISMATCH');
+});
+
+test('rejects reviewer identity resolution that binds the wrong evidence digest', async () => {
+  const f=await fixture(),resolve=f.deps.identityResolver.resolve;
+  f.deps.identityResolver.resolve=async args=>{const result=await resolve(args);return args.purpose==='INDEPENDENT_ADMISSION_REVIEWER'?{...result,evidenceBindings:result.evidenceBindings.map(x=>({...x,digest:'0'.repeat(64)}))}:result;};
+  await assert.rejects(f.verifier.verifyBound({intakeReceiptId:'intake-receipt-001',boundDecisionDigest:f.third.digest}),e=>e.code==='IDENTITY_EVIDENCE_BINDING_DIGEST_MISMATCH');
 });
 
 test('rejects substituted reviewer evidence bytes even when the reviewer adapter claims VERIFIED', async () => {
