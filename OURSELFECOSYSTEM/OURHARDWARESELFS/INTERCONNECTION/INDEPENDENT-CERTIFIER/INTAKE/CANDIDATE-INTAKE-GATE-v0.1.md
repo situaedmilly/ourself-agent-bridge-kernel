@@ -35,12 +35,13 @@ The immutable intake envelope contains these fields:
 - administrativeControlEvidence;
 - jurisdictionEvidence;
 - custodyEvidence;
+- recoveryEvidence;
 - auditEvidence;
 - independentRecontact;
 - evidenceDigests;
 - admissionStatus.
 
-All evidence sections accept MISSING or SUBMITTED material. The submitter cannot set VERIFIED, IDENTITY_VERIFIED, or BOUND. Every accepted envelope is recorded with admissionStatus=RECEIVED. Missing material is permitted at intake and remains explicitly missing; it is not silently inferred.
+All evidence sections, including recoveryEvidence, accept MISSING or SUBMITTED material. The submitter cannot set VERIFIED, IDENTITY_VERIFIED, or BOUND. Every accepted envelope is recorded with admissionStatus=RECEIVED. Missing material is permitted at intake and remains explicitly missing; it is not silently inferred.
 
 Each evidence digest binds a stable evidence reference, SHA-256 digest, media type, observation time, and source identity. Digests establish byte integrity only. They do not establish truth, provenance, independence, or authority.
 
