@@ -94,7 +94,7 @@ The receipt includes:
 - policy version and verification time;
 - explicit false values for root-key generation, certificate issuance, trust-bundle signing, PORTAL trust mutation, and C10 dispatch.
 
-The verifier receipt includes the external runtime-attestation digest and reviewer evidence manifest digests. The verifier does not sign the receipt. Its integrity is content-addressed and its immutability depends on the injected receipt store's append-only guarantees. The verifier confirms write/read digest equality; it does not independently certify the storage provider's immutability.
+The verifier receipt includes the complete signed external runtime-attestation envelope (canonical payload bytes, signer key ID, and signature), its digest, and the reviewer evidence manifest digests. This permits a downstream independent verifier to re-check the measurement rather than trusting a returned runtime ID. The verifier does not sign the receipt. Its integrity is content-addressed and its immutability depends on the injected receipt store's append-only guarantees. The verifier confirms write/read digest equality; it does not independently certify the storage provider's immutability.
 
 ## 7. Fail-closed behavior
 
@@ -104,33 +104,41 @@ Refusal and quarantine decisions are not converted to BOUND. They remain distinc
 
 ## 8. Validation record
 
-Historical baseline validation at the pre-hardening verifier revision:
-- Node syntax check: PASS.
-- Targeted Node test suites: 45/45 PASS (14 intake-contract assertions and 31 verifier tests).
-- Draft 2020-12 schema meta-validation: 2/2 PASS.
-- Synthetic Ed25519 keypairs and synthetic adapter fixtures only; no production trust material was used.
+Current hardening branch validation was performed against freshly fetched remote blobs in an isolated temporary directory on OURSELFMAC:
 
-Post-hardening verification performed against re-fetched remote blobs:
-- Remote source/contract assertions: 10/10 PASS.
-- Verifier test cases present: 33 (two new regression cases cover submitter-evidence substitution and reviewer-decision provenance metadata).
-- Node test execution after these latest changes: NOT RUN.
-- Full Draft 2020-12 meta-validation after these latest code/test changes: NOT RUN; the schema files were not modified in this hardening delta.
+- Working directory: `/tmp/ourself-verifier-v02-isolated`.
+- Canonical repository checkout: NOT TOUCHED.
+- Node syntax check for the verifier module: PASS.
+- Independent Admission Verifier suite: 42/42 PASS.
+- Candidate Intake Gate contract suite: 15/15 PASS.
+- Combined Node test execution: 57/57 PASS, 0 failures, 0 skipped.
+- Draft 2020-12 JSON Schema meta-validation: 2/2 PASS.
+- Tests use synthetic Ed25519 reviewer and runtime-attestation keys. They validate fail-closed behavior and contract enforcement, not production trust material or a real hardware/TEE measurement authority.
 
-The 45/45 baseline result is historical and is not represented as execution of the current 33-case verifier suite.
+The earlier 45/45 result belongs to the pre-hardening baseline and is retained only as historical context. It is not the validation count for this branch.
 
 ## 9. Current realization state
 
-Current hardening branch: hardening/reviewer-evidence-boundary-v0.2.
-The hardening branch adds mandatory reviewer evidence manifests, authenticated retrieval and byte/provenance/freshness/revocation checks, identity-resolver evidenceBindings, and externally signed runtime measurement. The attestation authority and measured component policy remain deployment trust inputs; synthetic test keys are not production trust anchors.
+Current hardening branch: `hardening/reviewer-evidence-boundary-v0.2`.
 
-## 10. Current realization state
+The branch now enforces:
+- Mandatory reviewer identity, administrative-separation, and independent-recontact digest manifests on every review decision in the exact three-stage chain.
+- Independent retrieval of each reviewer evidence object, SHA-256 recomputation, provenance validation, freshness checks, and evidence-source revocation checks.
+- Identity resolver input bound to the exact retrieved evidence-record maps; resolver output must enumerate exact evidence references and matching SHA-256 digests.
+- A frozen policy snapshot.
+- Fresh Ed25519 runtime attestation from an externally pinned authority, binding runtime artifact/version/configuration/administrative custody and the measured identities of the verifier and security-sensitive adapters.
+- Rejection when verifier runtime or component administrative boundaries overlap forbidden endpoint/PORTAL boundaries, reviewer administration, or candidate administration.
+- Inclusion of the signed runtime-attestation envelope in the content-addressed verification receipt.
 
-- Verifier library: IMPLEMENTED.
-- Unit tests: synthetic fixtures only.
-- Production evidence resolvers: NOT BOUND.
+The runtime-attestation authority, its public-key trust anchor, measured production component identities, and production administrative-custody evidence remain deployment trust inputs. Synthetic test keys are not production trust anchors. The library cannot manufacture or independently establish the existence of an external hardware/TEE measurement authority.
+
+- Verifier library: IMPLEMENTED / HARDENED IN FEATURE BRANCH.
+- Unit tests: 57/57 PASS using synthetic fixtures.
+- Production evidence resolver: NOT BOUND.
 - Production identity resolver: NOT BOUND.
 - Production domain verifiers: NOT BOUND.
 - Production revocation source: NOT BOUND.
+- Production runtime-attestation authority: NOT BOUND.
 - Append-only receipt store: NOT BOUND.
 - Independent reviewer: NOT ESTABLISHED.
 - Candidate trust domain: UNRESOLVED.
@@ -143,4 +151,4 @@ The hardening branch adds mandatory reviewer evidence manifests, authenticated r
 - SELFSERVER-2: EXCLUDED.
 - Local checkout: NOT TOUCHED.
 
-The next transition after this library is adapter qualification and an independently witnessed integration test. No production binding or trust promotion occurs through this artifact.
+The next transition is not admission or provisioning. It is independent qualification of the runtime-attestation authority and production adapters, followed by an independently witnessed integration test. No trust promotion occurs through this artifact.
