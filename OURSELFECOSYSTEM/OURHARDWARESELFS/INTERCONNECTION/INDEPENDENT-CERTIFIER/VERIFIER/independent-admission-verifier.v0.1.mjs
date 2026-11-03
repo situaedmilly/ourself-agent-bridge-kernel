@@ -44,6 +44,7 @@ const subjectCheck = (d,i,id,h) => {
   need(sameSet(d.submitterIdentityEvidenceRefs,i.submitterIdentityEvidenceRefs),'SUBMITTER_EVIDENCE_MISMATCH','Submitter evidence references changed');
 };
 const evidenceRefs = i => ({
+  submitterIdentity:i.submitterIdentityEvidenceRefs ?? [],
   substrateIdentity:[i.substrateIdentity?.evidenceRef].filter(Boolean),
   administrativeSeparation:i.administrativeControlEvidence?.evidenceRefs ?? [],
   jurisdiction:i.jurisdictionEvidence?.evidenceRefs ?? [],
@@ -195,8 +196,7 @@ export function createIndependentAdmissionVerifier(deps) {
         const manifest=new Map();
         for (const entry of d.decisionEvidenceDigests) {
           need(entry && typeof entry.evidenceRef === 'string' && !manifest.has(entry.evidenceRef), 'DECISION_EVIDENCE_DIGEST_DUPLICATE', 'Decision evidence digest is missing or duplicated');
-          digest(entry.digest,'decision evidence digest');
-          need(entry.algorithm === 'SHA-256','DECISION_EVIDENCE_ALGORITHM_UNSUPPORTED','Only SHA-256 review evidence digests are supported');
+          validateEvidenceDigest(entry,'Decision evidence ' + entry.evidenceRef);
           manifest.set(entry.evidenceRef,entry);
         }
         need(sameSet([...manifest.keys()],d.decisionEvidenceRefs),'DECISION_EVIDENCE_SCOPE_MISMATCH','Decision evidence digest manifest does not exactly match its references');
