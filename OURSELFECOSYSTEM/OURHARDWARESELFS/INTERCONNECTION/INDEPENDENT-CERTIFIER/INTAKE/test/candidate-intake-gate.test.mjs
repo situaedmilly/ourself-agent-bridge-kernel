@@ -8,7 +8,7 @@ const review = JSON.parse(readFileSync(new URL('contracts/admission-review.v0.1.
 const doc = readFileSync(new URL('CANDIDATE-INTAKE-GATE-v0.1.md', root), 'utf8');
 
 test('intake envelope requires every candidate evidence domain and is RECEIVED-only', () => {
-  for (const field of ['candidateId','trustDomainId','substrateIdentity','administrativeControlEvidence','jurisdictionEvidence','custodyEvidence','recoveryEvidence','auditEvidence','independentRecontact','evidenceDigests','admissionStatus']) {
+  for (const field of ['candidateId','trustDomainId','submitterIdentity','submitterTrustDomainId','submitterIdentityEvidenceRefs','substrateIdentity','administrativeControlEvidence','jurisdictionEvidence','custodyEvidence','recoveryEvidence','auditEvidence','independentRecontact','evidenceDigests','admissionStatus']) {
     assert.ok(intake.required.includes(field), field);
   }
   assert.deepEqual(intake.properties.admissionStatus, { const: 'RECEIVED' });
@@ -81,4 +81,13 @@ test('identity verification and BOUND require a preceding review decision digest
   assert.ok(gate.then.required.includes('priorDecisionDigest'));
   assert.equal(gate.then.properties.priorDecisionDigest.type, 'string');
   assert.match(gate.then.properties.priorDecisionDigest.pattern, /64/);
+});
+
+
+test('submitter identity is captured at intake and bound into every review decision', () => {
+  for (const field of ['submitterIdentity','submitterTrustDomainId','submitterIdentityEvidenceRefs']) {
+    assert.ok(intake.required.includes(field), field);
+    assert.ok(review.required.includes(field), field);
+  }
+  assert.match(doc, /reviewer whose identity or trust-domain ID equals the recorded submitter/i);
 });
