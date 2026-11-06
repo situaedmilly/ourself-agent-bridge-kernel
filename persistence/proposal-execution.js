@@ -80,6 +80,7 @@ import { canonicalHash } from './canonical-json.js';
 import { EXECUTION_CLASSES } from '../tools/execution-classes.js';
 import { evaluateApproval } from '../tools/execution-classes.js';
 import { SECRET_PATH } from '../tools/execution-classes.js';
+import { createExecutionPreimage } from '../tools/execution-preimage.js';
 import { inspectCommand, enforceClassPolicy } from '../tools/command-firewall.js';
 
 export const EXECUTION_PLAN_VERSION = 'ourself.execution-plan.v1';
@@ -111,6 +112,7 @@ export const PROPOSAL_EXECUTION_ERRORS = Object.freeze({
   EXECUTION_OVERRIDE_FORBIDDEN: 'EXECUTION_OVERRIDE_FORBIDDEN',
   INVALID_EXECUTION_REQUEST: 'INVALID_EXECUTION_REQUEST',
   EXECUTION_PRESPAWN_REVALIDATION_FAILED: 'EXECUTION_PRESPAWN_REVALIDATION_FAILED',
+  EXECUTION_PREIMAGE_MISMATCH: 'EXECUTION_PREIMAGE_MISMATCH',
 });
 
 const ERR = PROPOSAL_EXECUTION_ERRORS;
@@ -281,12 +283,16 @@ function boundedUtf8(buffers, limitBytes) {
  * Run one bounded process under the PROCESS LAW. Never a shell. Never stdin.
  * Resolves with a classification — it never throws for process-level failure.
  */
-function runBoundedProcess({ spawnImpl, plan, now }) {
+function runBoundedProcess({ spawnImpl, plan, now, preimage }) {
   return new Promise((resolvePromise) => {
     const startedAtMs = Date.now();
     let child;
     const finish = (partial) => resolvePromise({ started_at: now(), duration_ms: Date.now() - startedAtMs, ...partial });
     try {
+      if (preimage && !preimage.check(plan)) {
+        finish({ classification: 'preimage_refused' });
+        return;
+      }
       child = spawnImpl(plan.executable, [...plan.argv], {
         cwd: plan.cwd,
         env: { ...plan.environment },
@@ -372,6 +378,8 @@ export function createBoundedProposalExecutor(config) {
     throw new TypeError('createBoundedProposalExecutor requires an absolute authorizedExecutionRoot');
   }
   const authorizedRoot = resolve(cfg.authorizedExecutionRoot);
+  const preimage = cfg.executionPreimage === undefined ? null
+    : createExecutionPreimage(authorizedRoot, cfg.executionPreimage);
   const workingDirectory = resolve(typeof cfg.workingDirectory === 'string' && cfg.workingDirectory.length > 0 ? cfg.workingDirectory : authorizedRoot);
   const timeoutMs = Math.min(Math.max(Number.isInteger(cfg.timeoutMs) ? cfg.timeoutMs : DEFAULT_TIMEOUT_MS, 1), MAX_TIMEOUT_MS);
   const maxOutputBytes = Math.min(Math.max(Number.isInteger(cfg.maxOutputBytes) ? cfg.maxOutputBytes : DEFAULT_MAX_OUTPUT_BYTES, 1), MAX_OUTPUT_BYTES_CAP);
@@ -508,6 +516,10 @@ export function createBoundedProposalExecutor(config) {
       return fail(ERR.INVALID_EXECUTION_PLAN, `no bounded operation is registered for route "${route}" with class "${storedClass}"`);
     }
 
+    if (operation.requiresTarget && cfg.requireExecutionPreimage === true && !preimage) {
+      return fail(ERR.EXECUTION_PREIMAGE_MISMATCH, 'operator mutation requires a reviewed target preimage');
+    }
+
     // Target-bearing operations (git-add) derive argv/display from the
     // SEALED packet.target — re-validated fresh against the authorized
     // execution root on every invocation, never trusted from intake time,
@@ -565,6 +577,10 @@ export function createBoundedProposalExecutor(config) {
       created_at: now(),
       plan_hash: null,
     };
+    if (preimage) {
+      plan.execution_preimage = preimage.binding;
+      if (!preimage.check(plan)) return fail(ERR.EXECUTION_PREIMAGE_MISMATCH, 'recontact required');
+    }
     plan.plan_hash = computeExecutionPlanHash(plan);
 
     // ── One-shot exclusive claim (O_EXCL) — never deleted by this module ────
@@ -664,15 +680,17 @@ export function createBoundedProposalExecutor(config) {
     }
 
     // ── Bounded process invocation — the single spawn of this proposal ──────
-    const processOutcome = await runBoundedProcess({ spawnImpl, plan, now });
+    const processOutcome = await runBoundedProcess({ spawnImpl, plan, now, preimage });
 
     const failureCode =
-      processOutcome.classification === 'spawn_failed' ? ERR.EXECUTION_SPAWN_FAILED
+      processOutcome.classification === 'preimage_refused' ? ERR.EXECUTION_PREIMAGE_MISMATCH
+      : processOutcome.classification === 'spawn_failed' ? ERR.EXECUTION_SPAWN_FAILED
       : processOutcome.classification === 'timeout' ? ERR.EXECUTION_TIMEOUT
       : processOutcome.classification === 'nonzero_exit' ? ERR.EXECUTION_NONZERO_EXIT
       : null;
 
     const result = {
+      ...(processOutcome.classification === 'preimage_refused' ? { actuation_attempted: false } : {}),
       classification: processOutcome.classification,
       failure_code: failureCode,
       exit_code: processOutcome.exit_code ?? null,
@@ -749,9 +767,10 @@ export function createBoundedProposalExecutor(config) {
     }
 
     return {
-      ok: true,
+      ok: processOutcome.classification !== 'preimage_refused',
+      ...(processOutcome.classification === 'preimage_refused' ? { error: ERR.EXECUTION_PREIMAGE_MISMATCH } : {}),
       idempotent: false,
-      executed: true,
+      executed: processOutcome.classification !== 'preimage_refused',
       state: terminalRecord.state,
       outcome: terminalType,
       failure_code: failureCode,

@@ -7,7 +7,9 @@
     "setup": "node tools/setup-secret.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "proof:run": "node tools/proof-path-cli.js run",
+    "proof:verify": "node tools/proof-path-cli.js verify"
   },
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.20.0",
