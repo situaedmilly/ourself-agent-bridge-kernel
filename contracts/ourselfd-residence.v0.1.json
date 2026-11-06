@@ -1,0 +1,29 @@
+{
+  "version": "0.1",
+  "authority": "OURSELFd",
+  "purpose": "Bounded admission contract for proving machine residence without granting arbitrary execution authority",
+  "required_evidence": [
+    "INSTALL",
+    "LOAD",
+    "BIRTH",
+    "PROCESS_IDENTITY",
+    "LIVENESS",
+    "RECONTACT"
+  ],
+  "proof_rule": "MACHINE_RESIDENCE_PROVEN iff every required evidence species is present, each carries the same instance_id, and the final RECONTACT observation confirms the same process identity as BIRTH",
+  "explicitly_excluded": [
+    "shell.execute",
+    "arbitrary_filesystem_access",
+    "arbitrary_process_start",
+    "unbounded_write",
+    "machine_residence_claim_without_observation"
+  ],
+  "non_collapse": [
+    "INSTALL != LOAD",
+    "LOAD != BIRTH",
+    "BIRTH != PROCESS_IDENTITY",
+    "PROCESS_IDENTITY != LIVENESS",
+    "LIVENESS != RECONTACT",
+    "RECONTACT != RESIDENCE_PROOF"
+  ]
+}
