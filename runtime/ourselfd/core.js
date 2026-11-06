@@ -196,6 +196,22 @@ export class OURSELFdCore {
     return structuredClone(receipt);
   }
 
+  async recontactReceipt(receiptId) {
+    const inMemory = this.receipts.get(receiptId);
+    if (inMemory) return structuredClone(inMemory);
+    if (!this.receiptDir) throw new Error("RECEIPT_NOT_FOUND");
+    const file = path.join(this.receiptDir, `${receiptId}.json`);
+    try {
+      const raw = await fs.readFile(file, "utf8");
+      const receipt = JSON.parse(raw);
+      this.receipts.set(receiptId, receipt);
+      return structuredClone(receipt);
+    } catch (error) {
+      if (error.code === "ENOENT") throw new Error("RECEIPT_NOT_FOUND");
+      throw error;
+    }
+  }
+
   getReceipt(receiptId) {
     const receipt = this.receipts.get(receiptId);
     if (!receipt) throw new Error("RECEIPT_NOT_FOUND");
