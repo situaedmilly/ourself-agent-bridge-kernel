@@ -59,3 +59,15 @@ Verification:
 - JavaScript syntax check: passed.
 
 No production trust values were fabricated. No launchd trust environment, service source, firewall, SSH policy, keys, or authority records were mutated. No default-branch update, PR, or merge was performed. Transport remains distinct from trust, admission, and host administration.
+
+
+### Durable local verification artifacts
+
+- `runtime/aetherbridge/config/pipeportal-reverself-config.v1.json`
+  SHA-256: `af3c4fcadcb19ae9e481d65dac27b2bee5d217be3f7b8068e0cb73dfb097b372`
+- `runtime/aetherbridge/portal-reverself-preflight.mjs`
+  SHA-256: `cb813855008859bccdef19b86aca69b636f016772814b321e447e00faa89ee3a`
+- `runtime/aetherbridge/logs/PIPEPORTAL-REVERSELF-PREFLIGHT-20261106.json`
+  SHA-256: `cb4afc779457c1e9404607c5bb07ae27cbf8671bc6eb2801a82f5cb8889a91e9`
+
+The report was copied from the live preflight output into the repository evidence log, re-read as JSON, and checked to contain exactly six fact records. The three trust/admin facts remain negative by design; the verifier exits nonzero rather than promote incomplete trust.
