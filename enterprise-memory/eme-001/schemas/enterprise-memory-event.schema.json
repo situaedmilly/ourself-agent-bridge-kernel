@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ourself.invalid/eme-001/schemas/enterprise-memory-event.schema.json",
+  "title": "EnterpriseMemoryEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec_version",
+    "object_type",
+    "event_id",
+    "enterprise_id",
+    "sequence",
+    "event_type",
+    "subject",
+    "recorded_at",
+    "source_identity_ref",
+    "state_operations",
+    "evidence_refs",
+    "previous_event_hash",
+    "content_hash"
+  ],
+  "properties": {
+    "spec_version": { "const": "EME-001/v0.1" },
+    "object_type": { "const": "EnterpriseMemoryEvent" },
+    "event_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "enterprise_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "event_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "recorded_at": { "type": "string", "format": "date-time" },
+    "effective_at": { "type": ["string", "null"], "format": "date-time" },
+    "source_identity_ref": { "type": "string", "minLength": 1 },
+    "state_operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "path"],
+        "properties": {
+          "op": { "enum": ["set", "remove"] },
+          "path": { "type": "string", "pattern": "^/[^/].*" },
+          "value": {}
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "op": { "const": "set" } }, "required": ["op"] },
+            "then": { "required": ["value"] },
+            "else": { "not": { "required": ["value"] } }
+          }
+        ]
+      }
+    },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "authority_attestation_ref": { "type": ["string", "null"] },
+    "causal_parent_event_id": { "type": ["string", "null"] },
+    "supersedes_event_id": { "type": ["string", "null"] },
+    "previous_event_hash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
