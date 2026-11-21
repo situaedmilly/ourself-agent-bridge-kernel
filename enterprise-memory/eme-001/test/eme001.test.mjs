@@ -125,3 +125,20 @@ test("export/import verifies exact bytes, manifest inventory, and reports unreso
 test("canonicalization lexically orders integer-like object keys", () => {
   assert.equal(canonicalize({ "10": "ten", "2": "two", a: "aye" }), '{"10":"ten","2":"two","a":"aye"}');
 });
+
+test("export package builds a verifiable multi-step custody chain", () => {
+  const first = event(1, null);
+  const pkg = exportMemoryPackage([first], {
+    package_id: "pkg-chain",
+    manifest_id: "manifest-chain",
+    created_at: "2026-11-21T14:00:00Z",
+    custody_events: [
+      { custodian_identity_ref: "custodian:a", action: "CREATED", occurred_at: "2026-11-21T14:00:00Z" },
+      { custodian_identity_ref: "custodian:b", action: "TRANSFERRED", occurred_at: "2026-11-21T14:01:00Z" }
+    ]
+  });
+  assert.equal(importMemoryPackage(pkg).manifest.custody_events.length, 2);
+  const broken = structuredClone(pkg);
+  broken.manifest.custody_events[1].action = "IMPORTED";
+  assert.throws(() => importMemoryPackage(broken), /manifest verification failed/i);
+});
