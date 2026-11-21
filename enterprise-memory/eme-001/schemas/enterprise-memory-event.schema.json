@@ -52,6 +52,7 @@
     },
     "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
     "authority_attestation_ref": { "type": ["string", "null"] },
+    "source_signature_ref": { "type": ["string", "null"] },
     "causal_parent_event_id": { "type": ["string", "null"] },
     "supersedes_event_id": { "type": ["string", "null"] },
     "previous_event_hash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
