@@ -26,8 +26,15 @@ function normalize(value, path = "$") {
   throw new TypeError(`Unsupported JSON value at ${path}`);
 }
 
+function serializeCanonical(value) {
+  if (value === null || typeof value === "string" || typeof value === "boolean" || typeof value === "number") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(serializeCanonical).join(",")}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${serializeCanonical(value[key])}`).join(",")}}`;
+}
+
 export function canonicalize(value) {
-  return JSON.stringify(normalize(value));
+  return serializeCanonical(normalize(value));
 }
 
 function domainBytes(objectType, canonicalBytes) {
@@ -231,6 +238,136 @@ export function replayEvents(events, initialState = {}) {
     for (const operation of event.state_operations) applyOperation(state, operation);
   }
   return state;
+}
+
+
+function objectId(object) {
+  const fields = {
+    EnterpriseMemoryEvent: "event_id",
+    EvidenceReference: "evidence_id",
+    AuthorityAttestation: "attestation_id",
+    ExecutionReceipt: "receipt_id",
+    IntegrityManifest: "manifest_id"
+  };
+  const field = fields[object?.object_type];
+  if (!field || typeof object[field] !== "string" || !object[field]) throw new TypeError("Unsupported or unidentified package object");
+  return object[field];
+}
+
+function manifestBody(manifest) {
+  const { manifest_hash: _manifestHash, ...body } = manifest;
+  return body;
+}
+
+function custodyBody(entry) {
+  const { custody_event_hash: _hash, ...body } = entry;
+  return body;
+}
+
+export function exportMemoryPackage(objects, options) {
+  if (!Array.isArray(objects) || !options?.package_id || !options?.manifest_id || !options?.created_at) {
+    throw new TypeError("objects, package_id, manifest_id, and created_at are required");
+  }
+  const seen = new Set();
+  const entries = objects.map((object) => {
+    const id = objectId(object);
+    const key = `${object.object_type}:${id}`;
+    if (seen.has(key)) throw new Error(`Duplicate package object: ${key}`);
+    seen.add(key);
+    if (object.object_type === "EnterpriseMemoryEvent") validateEvent(object);
+    const bytes = canonicalize(object);
+    return {
+      object_type: object.object_type,
+      object_id: id,
+      object_digest: hashObject(object.object_type, object),
+      canonical_bytes_b64: Buffer.from(bytes, "utf8").toString("base64")
+    };
+  });
+  const custodyEvents = (options.custody_events ?? []).map((entry, index, all) => {
+    const expectedPrior = index === 0 ? null : all[index - 1].custody_event_hash;
+    if ((entry.prior_custody_event_hash ?? null) !== expectedPrior) throw new Error("Custody chain discontinuity");
+    const body = custodyBody(entry);
+    return { ...body, custody_event_hash: hashObject("CustodyEvent", body) };
+  });
+  const manifestBodyValue = {
+    object_type: "IntegrityManifest",
+    manifest_id: options.manifest_id,
+    package_id: options.package_id,
+    profile: PROFILE,
+    created_at: options.created_at,
+    objects: entries.map(({ object_type, object_id, object_digest }) => ({
+      object_type, object_id, content_hash: object_digest
+    })),
+    custody_events: custodyEvents
+  };
+  const manifest = {
+    ...manifestBodyValue,
+    manifest_hash: hashObject("IntegrityManifest", manifestBodyValue)
+  };
+  return { package_spec: "EME-001-PACKAGE/v0.1", manifest, objects: entries };
+}
+
+export function importMemoryPackage(pkg) {
+  if (pkg?.package_spec !== "EME-001-PACKAGE/v0.1" || !Array.isArray(pkg.objects) || !pkg.manifest) {
+    throw new TypeError("Unsupported enterprise memory package");
+  }
+  const manifest = pkg.manifest;
+  if (manifest.profile !== PROFILE || hashObject("IntegrityManifest", manifestBody(manifest)) !== manifest.manifest_hash) {
+    throw new Error("Integrity manifest verification failed");
+  }
+  const imported = [];
+  const ids = new Set();
+  for (const entry of pkg.objects) {
+    if (typeof entry.canonical_bytes_b64 !== "string" || Buffer.from(entry.canonical_bytes_b64, "base64").toString("base64") !== entry.canonical_bytes_b64) {
+      throw new Error("Invalid canonical object encoding");
+    }
+    const bytes = Buffer.from(entry.canonical_bytes_b64, "base64").toString("utf8");
+    const object = JSON.parse(bytes);
+    if (canonicalize(object) !== bytes) throw new Error("Object bytes are not canonical under EME-CJ-1");
+    const id = objectId(object);
+    if (object.object_type !== entry.object_type || id !== entry.object_id) throw new Error("Package object identity mismatch");
+    if (hashObject(object.object_type, object) !== entry.object_digest) throw new Error(`Object digest mismatch: ${id}`);
+    if (object.object_type === "EnterpriseMemoryEvent") validateEvent(object);
+    const key = `${object.object_type}:${id}`;
+    if (ids.has(key)) throw new Error(`Duplicate imported object: ${key}`);
+    ids.add(key);
+    imported.push(object);
+  }
+  const expected = manifest.objects.map((item) => `${item.object_type}:${item.object_id}:${item.content_hash}`).sort();
+  const actual = pkg.objects.map((item) => `${item.object_type}:${item.object_id}:${item.object_digest}`).sort();
+  if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error("Manifest inventory does not match package objects");
+  let priorCustodyHash = null;
+  for (const entry of manifest.custody_events ?? []) {
+    if ((entry.prior_custody_event_hash ?? null) !== priorCustodyHash) throw new Error("Custody chain discontinuity");
+    if (hashObject("CustodyEvent", custodyBody(entry)) !== entry.custody_event_hash) throw new Error("Custody event integrity failure");
+    priorCustodyHash = entry.custody_event_hash;
+  }
+
+  const eventIds = new Set(imported.filter((o) => o.object_type === "EnterpriseMemoryEvent").map((o) => o.event_id));
+  const eventHashes = new Set(imported.filter((o) => o.object_type === "EnterpriseMemoryEvent").map((o) => o.content_hash));
+  const evidenceIds = new Set(imported.filter((o) => o.object_type === "EvidenceReference").map((o) => o.evidence_id));
+  const attestationIds = new Set(imported.filter((o) => o.object_type === "AuthorityAttestation").map((o) => o.attestation_id));
+  const unresolvedReferences = [];
+  for (const object of imported) {
+    if (object.object_type === "EnterpriseMemoryEvent") {
+      for (const ref of object.evidence_refs ?? []) if (!evidenceIds.has(ref)) unresolvedReferences.push({ from: object.event_id, ref_type: "EvidenceReference", ref });
+      if (object.authority_attestation_ref && !attestationIds.has(object.authority_attestation_ref)) unresolvedReferences.push({ from: object.event_id, ref_type: "AuthorityAttestation", ref: object.authority_attestation_ref });
+      for (const field of ["causal_parent_event_id", "supersedes_event_id"]) {
+        if (object[field] && !eventIds.has(object[field])) unresolvedReferences.push({ from: object.event_id, ref_type: "EnterpriseMemoryEvent", ref: object[field] });
+      }
+    }
+    if (object.object_type === "AuthorityAttestation" && !eventHashes.has(object.target_event_hash)) unresolvedReferences.push({ from: object.attestation_id, ref_type: "EventHash", ref: object.target_event_hash });
+    if (object.object_type === "ExecutionReceipt" && !eventHashes.has(object.requested_event_hash)) unresolvedReferences.push({ from: object.receipt_id, ref_type: "EventHash", ref: object.requested_event_hash });
+  }
+  return {
+    verified: true,
+    profile: PROFILE,
+    manifest,
+    objects: imported,
+    unresolved_references: unresolvedReferences,
+    authority_created: false,
+    actuation_enabled: false
+  };
 }
 
 export const EME_PROFILE = PROFILE;
