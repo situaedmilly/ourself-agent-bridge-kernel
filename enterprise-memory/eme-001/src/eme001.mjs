@@ -60,6 +60,20 @@ export function signObject(objectType, value, privateKey, keyId) {
   };
 }
 
+export function createSignatureRecord(signature_id, subject_object_type, subject_object_id, signature) {
+  if (!signature_id || !subject_object_type || !subject_object_id) throw new TypeError("Signature identity and subject are required");
+  return {
+    object_type: "CryptographicSignature",
+    signature_id,
+    subject_object_type,
+    subject_object_id,
+    algorithm: signature.algorithm,
+    key_id: signature.key_id,
+    signed_object_hash: signature.signed_object_hash,
+    signature_b64: signature.signature_b64
+  };
+}
+
 export function verifyObjectSignature(objectType, value, signature, publicKey) {
   if (!signature || signature.algorithm !== "Ed25519" || !HEX_256.test(signature.signed_object_hash ?? "")) return false;
   try {
@@ -92,6 +106,7 @@ export function createEvent(input) {
     state_operations: input.state_operations ?? [],
     evidence_refs: input.evidence_refs ?? [],
     ...(input.authority_attestation_ref === undefined ? {} : { authority_attestation_ref: input.authority_attestation_ref }),
+    ...(input.source_signature_ref === undefined ? {} : { source_signature_ref: input.source_signature_ref }),
     ...(input.causal_parent_event_id === undefined ? {} : { causal_parent_event_id: input.causal_parent_event_id }),
     ...(input.supersedes_event_id === undefined ? {} : { supersedes_event_id: input.supersedes_event_id }),
     previous_event_hash: input.previous_event_hash ?? null
@@ -247,7 +262,8 @@ function objectId(object) {
     EvidenceReference: "evidence_id",
     AuthorityAttestation: "attestation_id",
     ExecutionReceipt: "receipt_id",
-    IntegrityManifest: "manifest_id"
+    IntegrityManifest: "manifest_id",
+    CryptographicSignature: "signature_id"
   };
   const field = fields[object?.object_type];
   if (!field || typeof object[field] !== "string" || !object[field]) throw new TypeError("Unsupported or unidentified package object");
@@ -311,7 +327,7 @@ export function exportMemoryPackage(objects, options) {
   return { package_spec: "EME-001-PACKAGE/v0.1", manifest, objects: entries };
 }
 
-export function importMemoryPackage(pkg) {
+export function importMemoryPackage(pkg, options = {}) {
   if (pkg?.package_spec !== "EME-001-PACKAGE/v0.1" || !Array.isArray(pkg.objects) || !pkg.manifest) {
     throw new TypeError("Unsupported enterprise memory package");
   }
@@ -349,6 +365,7 @@ export function importMemoryPackage(pkg) {
 
   const importedEvents = imported.filter((o) => o.object_type === "EnterpriseMemoryEvent");
   if (importedEvents.length) verifyEventChain(importedEvents);
+  const signatureIds = new Set(imported.filter((o) => o.object_type === "CryptographicSignature").map((o) => o.signature_id));
   const eventIds = new Set(importedEvents.map((o) => o.event_id));
   const eventHashes = new Set(importedEvents.map((o) => o.content_hash));
   const evidenceIds = new Set(imported.filter((o) => o.object_type === "EvidenceReference").map((o) => o.evidence_id));
@@ -358,12 +375,36 @@ export function importMemoryPackage(pkg) {
     if (object.object_type === "EnterpriseMemoryEvent") {
       for (const ref of object.evidence_refs ?? []) if (!evidenceIds.has(ref)) unresolvedReferences.push({ from: object.event_id, ref_type: "EvidenceReference", ref });
       if (object.authority_attestation_ref && !attestationIds.has(object.authority_attestation_ref)) unresolvedReferences.push({ from: object.event_id, ref_type: "AuthorityAttestation", ref: object.authority_attestation_ref });
+      if (object.source_signature_ref && !signatureIds.has(object.source_signature_ref)) unresolvedReferences.push({ from: object.event_id, ref_type: "CryptographicSignature", ref: object.source_signature_ref });
       for (const field of ["causal_parent_event_id", "supersedes_event_id"]) {
         if (object[field] && !eventIds.has(object[field])) unresolvedReferences.push({ from: object.event_id, ref_type: "EnterpriseMemoryEvent", ref: object[field] });
       }
     }
-    if (object.object_type === "AuthorityAttestation" && !eventHashes.has(object.target_event_hash)) unresolvedReferences.push({ from: object.attestation_id, ref_type: "EventHash", ref: object.target_event_hash });
-    if (object.object_type === "ExecutionReceipt" && !eventHashes.has(object.requested_event_hash)) unresolvedReferences.push({ from: object.receipt_id, ref_type: "EventHash", ref: object.requested_event_hash });
+    if (object.object_type === "AuthorityAttestation") {
+      if (!eventHashes.has(object.target_event_hash)) unresolvedReferences.push({ from: object.attestation_id, ref_type: "EventHash", ref: object.target_event_hash });
+      if (!signatureIds.has(object.signature_ref)) unresolvedReferences.push({ from: object.attestation_id, ref_type: "CryptographicSignature", ref: object.signature_ref });
+    }
+    if (object.object_type === "ExecutionReceipt") {
+      if (!eventHashes.has(object.requested_event_hash)) unresolvedReferences.push({ from: object.receipt_id, ref_type: "EventHash", ref: object.requested_event_hash });
+      if (!signatureIds.has(object.signature_ref)) unresolvedReferences.push({ from: object.receipt_id, ref_type: "CryptographicSignature", ref: object.signature_ref });
+    }
+  }
+  const verifiedSignatures = [];
+  const unverifiedSignatures = [];
+  for (const signature of imported.filter((o) => o.object_type === "CryptographicSignature")) {
+    const subject = imported.find((o) => o.object_type === signature.subject_object_type &&
+      objectId(o) === signature.subject_object_id);
+    const publicKey = typeof options.publicKeyResolver === "function"
+      ? options.publicKeyResolver(signature.key_id, signature)
+      : null;
+    if (!subject || !publicKey) {
+      unverifiedSignatures.push(signature.signature_id);
+      continue;
+    }
+    if (!verifyObjectSignature(signature.subject_object_type, subject, signature, publicKey)) {
+      throw new Error(`Cryptographic signature verification failed: ${signature.signature_id}`);
+    }
+    verifiedSignatures.push(signature.signature_id);
   }
   return {
     verified: true,
@@ -371,6 +412,8 @@ export function importMemoryPackage(pkg) {
     manifest,
     objects: imported,
     unresolved_references: unresolvedReferences,
+    verified_signatures: verifiedSignatures,
+    unverified_signatures: unverifiedSignatures,
     authority_created: false,
     actuation_enabled: false
   };
