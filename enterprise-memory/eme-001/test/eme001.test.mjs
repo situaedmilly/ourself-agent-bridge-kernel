@@ -147,14 +147,11 @@ test("export package builds a verifiable multi-step custody chain", () => {
 test("signature records survive export/import and require an external key resolver for verification", () => {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const first = event(1, null);
-  const signature = signObject("EnterpriseMemoryEvent", first, privateKey, "key:source-01");
-  const signatureRecord = createSignatureRecord("sig-01", "EnterpriseMemoryEvent", first.event_id, signature);
   const signedEvent = createEvent({
     ...first,
-    source_signature_ref: "sig-01",
+    source_signature_ref: "sig-02",
     previous_event_hash: null
   });
-  // Re-sign the final event envelope after attaching the signature reference.
   const finalSignature = signObject("EnterpriseMemoryEvent", signedEvent, privateKey, "key:source-01");
   const finalSignatureRecord = createSignatureRecord("sig-02", "EnterpriseMemoryEvent", signedEvent.event_id, finalSignature);
   const pkg = exportMemoryPackage([signedEvent, finalSignatureRecord], {
