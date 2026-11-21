@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ourself.invalid/eme-001/schemas/linked-objects.schema.json",
+  "$defs": {
+    "EvidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_type", "evidence_id", "media_type", "content_hash", "source_identity_ref", "observed_at", "confidentiality_class", "retention_policy_ref"],
+      "properties": {
+        "object_type": { "const": "EvidenceReference" },
+        "evidence_id": { "type": "string", "minLength": 1 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "locator_ref": { "type": ["string", "null"] },
+        "source_identity_ref": { "type": "string", "minLength": 1 },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "confidentiality_class": { "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "PRIVILEGED"] },
+        "retention_policy_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "AuthorityAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_type", "attestation_id", "issuer_identity_ref", "subject_identity_ref", "jurisdiction", "policy_ref", "action_scope", "target_event_hash", "decision", "valid_from", "valid_until", "signature_ref"],
+      "properties": {
+        "object_type": { "const": "AuthorityAttestation" },
+        "attestation_id": { "type": "string", "minLength": 1 },
+        "issuer_identity_ref": { "type": "string", "minLength": 1 },
+        "subject_identity_ref": { "type": "string", "minLength": 1 },
+        "jurisdiction": { "type": "string", "minLength": 1 },
+        "policy_ref": { "type": "string", "minLength": 1 },
+        "action_scope": { "type": "string", "minLength": 1 },
+        "target_event_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "decision": { "enum": ["APPROVE", "REJECT", "REVOKE"] },
+        "valid_from": { "type": "string", "format": "date-time" },
+        "valid_until": { "type": "string", "format": "date-time" },
+        "signature_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ExecutionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_type", "receipt_id", "execution_environment_identity_ref", "requested_event_hash", "operation", "outcome", "started_at", "completed_at", "signature_ref"],
+      "properties": {
+        "object_type": { "const": "ExecutionReceipt" },
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "execution_environment_identity_ref": { "type": "string", "minLength": 1 },
+        "requested_event_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "admission_ref": { "type": ["string", "null"] },
+        "operation": { "type": "string", "minLength": 1 },
+        "outcome": { "enum": ["SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN"] },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "effect_refs": { "type": "array", "items": { "type": "string" } },
+        "signature_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "IntegrityManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_type", "manifest_id", "package_id", "profile", "created_at", "objects", "custody_events"],
+      "properties": {
+        "object_type": { "const": "IntegrityManifest" },
+        "manifest_id": { "type": "string", "minLength": 1 },
+        "package_id": { "type": "string", "minLength": 1 },
+        "profile": { "const": "EME-CJ-1" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["object_type", "object_id", "content_hash"],
+            "properties": {
+              "object_type": { "type": "string", "minLength": 1 },
+              "object_id": { "type": "string", "minLength": 1 },
+              "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        },
+        "custody_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["custodian_identity_ref", "action", "occurred_at"],
+            "properties": {
+              "custodian_identity_ref": { "type": "string", "minLength": 1 },
+              "action": { "enum": ["CREATED", "EXPORTED", "TRANSFERRED", "IMPORTED", "VERIFIED", "REJECTED"] },
+              "occurred_at": { "type": "string", "format": "date-time" },
+              "prior_custody_event_hash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
