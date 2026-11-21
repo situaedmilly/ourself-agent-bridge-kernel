@@ -283,11 +283,15 @@ export function exportMemoryPackage(objects, options) {
       canonical_bytes_b64: Buffer.from(bytes, "utf8").toString("base64")
     };
   });
-  const custodyEvents = (options.custody_events ?? []).map((entry, index, all) => {
-    const expectedPrior = index === 0 ? null : all[index - 1].custody_event_hash;
-    if ((entry.prior_custody_event_hash ?? null) !== expectedPrior) throw new Error("Custody chain discontinuity");
-    const body = custodyBody(entry);
-    return { ...body, custody_event_hash: hashObject("CustodyEvent", body) };
+  let priorCustodyHash = null;
+  const custodyEvents = (options.custody_events ?? []).map((entry) => {
+    if (entry.prior_custody_event_hash !== undefined && entry.prior_custody_event_hash !== priorCustodyHash) {
+      throw new Error("Custody chain discontinuity");
+    }
+    const body = { ...custodyBody(entry), prior_custody_event_hash: priorCustodyHash };
+    const sealed = { ...body, custody_event_hash: hashObject("CustodyEvent", body) };
+    priorCustodyHash = sealed.custody_event_hash;
+    return sealed;
   });
   const manifestBodyValue = {
     object_type: "IntegrityManifest",
@@ -343,8 +347,10 @@ export function importMemoryPackage(pkg) {
     priorCustodyHash = entry.custody_event_hash;
   }
 
-  const eventIds = new Set(imported.filter((o) => o.object_type === "EnterpriseMemoryEvent").map((o) => o.event_id));
-  const eventHashes = new Set(imported.filter((o) => o.object_type === "EnterpriseMemoryEvent").map((o) => o.content_hash));
+  const importedEvents = imported.filter((o) => o.object_type === "EnterpriseMemoryEvent");
+  if (importedEvents.length) verifyEventChain(importedEvents);
+  const eventIds = new Set(importedEvents.map((o) => o.event_id));
+  const eventHashes = new Set(importedEvents.map((o) => o.content_hash));
   const evidenceIds = new Set(imported.filter((o) => o.object_type === "EvidenceReference").map((o) => o.evidence_id));
   const attestationIds = new Set(imported.filter((o) => o.object_type === "AuthorityAttestation").map((o) => o.attestation_id));
   const unresolvedReferences = [];
