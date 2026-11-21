@@ -133,7 +133,24 @@ export function validateEvent(event) {
   if (event.spec_version !== "EME-001/v0.1" || event.object_type !== "EnterpriseMemoryEvent") throw new TypeError("Unsupported event envelope");
   if (!Number.isSafeInteger(event.sequence) || event.sequence < 1) throw new TypeError("sequence must be a positive safe integer");
   if (!Number.isFinite(Date.parse(event.recorded_at))) throw new TypeError("recorded_at must be a valid timestamp");
+  if (event.effective_at !== undefined && event.effective_at !== null && !Number.isFinite(Date.parse(event.effective_at))) throw new TypeError("effective_at must be a valid timestamp");
   if (!Array.isArray(event.state_operations) || !Array.isArray(event.evidence_refs)) throw new TypeError("state_operations and evidence_refs must be arrays");
+  if (new Set(event.evidence_refs).size !== event.evidence_refs.length || event.evidence_refs.some((ref) => typeof ref !== "string" || !ref)) throw new TypeError("evidence_refs must contain unique non-empty strings");
+  for (const field of ["authority_attestation_ref", "source_signature_ref", "causal_parent_event_id", "supersedes_event_id"]) {
+    if (event[field] !== undefined && event[field] !== null && (typeof event[field] !== "string" || !event[field])) throw new TypeError(`Invalid event reference: ${field}`);
+  }
+  for (const operation of event.state_operations) {
+    if (!operation || !["set", "remove"].includes(operation.op)) throw new TypeError("Invalid state operation");
+    pathParts(operation.path);
+    const allowed = operation.op === "set" ? ["op", "path", "value"] : ["op", "path"];
+    if (Object.keys(operation).some((key) => !allowed.includes(key))) throw new TypeError("Unexpected state operation property");
+    if (operation.op === "set") {
+      if (!Object.hasOwn(operation, "value")) throw new TypeError("set operation requires value");
+      normalize(operation.value);
+    } else if (Object.hasOwn(operation, "value")) {
+      throw new TypeError("remove operation cannot contain value");
+    }
+  }
   if (event.previous_event_hash !== null && !HEX_256.test(event.previous_event_hash)) throw new TypeError("Invalid previous_event_hash");
   if (!verifyEventIntegrity(event)) throw new TypeError("Event content hash mismatch");
   return true;
@@ -284,6 +301,8 @@ export function exportMemoryPackage(objects, options) {
   if (!Array.isArray(objects) || !options?.package_id || !options?.manifest_id || !options?.created_at) {
     throw new TypeError("objects, package_id, manifest_id, and created_at are required");
   }
+  const eventObjects = objects.filter((object) => object?.object_type === "EnterpriseMemoryEvent");
+  if (eventObjects.length) verifyEventChain(eventObjects);
   const seen = new Set();
   const entries = objects.map((object) => {
     const id = objectId(object);
@@ -407,8 +426,14 @@ export function importMemoryPackage(pkg, options = {}) {
     verifiedSignatures.push(signature.signature_id);
   }
   return {
-    verified: true,
+    integrity_verified: true,
     profile: PROFILE,
+    signature_verification_status: verifiedSignatures.length === 0 && unverifiedSignatures.length === 0
+      ? "NOT_PRESENT"
+      : unverifiedSignatures.length === 0 ? "VERIFIED" : "UNVERIFIED",
+    references_complete: unresolvedReferences.length === 0,
+    truthfulness_evaluated: false,
+    historical_completeness_evaluated: false,
     manifest,
     objects: imported,
     unresolved_references: unresolvedReferences,
