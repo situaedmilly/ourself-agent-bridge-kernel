@@ -2,6 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ourself.invalid/eme-001/schemas/linked-objects.schema.json",
   "$defs": {
+    "CryptographicSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "signed_object_hash", "signature_b64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "key_id": { "type": "string", "minLength": 1 },
+        "signed_object_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "signature_b64": { "type": "string", "contentEncoding": "base64" }
+      }
+    },
     "EvidenceReference": {
       "type": "object",
       "additionalProperties": false,
@@ -58,12 +69,13 @@
     "IntegrityManifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["object_type", "manifest_id", "package_id", "profile", "created_at", "objects", "custody_events"],
+      "required": ["object_type", "manifest_id", "package_id", "profile", "created_at", "objects", "custody_events", "manifest_hash"],
       "properties": {
         "object_type": { "const": "IntegrityManifest" },
         "manifest_id": { "type": "string", "minLength": 1 },
         "package_id": { "type": "string", "minLength": 1 },
         "profile": { "const": "EME-CJ-1" },
+        "manifest_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "created_at": { "type": "string", "format": "date-time" },
         "objects": {
           "type": "array",
@@ -88,7 +100,8 @@
               "custodian_identity_ref": { "type": "string", "minLength": 1 },
               "action": { "enum": ["CREATED", "EXPORTED", "TRANSFERRED", "IMPORTED", "VERIFIED", "REJECTED"] },
               "occurred_at": { "type": "string", "format": "date-time" },
-              "prior_custody_event_hash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+              "prior_custody_event_hash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+              "custody_event_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
             }
           }
         }
