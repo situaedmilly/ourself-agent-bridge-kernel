@@ -111,7 +111,7 @@ test("export/import verifies exact bytes, manifest inventory, and reports unreso
     }]
   });
   const imported = importMemoryPackage(pkg);
-  assert.equal(imported.verified, true);
+  assert.equal(imported.integrity_verified, true);
   assert.equal(imported.authority_created, false);
   assert.equal(imported.actuation_enabled, false);
   assert.equal(imported.unresolved_references.length, 1);
@@ -161,7 +161,9 @@ test("signature records survive export/import and require an external key resolv
   });
   const withoutResolver = importMemoryPackage(pkg);
   assert.deepEqual(withoutResolver.unverified_signatures, ["sig-02"]);
+  assert.equal(withoutResolver.signature_verification_status, "UNVERIFIED");
   const withResolver = importMemoryPackage(pkg, { publicKeyResolver: () => publicKey });
   assert.deepEqual(withResolver.verified_signatures, ["sig-02"]);
   assert.equal(withResolver.authority_created, false);
+  assert.equal(withResolver.signature_verification_status, "VERIFIED");
 });
