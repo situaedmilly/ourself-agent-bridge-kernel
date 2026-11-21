@@ -28,7 +28,8 @@ The JSON Schemas in `schemas/` define the wire envelopes. The Node.js reference 
 - Encoding: UTF-8 JSON.
 - Canonicalization: recursive object-key ordering using JavaScript UTF-16 code-unit ordering; arrays retain order; strings and booleans retain value; null is permitted; numbers must be safe integers. Undefined values, non-finite numbers, floats, non-plain objects, and unsafe integers are rejected.
 - Digest: SHA-256 over the domain prefix `OURSELF:EME-001:v0.1:<object-type>\0` followed by canonical UTF-8 bytes.
-- Signature: Ed25519 over the same domain-separated canonical bytes. Signatures identify a key reference; they do not establish real-world identity or authority without an independently governed trust resolver.
+- Signature: Ed25519 over the same domain-separated canonical bytes. Signature records bind a key reference and subject object. Signatures identify a key reference; they do not establish real-world identity or authority without an independently governed trust resolver.
+- Import preserves signature records. Cryptographic verification is performed only when an external public-key resolver is supplied; unresolved keys remain explicitly unverified.
 - Hashes are lowercase hexadecimal SHA-256 values. Signatures are base64.
 
 This is a deliberately constrained profile, not a claim of RFC 8785/JCS conformance. A future profile migration must be versioned and tested; existing bytes must not be silently recanonicalized.
