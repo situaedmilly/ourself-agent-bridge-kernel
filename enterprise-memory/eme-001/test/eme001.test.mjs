@@ -8,6 +8,8 @@ import {
   AppendOnlyJournal,
   canonicalize,
   createEvent,
+  exportMemoryPackage,
+  importMemoryPackage,
   hashObject,
   replayEvents,
   signObject,
@@ -92,4 +94,34 @@ test("replay reconstructs state without an execution or actuation path", () => {
 test("domain separation prevents cross-object digest substitution", () => {
   const payload = { value: "same bytes" };
   assert.notEqual(hashObject("EvidenceReference", payload), hashObject("AuthorityAttestation", payload));
+});
+
+test("export/import verifies exact bytes, manifest inventory, and reports unresolved references without creating authority", () => {
+  const first = event(1, null);
+  const pkg = exportMemoryPackage([first], {
+    package_id: "pkg-01",
+    manifest_id: "manifest-01",
+    created_at: "2026-11-21T13:00:00Z",
+    custody_events: [{
+      custodian_identity_ref: "custodian:origin",
+      action: "CREATED",
+      occurred_at: "2026-11-21T13:00:00Z",
+      prior_custody_event_hash: null
+    }]
+  });
+  const imported = importMemoryPackage(pkg);
+  assert.equal(imported.verified, true);
+  assert.equal(imported.authority_created, false);
+  assert.equal(imported.actuation_enabled, false);
+  assert.equal(imported.unresolved_references.length, 1);
+  const tampered = structuredClone(pkg);
+  tampered.objects[0].canonical_bytes_b64 = Buffer.from(
+    tampered.objects[0].canonical_bytes_b64, "base64"
+  ).toString("utf8").replace("vendor.payment_terms", "vendor.altered");
+  tampered.objects[0].canonical_bytes_b64 = Buffer.from(tampered.objects[0].canonical_bytes_b64).toString("base64");
+  assert.throws(() => importMemoryPackage(tampered), /canonical|digest|integrity/i);
+});
+
+test("canonicalization lexically orders integer-like object keys", () => {
+  assert.equal(canonicalize({ "10": "ten", "2": "two", a: "aye" }), '{"10":"ten","2":"two","a":"aye"}');
 });
