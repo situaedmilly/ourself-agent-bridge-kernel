@@ -8,6 +8,7 @@ import {
   AppendOnlyJournal,
   canonicalize,
   createEvent,
+  createSignatureRecord,
   exportMemoryPackage,
   importMemoryPackage,
   hashObject,
@@ -141,4 +142,29 @@ test("export package builds a verifiable multi-step custody chain", () => {
   const broken = structuredClone(pkg);
   broken.manifest.custody_events[1].action = "IMPORTED";
   assert.throws(() => importMemoryPackage(broken), /manifest verification failed/i);
+});
+
+test("signature records survive export/import and require an external key resolver for verification", () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const first = event(1, null);
+  const signature = signObject("EnterpriseMemoryEvent", first, privateKey, "key:source-01");
+  const signatureRecord = createSignatureRecord("sig-01", "EnterpriseMemoryEvent", first.event_id, signature);
+  const signedEvent = createEvent({
+    ...first,
+    source_signature_ref: "sig-01",
+    previous_event_hash: null
+  });
+  // Re-sign the final event envelope after attaching the signature reference.
+  const finalSignature = signObject("EnterpriseMemoryEvent", signedEvent, privateKey, "key:source-01");
+  const finalSignatureRecord = createSignatureRecord("sig-02", "EnterpriseMemoryEvent", signedEvent.event_id, finalSignature);
+  const pkg = exportMemoryPackage([signedEvent, finalSignatureRecord], {
+    package_id: "pkg-signature",
+    manifest_id: "manifest-signature",
+    created_at: "2026-11-21T15:00:00Z"
+  });
+  const withoutResolver = importMemoryPackage(pkg);
+  assert.deepEqual(withoutResolver.unverified_signatures, ["sig-02"]);
+  const withResolver = importMemoryPackage(pkg, { publicKeyResolver: () => publicKey });
+  assert.deepEqual(withResolver.verified_signatures, ["sig-02"]);
+  assert.equal(withResolver.authority_created, false);
 });
