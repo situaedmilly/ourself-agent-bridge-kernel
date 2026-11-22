@@ -15,6 +15,7 @@ function verifyBrokerEnvelope(envelope, publicKey) {
   const p = envelope.payload;
   if (!p.portal_admission) throw new Error("PORTAL_ADMISSION_MISSING");
   const portalKey = process.env.OURTUNNELSELF_PORTAL_PUBLIC_KEY;
+  if (!process.env.OURTUNNELSELF_PORTAL_ISSUER) throw new Error("PORTAL_ISSUER_NOT_CONFIGURED");
   if (!portalKey) throw new Error("PORTAL_VERIFIER_NOT_CONFIGURED");
   const tokenParts = p.portal_admission.split(".");
   if (tokenParts.length !== 3) throw new Error("PORTAL_TOKEN_MALFORMED");
@@ -25,13 +26,14 @@ function verifyBrokerEnvelope(envelope, publicKey) {
   if (!portalValid) throw new Error("PORTAL_SIGNATURE_INVALID");
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (!Number.isInteger(portalClaims.exp) || portalClaims.exp <= nowSeconds) throw new Error("PORTAL_ADMISSION_EXPIRED");
-  if (process.env.OURTUNNELSELF_PORTAL_ISSUER && portalClaims.iss !== process.env.OURTUNNELSELF_PORTAL_ISSUER) throw new Error("PORTAL_ISSUER_INVALID");
+  if (portalClaims.iss !== process.env.OURTUNNELSELF_PORTAL_ISSUER) throw new Error("PORTAL_ISSUER_INVALID");
   const expectedAudience = process.env.OURTUNNELSELF_PORTAL_AUDIENCE || "ourtunnelself";
   if (!(portalClaims.aud === expectedAudience || Array.isArray(portalClaims.aud) && portalClaims.aud.includes(expectedAudience))) throw new Error("PORTAL_AUDIENCE_INVALID");
   if (portalClaims.decision !== "ADMIT" || portalClaims.caller_sub !== p.caller_sub || portalClaims.target_device !== p.device_id) throw new Error("PORTAL_SCOPE_BINDING_INVALID");
   if (!Array.isArray(portalClaims.admitted_capabilities) || !portalClaims.admitted_capabilities.includes(p.capability)) throw new Error("PORTAL_CAPABILITY_INVALID");
   if (portalClaims.authority_grant_ref !== p.authority_grant_ref || portalClaims.policy_version !== p.policy_version) throw new Error("PORTAL_AUTHORITY_BINDING_INVALID");
   if (p.device_id !== process.env.OURTUNNELSELF_DEVICE_ID) throw new Error("WRONG_DEVICE_TARGET");
+  if (p.target !== ".") throw new Error("TARGET_NOT_ADMITTED");
   if (!Number.isInteger(p.expires_at) || p.expires_at <= Math.floor(Date.now() / 1000)) throw new Error("JOB_EXPIRED");
   if (p.capability !== "repo.status" || p.operation !== "git_status") throw new Error("CAPABILITY_NOT_ADMITTED");
   if (!p.authority_grant_ref || !p.policy_version) throw new Error("AUTHORITY_EVIDENCE_MISSING");
