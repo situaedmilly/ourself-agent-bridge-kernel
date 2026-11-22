@@ -122,6 +122,7 @@ export function createOURTUNNELSELFServer({
   function authenticateSeat(req, requiredScope) {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     const claims = verifyJwt(token, seatPublicKey, { issuer: seatIssuer, audience: seatAudience });
+    if (typeof claims.sub !== "string" || !claims.sub) throw new Error("JWT_SUBJECT_MISSING");
     const scopes = Array.isArray(claims.scope) ? claims.scope : String(claims.scope || "").split(/\s+/);
     if (!scopes.includes(requiredScope)) throw new Error("SEAT_SCOPE_DENIED");
     return claims;
