@@ -8,21 +8,20 @@ const b64u = v => Buffer.from(v).toString("base64url");
 const sha256 = v => crypto.createHash("sha256").update(v).digest("hex");
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-function verifyBrokerEnvelope(envelope, publicKey) {
+function verifyBrokerEnvelope(envelope, publicKey, portalPublicKey) {
   if (!envelope || envelope.algorithm !== "RS256" || !envelope.payload || !envelope.signature) throw new Error("BROKER_ENVELOPE_INVALID");
   const body = b64u(JSON.stringify(envelope.payload));
   if (!crypto.verify("RSA-SHA256", Buffer.from(body), publicKey, Buffer.from(envelope.signature, "base64url"))) throw new Error("BROKER_SIGNATURE_INVALID");
   const p = envelope.payload;
   if (!p.portal_admission) throw new Error("PORTAL_ADMISSION_MISSING");
-  const portalKey = process.env.OURTUNNELSELF_PORTAL_PUBLIC_KEY;
   if (!process.env.OURTUNNELSELF_PORTAL_ISSUER) throw new Error("PORTAL_ISSUER_NOT_CONFIGURED");
-  if (!portalKey) throw new Error("PORTAL_VERIFIER_NOT_CONFIGURED");
+  if (!portalPublicKey) throw new Error("PORTAL_VERIFIER_NOT_CONFIGURED");
   const tokenParts = p.portal_admission.split(".");
   if (tokenParts.length !== 3) throw new Error("PORTAL_TOKEN_MALFORMED");
   const portalHeader = JSON.parse(Buffer.from(tokenParts[0], "base64url").toString("utf8"));
   const portalClaims = JSON.parse(Buffer.from(tokenParts[1], "base64url").toString("utf8"));
   if (portalHeader.alg !== "RS256" || portalHeader.typ !== "JWT") throw new Error("PORTAL_ALGORITHM_REJECTED");
-  const portalValid = crypto.verify("RSA-SHA256", Buffer.from(tokenParts[0] + "." + tokenParts[1]), portalKey, Buffer.from(tokenParts[2], "base64url"));
+  const portalValid = crypto.verify("RSA-SHA256", Buffer.from(tokenParts[0] + "." + tokenParts[1]), portalPublicKey, Buffer.from(tokenParts[2], "base64url"));
   if (!portalValid) throw new Error("PORTAL_SIGNATURE_INVALID");
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (!Number.isInteger(portalClaims.exp) || portalClaims.exp <= nowSeconds) throw new Error("PORTAL_ADMISSION_EXPIRED");
@@ -104,6 +103,9 @@ export async function runOURTUNNELSELFDeviceAgent({
   if (!brokerUrl || !deviceId || !privateKeyPath || !brokerPublicKeyPath) throw new Error("DEVICE_AGENT_CONFIGURATION_INCOMPLETE");
   const privateKey = await fs.readFile(privateKeyPath, "utf8");
   const brokerPublicKey = await fs.readFile(brokerPublicKeyPath, "utf8");
+  const portalPublicKeyPath = process.env.OURTUNNELSELF_PORTAL_PUBLIC_KEY;
+  if (!portalPublicKeyPath) throw new Error("PORTAL_VERIFIER_NOT_CONFIGURED");
+  const portalPublicKey = await fs.readFile(portalPublicKeyPath, "utf8");
   const seen = new Set();
   try {
     const lines = (await fs.readFile(journalPath, "utf8")).split("\n").filter(Boolean);
@@ -128,7 +130,7 @@ export async function runOURTUNNELSELFDeviceAgent({
       const headers = signedHeaders(empty, deviceId, privateKey);
       const envelope = await brokerRequest(brokerUrl, "/v1/device/poll", empty, headers);
       if (!envelope) { await sleep(2500); continue; }
-      const job = verifyBrokerEnvelope(envelope, brokerPublicKey);
+      const job = verifyBrokerEnvelope(envelope, brokerPublicKey, portalPublicKey);
       if (seen.has(job.job_id)) {
         await append({ job_id: job.job_id, state: "DUPLICATE_SUPPRESSED" });
         continue;
