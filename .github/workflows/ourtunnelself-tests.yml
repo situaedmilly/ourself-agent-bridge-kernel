@@ -1,0 +1,21 @@
+name: OURTUNNELSELF v0.1 checks
+on:
+  push:
+    branches:
+      - architecture/ourself-desktop-commander-tunnel-v0.1
+  pull_request:
+    branches:
+      - main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check runtime/ourtunnelself/broker.js
+      - run: node --check runtime/ourtunnelself/device-agent.js
+      - run: node --check tools/ourtunnelself/enroll-device.mjs
+      - run: node --check tools/ourtunnelself/init-broker.mjs
+      - run: node --test test/ourtunnelself-broker.test.js
