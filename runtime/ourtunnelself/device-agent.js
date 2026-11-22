@@ -1,4 +1,5 @@
 import http from "node:http";
+import https from "node:https";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -50,7 +51,8 @@ function brokerRequest(baseUrl, route, rawBody, headers) {
   return new Promise((resolve, reject) => {
     const target = new URL(route, baseUrl);
     if (target.protocol !== "https:" && process.env.OURTUNNELSELF_ALLOW_INSECURE !== "1") return reject(new Error("BROKER_HTTPS_REQUIRED"));
-    const req = http.request({
+    const transport = target.protocol === "https:" ? https : http;
+    const req = transport.request({
       protocol: target.protocol, hostname: target.hostname, port: target.port || (target.protocol === "https:" ? 443 : 80),
       path: target.pathname + target.search, method: "POST", headers: { ...headers, "content-type": "application/json", "content-length": Buffer.byteLength(rawBody) },
       ...(target.protocol === "https:" ? { agent: undefined } : {})
