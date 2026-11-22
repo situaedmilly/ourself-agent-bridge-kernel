@@ -141,6 +141,11 @@ export function createOURTUNNELSELFServer({
     return claims;
   }
 
+  function currentJobStatus(job) {
+    if (job.status === "QUEUED" && job.expires_at <= now()) return "EXPIRED";
+    return job.status;
+  }
+
   function findPriorPortalJob(portal, caller, deviceId, capability, operation, purpose, target) {
     const prior = [...jobs.values()].find(job => job.portal_decision_jti === portal.jti);
     if (!prior) return null;
@@ -208,7 +213,7 @@ export function createOURTUNNELSELFServer({
             if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
             const prior = findPriorPortalJob(portal, caller, job.device_id, job.capability, job.operation, job.purpose, job.target);
             if (prior) {
-              value = { job_id: prior.job_id, status: prior.status, expires_at: prior.expires_at, idempotent_replay: true };
+              value = { job_id: prior.job_id, status: currentJobStatus(prior), expires_at: prior.expires_at, idempotent_replay: true };
               return reply({ content: [{ type: "text", text: JSON.stringify(value) }], structuredContent: value, isError: false });
             }
             await consumePortalDecision(portal);
@@ -275,7 +280,7 @@ export function createOURTUNNELSELFServer({
         const jobId = url.pathname.split("/").pop();
         const job = jobs.get(jobId);
         if (!job || job.caller_sub !== caller.sub) return send(res, 404, { error: "JOB_NOT_FOUND" });
-        return send(res, 200, { job_id: job.job_id, status: job.status, result: job.result || null });
+        return send(res, 200, { job_id: job.job_id, status: currentJobStatus(job), result: job.result || null });
       }
 
       if (req.method === "POST" && ["/v1/device/poll", "/v1/device/result"].includes(url.pathname)) {
