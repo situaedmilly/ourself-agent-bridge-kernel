@@ -1,0 +1,6 @@
+{$OURTUNNELSELF_DOMAIN} {
+  encode zstd gzip
+  @mcp path /mcp
+  reverse_proxy @mcp 127.0.0.1:8787
+  reverse_proxy 127.0.0.1:8787
+}
