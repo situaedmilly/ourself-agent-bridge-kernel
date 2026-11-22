@@ -84,6 +84,8 @@ export function createOURTUNNELSELFServer({
   const jobs = new Map();
   const replay = new Map();
   const pendingReplay = new Set();
+  const consumedPortalDecisions = new Set();
+  const pendingPortalDecisions = new Set();
   let devices = new Map();
   let brokerPrivateKey, seatPublicKey, portalPublicKey;
   const journalPath = path.join(dataDir, "events.jsonl");
@@ -110,6 +112,7 @@ export function createOURTUNNELSELFServer({
       for (const line of lines) {
         const e = JSON.parse(line);
         if (e.type === "DEVICE_NONCE" && e.expires_at_ms > Date.now()) replay.set(e.replay_key, e.expires_at_ms);
+        if (e.type === "PORTAL_CONSUMED" && e.decision_jti) consumedPortalDecisions.add(e.decision_jti);
         if (e.type === "REQUESTED") jobs.set(e.job.job_id, { ...e.job, status: "QUEUED" });
         if (e.type === "DELIVERED" && jobs.has(e.job_id)) jobs.get(e.job_id).status = "DELIVERY_UNKNOWN";
         if (e.type === "COMPLETED" && jobs.has(e.job_id)) { jobs.get(e.job_id).status = "COMPLETED"; jobs.get(e.job_id).result = e.result; }
@@ -134,8 +137,18 @@ export function createOURTUNNELSELFServer({
     if (claims.caller_sub !== caller.sub) throw new Error("PORTAL_CALLER_MISMATCH");
     if (claims.target_device !== deviceId) throw new Error("PORTAL_TARGET_MISMATCH");
     if (!Array.isArray(claims.admitted_capabilities) || !claims.admitted_capabilities.includes(capability)) throw new Error("PORTAL_CAPABILITY_MISMATCH");
-    if (!claims.authority_grant_ref || !claims.policy_version) throw new Error("PORTAL_EVIDENCE_INCOMPLETE");
+    if (!claims.authority_grant_ref || !claims.policy_version || typeof claims.jti !== "string" || !claims.jti) throw new Error("PORTAL_EVIDENCE_INCOMPLETE");
     return claims;
+  }
+
+  async function consumePortalDecision(claims) {
+    const decisionId = claims.jti;
+    if (consumedPortalDecisions.has(decisionId) || pendingPortalDecisions.has(decisionId)) throw new Error("PORTAL_REPLAY_REJECTED");
+    pendingPortalDecisions.add(decisionId);
+    try {
+      await appendEvent({ type: "PORTAL_CONSUMED", decision_jti: decisionId });
+      consumedPortalDecisions.add(decisionId);
+    } finally { pendingPortalDecisions.delete(decisionId); }
   }
 
   const server = http.createServer(async (req, res) => {
@@ -183,6 +196,7 @@ export function createOURTUNNELSELFServer({
               expires_at: Math.min(Number(portal.exp), now() + 120), created_at: new Date().toISOString()
             };
             if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
+            await consumePortalDecision(portal);
             const envelope = signEnvelope(job, brokerPrivateKey);
             await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
             jobs.set(job.job_id, { ...job, envelope, status: "QUEUED" });
@@ -232,6 +246,7 @@ export function createOURTUNNELSELFServer({
           created_at: new Date().toISOString()
         };
         if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
+        await consumePortalDecision(portal);
         const envelope = signEnvelope(job, brokerPrivateKey);
         await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
         jobs.set(job.job_id, { ...job, envelope, status: "QUEUED" });
@@ -255,7 +270,7 @@ export function createOURTUNNELSELFServer({
         if (url.pathname === "/v1/device/poll") {
           const job = [...jobs.values()].find(j => j.device_id === deviceId && j.status === "QUEUED" && j.expires_at > now());
           if (!job) return send(res, 204, null);
-          await appendEvent({ type: "DELIVERED", job_id: job.job_id, device_id: deviceId });
+          await appendEvent({ type: "DELIVERED", job_id: job.job_id, device_id: deviceId, device_timestamp: req.headers["x-ourself-timestamp"], device_nonce: req.headers["x-ourself-nonce"], device_signature: req.headers["x-ourself-signature"] });
           job.status = "DELIVERY_UNKNOWN";
           return send(res, 200, job.envelope);
         }
@@ -263,7 +278,7 @@ export function createOURTUNNELSELFServer({
         const job = jobs.get(result.job_id);
         if (!job || job.device_id !== deviceId || job.status !== "DELIVERY_UNKNOWN") throw new Error("JOB_STATE_INVALID");
         if (job.expires_at <= now()) throw new Error("JOB_EXPIRED");
-        await appendEvent({ type: "COMPLETED", job_id: job.job_id, result });
+        await appendEvent({ type: "COMPLETED", job_id: job.job_id, result, device_timestamp: req.headers["x-ourself-timestamp"], device_nonce: req.headers["x-ourself-nonce"], device_signature: req.headers["x-ourself-signature"] });
         job.status = "COMPLETED";
         job.result = result;
         return send(res, 200, { accepted: true, job_id: job.job_id });
