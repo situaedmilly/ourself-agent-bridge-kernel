@@ -105,6 +105,8 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   const restartedBase = "http://127.0.0.1:" + restarted.server.address().port;
   const status = await fetch(restartedBase + "/v1/seat/requests/" + jobId, { headers: { authorization: "Bearer " + seatToken } });
   assert.equal((await status.json()).status, "DELIVERY_UNKNOWN");
+  const replayedNonce = await fetch(restartedBase + "/v1/device/poll", { method: "POST", headers: pollHeaders });
+  assert.equal(replayedNonce.status, 403);
   const noReplay = await fetch(restartedBase + "/v1/device/poll", {
     method: "POST", headers: deviceHeaders("", deviceId, deviceKeys.privateKey)
   });
