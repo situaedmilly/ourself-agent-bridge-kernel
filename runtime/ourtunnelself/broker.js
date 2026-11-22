@@ -163,6 +163,7 @@ export function createOURTUNNELSELFServer({
             const caller = authenticateSeat(req, "ourself:repo:status");
             if (typeof args.device_id !== "string" || typeof args.portal_admission !== "string" || typeof args.purpose !== "string") return rpcError(-32602, "device_id, portal_admission and purpose are required");
             if (!devices.has(args.device_id)) throw new Error("DEVICE_NOT_ADMITTED");
+            if (args.target !== undefined && args.target !== ".") throw new Error("TARGET_NOT_ADMITTED");
             const portal = authenticatePortal(args.portal_admission, caller, args.device_id, "repo.status");
             const job = {
               job_id: crypto.randomUUID(), device_id: args.device_id, caller_sub: caller.sub,
@@ -203,6 +204,7 @@ export function createOURTUNNELSELFServer({
         const caller = authenticateSeat(req, "ourself:repo:status");
         const body = JSON.parse((await readBody(req)).toString("utf8"));
         if (body.capability !== "repo.status" || body.operation !== "git_status") throw new Error("CAPABILITY_NOT_IMPLEMENTED");
+        if (body.target !== undefined && body.target !== ".") throw new Error("TARGET_NOT_ADMITTED");
         if (!devices.has(body.device_id)) throw new Error("DEVICE_NOT_ADMITTED");
         const portal = authenticatePortal(body.portal_admission, caller, body.device_id, body.capability);
         const job = {
