@@ -82,6 +82,15 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   });
   assert.equal(created.status, 202);
   const { job_id: jobId } = await created.json();
+  const idempotentRetry = await fetch(base + "/v1/seat/requests", {
+    method: "POST", headers: { authorization: "Bearer " + seatToken, "content-type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId, capability: "repo.status", operation: "git_status", purpose: "governed test", target: ".", portal_admission: portalToken })
+  });
+  const retryBody = await idempotentRetry.json();
+  assert.equal(idempotentRetry.status, 202);
+  assert.equal(retryBody.job_id, jobId);
+  assert.equal(retryBody.idempotent_replay, true);
+
   const reusedAdmission = await fetch(base + "/v1/seat/requests", {
     method: "POST", headers: { authorization: "Bearer " + seatToken, "content-type": "application/json" },
     body: JSON.stringify({ device_id: deviceId, capability: "repo.status", operation: "git_status", purpose: "reuse decision", target: ".", portal_admission: portalToken })
