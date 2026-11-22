@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ourself.invalid/contracts/ourself-tunnel-session.v0.1.schema.json",
+  "$id": "urn:ourself:contracts:our-tunnel-session:v0.1",
   "title": "OURTUNNELSELF Session Contract v0.1",
   "type": "object",
   "additionalProperties": false,
@@ -49,7 +49,7 @@
       "uniqueItems": true,
       "minItems": 1
     },
-    "transport_adapter": { "type": "string", "enum": ["selfhosted-wss", "wireguard", "ssh-reverse", "cloudflare-optional"] },
+    "transport_adapter": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
     "transport_session_id": { "type": "string", "minLength": 1 },
     "issued_at": { "type": "string", "format": "date-time" },
     "expires_at": { "type": "string", "format": "date-time" },
