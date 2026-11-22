@@ -105,7 +105,7 @@ Not yet implemented or proven:
 - production server provisioning, DNS, TLS ingress and hardening
 - durable external device registry authority / revocation distribution
 - independent MODELSELFWITNESS integration and DATASELF receipt ingestion
-- launchd/systemd service packaging for OURSELFMAC
+- actual launchd installation/start/read-back on OURSELFMAC (a template is committed; deployment is not verified)
 - end-to-end tests on a provisioned host and real Mac
 - cross-seat proof using two independently authenticated caller identities
 
