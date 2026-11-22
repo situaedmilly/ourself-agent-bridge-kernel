@@ -6,8 +6,7 @@
   <string>com.ourself.ourtunnelself.device-agent</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/env</string>
-    <string>node</string>
+    <string>/Users/REPLACE_USER/.nvm/versions/node/v22.23.0/bin/node</string>
     <string>/Users/REPLACE_USER/OURSELF/ourself-agent-bridge-kernel/runtime/ourtunnelself/device-agent.js</string>
   </array>
   <key>WorkingDirectory</key>
