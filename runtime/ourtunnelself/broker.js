@@ -225,7 +225,7 @@ export function createOURTUNNELSELFServer({
             const caller = authenticateSeat(req, "ourself:repo:status");
             const job = jobs.get(String(args.job_id || ""));
             if (!job || job.caller_sub !== caller.sub) throw new Error("JOB_NOT_FOUND");
-            value = { job_id: job.job_id, status: job.status, result: job.result || null };
+            value = { job_id: job.job_id, status: currentJobStatus(job), result: job.result || null };
           } else {
             return rpcError(-32602, "Unknown tool");
           }
