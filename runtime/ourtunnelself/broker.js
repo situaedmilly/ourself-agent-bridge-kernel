@@ -48,7 +48,7 @@ function signEnvelope(payload, privateKey) {
   return { payload, signature, algorithm: "RS256" };
 }
 
-function verifyDeviceRequest(req, rawBody, device, replay) {
+async function verifyDeviceRequest(req, rawBody, device, replay, pendingReplay, appendEvent) {
   const timestamp = Number(req.headers["x-ourself-timestamp"]);
   const nonce = String(req.headers["x-ourself-nonce"] || "");
   const signature = String(req.headers["x-ourself-signature"] || "");
@@ -58,8 +58,14 @@ function verifyDeviceRequest(req, rawBody, device, replay) {
   const message = [timestamp, nonce, sha256(rawBody)].join(".");
   if (!crypto.verify(null, Buffer.from(message), key, Buffer.from(signature, "base64url"))) throw new Error("DEVICE_SIGNATURE_INVALID");
   const replayKey = device.device_id + ":" + nonce;
-  if (replay.has(replayKey)) throw new Error("DEVICE_REPLAY_REJECTED");
-  replay.set(replayKey, Date.now() + 120_000);
+  const expiry = Date.now() + 120_000;
+  for (const [key, until] of replay) if (until <= Date.now()) replay.delete(key);
+  if (replay.has(replayKey) || pendingReplay.has(replayKey)) throw new Error("DEVICE_REPLAY_REJECTED");
+  pendingReplay.add(replayKey);
+  try {
+    await appendEvent({ type: "DEVICE_NONCE", replay_key: replayKey, expires_at_ms: expiry });
+    replay.set(replayKey, expiry);
+  } finally { pendingReplay.delete(replayKey); }
 }
 
 export function createOURTUNNELSELFServer({
@@ -77,6 +83,7 @@ export function createOURTUNNELSELFServer({
 } = {}) {
   const jobs = new Map();
   const replay = new Map();
+  const pendingReplay = new Set();
   let devices = new Map();
   let brokerPrivateKey, seatPublicKey, portalPublicKey;
   const journalPath = path.join(dataDir, "events.jsonl");
@@ -102,6 +109,7 @@ export function createOURTUNNELSELFServer({
       const lines = (await fs.readFile(journalPath, "utf8")).split("\n").filter(Boolean);
       for (const line of lines) {
         const e = JSON.parse(line);
+        if (e.type === "DEVICE_NONCE" && e.expires_at_ms > Date.now()) replay.set(e.replay_key, e.expires_at_ms);
         if (e.type === "REQUESTED") jobs.set(e.job.job_id, { ...e.job, status: "QUEUED" });
         if (e.type === "DELIVERED" && jobs.has(e.job_id)) jobs.get(e.job_id).status = "DELIVERY_UNKNOWN";
         if (e.type === "COMPLETED" && jobs.has(e.job_id)) { jobs.get(e.job_id).status = "COMPLETED"; jobs.get(e.job_id).result = e.result; }
@@ -242,7 +250,7 @@ export function createOURTUNNELSELFServer({
         const deviceId = String(req.headers["x-ourself-device"] || "");
         const device = devices.get(deviceId);
         if (!device) throw new Error("DEVICE_NOT_ADMITTED");
-        verifyDeviceRequest(req, raw, device, replay);
+        await verifyDeviceRequest(req, raw, device, replay, pendingReplay, appendEvent);
         if (url.pathname === "/v1/device/poll") {
           const job = [...jobs.values()].find(j => j.device_id === deviceId && j.status === "QUEUED" && j.expires_at > now());
           if (!job) return send(res, 204, null);
