@@ -1,0 +1,27 @@
+[Unit]
+Description=OURSELF OURTUNNELSELF Broker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ourtunnelself
+Group=ourtunnelself
+EnvironmentFile=/etc/ourtunnelself/ourtunnelself.env
+WorkingDirectory=/opt/ourself/ourself-agent-bridge-kernel
+ExecStart=/usr/bin/node runtime/ourtunnelself/broker.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ourtunnelself
+ReadOnlyPaths=/etc/ourtunnelself
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
