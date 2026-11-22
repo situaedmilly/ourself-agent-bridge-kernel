@@ -141,6 +141,16 @@ export function createOURTUNNELSELFServer({
     return claims;
   }
 
+  function findPriorPortalJob(portal, caller, deviceId, capability, operation, purpose, target) {
+    const prior = [...jobs.values()].find(job => job.portal_decision_jti === portal.jti);
+    if (!prior) return null;
+    const sameRequest = prior.caller_sub === caller.sub &&
+      prior.device_id === deviceId && prior.capability === capability &&
+      prior.operation === operation && prior.purpose === purpose && prior.target === target;
+    if (!sameRequest) throw new Error("PORTAL_REPLAY_REJECTED");
+    return prior;
+  }
+
   async function consumePortalDecision(claims) {
     const decisionId = claims.jti;
     if (consumedPortalDecisions.has(decisionId) || pendingPortalDecisions.has(decisionId)) throw new Error("PORTAL_REPLAY_REJECTED");
@@ -196,6 +206,11 @@ export function createOURTUNNELSELFServer({
               expires_at: Math.min(Number(portal.exp), now() + 120), created_at: new Date().toISOString()
             };
             if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
+            const prior = findPriorPortalJob(portal, caller, job.device_id, job.capability, job.operation, job.purpose, job.target);
+            if (prior) {
+              value = { job_id: prior.job_id, status: prior.status, expires_at: prior.expires_at, idempotent_replay: true };
+              return reply({ content: [{ type: "text", text: JSON.stringify(value) }], structuredContent: value, isError: false });
+            }
             await consumePortalDecision(portal);
             const envelope = signEnvelope(job, brokerPrivateKey);
             await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
@@ -246,6 +261,8 @@ export function createOURTUNNELSELFServer({
           created_at: new Date().toISOString()
         };
         if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
+        const prior = findPriorPortalJob(portal, caller, job.device_id, job.capability, job.operation, job.purpose, job.target);
+        if (prior) return send(res, 202, { job_id: prior.job_id, status: prior.status, expires_at: prior.expires_at, idempotent_replay: true });
         await consumePortalDecision(portal);
         const envelope = signEnvelope(job, brokerPrivateKey);
         await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
