@@ -27,8 +27,10 @@ OURTUNNELSELF does not create OSOS caller identity, PORTAL admission, or device 
 
 Generate only the broker keypair:
 ```sh
-sudo install -d -m 0700 -o root -g root /etc/ourtunnelself
+sudo install -d -m 0750 -o root -g ourtunnelself /etc/ourtunnelself
 sudo OURTUNNELSELF_KEY_DIR=/etc/ourtunnelself node tools/ourtunnelself/init-broker.mjs
+sudo chown root:ourtunnelself /etc/ourtunnelself/broker-private.pem
+sudo chmod 0640 /etc/ourtunnelself/broker-private.pem
 ```
 
 Install the seat and PORTAL public keys from their respective authorities as:
@@ -70,7 +72,7 @@ The template at `deploy/ourtunnelself/com.ourself.ourtunnelself.device-agent.pli
 
 Copy `deploy/ourtunnelself/ourtunnelself.env.example` to `/etc/ourtunnelself/ourtunnelself.env`, replace issuer placeholders with the exact OSOS and PORTAL issuer identifiers, and protect it with mode 0600. Configure the systemd service from `deploy/ourtunnelself/ourtunnelself.service`. Install the repository at `/opt/ourself/ourself-agent-bridge-kernel` or adjust WorkingDirectory.
 
-The `devices.json` registry must exist and be mode 0600. The broker journal is append-only JSONL with fsync before delivery. A job marked DELIVERED but lacking a result after broker restart becomes DELIVERY_UNKNOWN and is not automatically replayed; this intentionally prefers avoiding duplicate execution over automatic retry.
+Create `/var/lib/ourtunnelself` owned by `ourtunnelself:ourtunnelself` with mode 0700. The `devices.json` registry must be owned by `root:ourtunnelself` and mode 0640 so only root and the broker service group can read it. The broker key is `root:ourtunnelself` mode 0640; public verification keys may be root-owned mode 0644. Keep the environment file root-owned mode 0600. The broker journal is append-only JSONL with fsync before delivery. A job marked DELIVERED but lacking a result after broker restart becomes DELIVERY_UNKNOWN and is not automatically replayed; this intentionally prefers avoiding duplicate execution over automatic retry.
 
 ## HTTPS ingress
 
