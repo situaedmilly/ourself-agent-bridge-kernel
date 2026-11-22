@@ -62,7 +62,7 @@ node runtime/ourtunnelself/device-agent.js
 ```
 The broker public key and PORTAL public key are public verification material. The device private key is secret. Keep the agent running under the same least-privilege local account that can access the OURSELFd socket.
 
-## Gateway environment and service
+## macOS launchd agent\n\nThe template at `deploy/ourtunnelself/com.ourself.ourtunnelself.device-agent.plist.example` installs the device agent as a per-user LaunchAgent. Replace every `REPLACE_USER` and gateway/issuer placeholder, confirm the repository path and Node path, then install the rendered plist under `~/Library/LaunchAgents/com.ourself.ourtunnelself.device-agent.plist`. Load it with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ourself.ourtunnelself.device-agent.plist`. Inspect logs before treating the agent as online. Do not load it until OURSELFd is running, the device has been admitted in the server registry, and all public verification keys are installed.\n\n## Gateway environment and service
 
 Copy `deploy/ourtunnelself/ourtunnelself.env.example` to `/etc/ourtunnelself/ourtunnelself.env`, replace issuer placeholders with the exact OSOS and PORTAL issuer identifiers, and protect it with mode 0600. Configure the systemd service from `deploy/ourtunnelself/ourtunnelself.service`. Install the repository at `/opt/ourself/ourself-agent-bridge-kernel` or adjust WorkingDirectory.
 
