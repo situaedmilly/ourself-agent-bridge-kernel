@@ -131,6 +131,63 @@ export function createOURTUNNELSELFServer({
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://127.0.0.1");
+      if (req.method === "POST" && url.pathname === "/mcp") {
+        const rpc = JSON.parse((await readBody(req)).toString("utf8"));
+        const reply = result => send(res, 200, { jsonrpc: "2.0", id: rpc.id ?? null, result });
+        const rpcError = (code, message) => send(res, 200, { jsonrpc: "2.0", id: rpc.id ?? null, error: { code, message } });
+        if (rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") return rpcError(-32600, "Invalid JSON-RPC request");
+        if (rpc.method === "initialize") return reply({
+          protocolVersion: "2025-03-26",
+          capabilities: { tools: {} },
+          serverInfo: { name: "OURSELF DESKTOP COMMANDER", version: "0.1.0" }
+        });
+        if (rpc.method === "notifications/initialized") return send(res, 202, null);
+        if (rpc.method === "ping") return reply({});
+        if (rpc.method === "tools/list") {
+          authenticateSeat(req, "ourself:device:read");
+          return reply({ tools: [
+            { name: "ourself_list_devices", description: "List enrolled OURSELF devices; does not imply connectivity or admission.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+            { name: "ourself_request_repo_status", description: "Request a read-only git status operation after independent signed PORTAL admission.", inputSchema: { type: "object", required: ["device_id", "portal_admission", "purpose"], properties: { device_id: { type: "string" }, portal_admission: { type: "string" }, purpose: { type: "string", maxLength: 512 }, target: { type: "string" } }, additionalProperties: false } },
+            { name: "ourself_get_job", description: "Read the status and result of a request created by this caller.", inputSchema: { type: "object", required: ["job_id"], properties: { job_id: { type: "string" } }, additionalProperties: false } }
+          ] });
+        }
+        if (rpc.method === "tools/call") {
+          const name = rpc.params?.name;
+          const args = rpc.params?.arguments || {};
+          let value;
+          if (name === "ourself_list_devices") {
+            authenticateSeat(req, "ourself:device:read");
+            value = { devices: [...devices.values()].map(d => ({ device_id: d.device_id, label: d.label, enabled: d.enabled === true })) };
+          } else if (name === "ourself_request_repo_status") {
+            const caller = authenticateSeat(req, "ourself:repo:status");
+            if (typeof args.device_id !== "string" || typeof args.portal_admission !== "string" || typeof args.purpose !== "string") return rpcError(-32602, "device_id, portal_admission and purpose are required");
+            if (!devices.has(args.device_id)) throw new Error("DEVICE_NOT_ADMITTED");
+            const portal = authenticatePortal(args.portal_admission, caller, args.device_id, "repo.status");
+            const job = {
+              job_id: crypto.randomUUID(), device_id: args.device_id, caller_sub: caller.sub,
+              capability: "repo.status", operation: "git_status", target: typeof args.target === "string" ? args.target : ".",
+              purpose: args.purpose.slice(0, 512), portal_decision_jti: portal.jti || null,
+              authority_grant_ref: portal.authority_grant_ref, policy_version: portal.policy_version,
+              expires_at: Math.min(Number(portal.exp), now() + 120), created_at: new Date().toISOString()
+            };
+            if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
+            const envelope = signEnvelope(job, brokerPrivateKey);
+            await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
+            jobs.set(job.job_id, { ...job, envelope, status: "QUEUED" });
+            value = { job_id: job.job_id, status: "QUEUED", expires_at: job.expires_at };
+          } else if (name === "ourself_get_job") {
+            const caller = authenticateSeat(req, "ourself:repo:status");
+            const job = jobs.get(String(args.job_id || ""));
+            if (!job || job.caller_sub !== caller.sub) throw new Error("JOB_NOT_FOUND");
+            value = { job_id: job.job_id, status: job.status, result: job.result || null };
+          } else {
+            return rpcError(-32602, "Unknown tool");
+          }
+          return reply({ content: [{ type: "text", text: JSON.stringify(value) }], structuredContent: value, isError: false });
+        }
+        return rpcError(-32601, "Method not found");
+      }
+
       if (req.method === "GET" && url.pathname === "/health") {
         return send(res, 200, { service: "OURTUNNELSELF", state: "READY", device_count: devices.size, authority: "NONE_BY_TRANSPORT" });
       }
