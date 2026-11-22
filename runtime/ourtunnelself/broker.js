@@ -89,6 +89,7 @@ export function createOURTUNNELSELFServer({
   }
 
   async function load() {
+    if (!seatIssuer || !portalIssuer || !seatAudience || !portalAudience) throw new Error("TRUST_ISSUER_CONFIGURATION_REQUIRED");
     [brokerPrivateKey, seatPublicKey, portalPublicKey] = await Promise.all([
       fs.readFile(brokerPrivateKeyPath, "utf8"),
       fs.readFile(seatPublicKeyPath, "utf8"),
@@ -167,6 +168,7 @@ export function createOURTUNNELSELFServer({
               job_id: crypto.randomUUID(), device_id: args.device_id, caller_sub: caller.sub,
               capability: "repo.status", operation: "git_status", target: typeof args.target === "string" ? args.target : ".",
               purpose: args.purpose.slice(0, 512), portal_decision_jti: portal.jti || null,
+              portal_admission: args.portal_admission,
               authority_grant_ref: portal.authority_grant_ref, policy_version: portal.policy_version,
               expires_at: Math.min(Number(portal.exp), now() + 120), created_at: new Date().toISOString()
             };
@@ -212,6 +214,7 @@ export function createOURTUNNELSELFServer({
           target: typeof body.target === "string" ? body.target : ".",
           purpose: String(body.purpose || "").slice(0, 512),
           portal_decision_jti: portal.jti || null,
+          portal_admission: body.portal_admission,
           authority_grant_ref: portal.authority_grant_ref,
           policy_version: portal.policy_version,
           expires_at: Math.min(Number(portal.exp), now() + 120),
