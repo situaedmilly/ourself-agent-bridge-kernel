@@ -113,7 +113,10 @@ export function createOURTUNNELSELFServer({
         const e = JSON.parse(line);
         if (e.type === "DEVICE_NONCE" && e.expires_at_ms > Date.now()) replay.set(e.replay_key, e.expires_at_ms);
         if (e.type === "PORTAL_CONSUMED" && e.decision_jti) consumedPortalDecisions.add(e.decision_jti);
-        if (e.type === "REQUESTED") jobs.set(e.job.job_id, { ...e.job, status: "QUEUED" });
+        if (e.type === "REQUESTED") {
+          jobs.set(e.job.job_id, { ...e.job, status: "QUEUED" });
+          if (e.job.portal_decision_jti) consumedPortalDecisions.add(e.job.portal_decision_jti);
+        }
         if (e.type === "DELIVERED" && jobs.has(e.job_id)) jobs.get(e.job_id).status = "DELIVERY_UNKNOWN";
         if (e.type === "COMPLETED" && jobs.has(e.job_id)) { jobs.get(e.job_id).status = "COMPLETED"; jobs.get(e.job_id).result = e.result; }
         if (e.type === "REVOKED" && jobs.has(e.job_id)) jobs.get(e.job_id).status = "REVOKED";
@@ -156,13 +159,17 @@ export function createOURTUNNELSELFServer({
     return prior;
   }
 
-  async function consumePortalDecision(claims) {
-    const decisionId = claims.jti;
+  async function recordRequestedJob(job, portal) {
+    const decisionId = portal.jti;
     if (consumedPortalDecisions.has(decisionId) || pendingPortalDecisions.has(decisionId)) throw new Error("PORTAL_REPLAY_REJECTED");
     pendingPortalDecisions.add(decisionId);
     try {
-      await appendEvent({ type: "PORTAL_CONSUMED", decision_jti: decisionId });
+      const envelope = signEnvelope(job, brokerPrivateKey);
+      await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
       consumedPortalDecisions.add(decisionId);
+      const stored = { ...job, envelope, status: "QUEUED" };
+      jobs.set(job.job_id, stored);
+      return stored;
     } finally { pendingPortalDecisions.delete(decisionId); }
   }
 
@@ -216,11 +223,8 @@ export function createOURTUNNELSELFServer({
               value = { job_id: prior.job_id, status: currentJobStatus(prior), expires_at: prior.expires_at, idempotent_replay: true };
               return reply({ content: [{ type: "text", text: JSON.stringify(value) }], structuredContent: value, isError: false });
             }
-            await consumePortalDecision(portal);
-            const envelope = signEnvelope(job, brokerPrivateKey);
-            await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
-            jobs.set(job.job_id, { ...job, envelope, status: "QUEUED" });
-            value = { job_id: job.job_id, status: "QUEUED", expires_at: job.expires_at };
+            const stored = await recordRequestedJob(job, portal);
+            value = { job_id: stored.job_id, status: stored.status, expires_at: stored.expires_at };
           } else if (name === "ourself_get_job") {
             const caller = authenticateSeat(req, "ourself:repo:status");
             const job = jobs.get(String(args.job_id || ""));
@@ -268,11 +272,8 @@ export function createOURTUNNELSELFServer({
         if (!job.purpose) throw new Error("PURPOSE_REQUIRED");
         const prior = findPriorPortalJob(portal, caller, job.device_id, job.capability, job.operation, job.purpose, job.target);
         if (prior) return send(res, 202, { job_id: prior.job_id, status: prior.status, expires_at: prior.expires_at, idempotent_replay: true });
-        await consumePortalDecision(portal);
-        const envelope = signEnvelope(job, brokerPrivateKey);
-        await appendEvent({ type: "REQUESTED", job: { ...job, envelope } });
-        jobs.set(job.job_id, { ...job, envelope, status: "QUEUED" });
-        return send(res, 202, { job_id: job.job_id, status: "QUEUED", expires_at: job.expires_at });
+        const stored = await recordRequestedJob(job, portal);
+        return send(res, 202, { job_id: stored.job_id, status: stored.status, expires_at: stored.expires_at });
       }
 
       if (req.method === "GET" && url.pathname.startsWith("/v1/seat/requests/")) {
