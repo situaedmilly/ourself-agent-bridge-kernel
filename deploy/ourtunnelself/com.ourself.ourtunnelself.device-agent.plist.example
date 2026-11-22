@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ourself.ourtunnelself.device-agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>node</string>
+    <string>/Users/REPLACE_USER/OURSELF/ourself-agent-bridge-kernel/runtime/ourtunnelself/device-agent.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/REPLACE_USER/OURSELF/ourself-agent-bridge-kernel</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OURTUNNELSELF_BROKER_URL</key>
+    <string>https://REPLACE_WITH_OURSELF_GATEWAY_DOMAIN</string>
+    <key>OURTUNNELSELF_DEVICE_ID</key>
+    <string>OURSELFMAC.local</string>
+    <key>OURTUNNELSELF_DEVICE_PRIVATE_KEY</key>
+    <string>/Users/REPLACE_USER/.ourself/keys/OURSELFMAC.local.ed25519.pem</string>
+    <key>OURTUNNELSELF_BROKER_PUBLIC_KEY</key>
+    <string>/Users/REPLACE_USER/.ourself/keys/broker-public.pem</string>
+    <key>OURTUNNELSELF_PORTAL_PUBLIC_KEY</key>
+    <string>/Users/REPLACE_USER/.ourself/keys/portal-public.pem</string>
+    <key>OURTUNNELSELF_PORTAL_ISSUER</key>
+    <string>REPLACE_WITH_OSOS_PORTAL_ISSUER</string>
+    <key>OURSELFD_SOCKET</key>
+    <string>/var/tmp/ourselfd.sock</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/REPLACE_USER/Library/Logs/ourtunnelself-device-agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/REPLACE_USER/Library/Logs/ourtunnelself-device-agent-error.log</string>
+</dict>
+</plist>
