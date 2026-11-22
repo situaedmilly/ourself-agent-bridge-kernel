@@ -82,6 +82,11 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   });
   assert.equal(created.status, 202);
   const { job_id: jobId } = await created.json();
+  const reusedAdmission = await fetch(base + "/v1/seat/requests", {
+    method: "POST", headers: { authorization: "Bearer " + seatToken, "content-type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId, capability: "repo.status", operation: "git_status", purpose: "reuse decision", target: ".", portal_admission: portalToken })
+  });
+  assert.equal(reusedAdmission.status, 403);
 
   const pollHeaders = deviceHeaders("", deviceId, deviceKeys.privateKey);
   const delivered = await fetch(base + "/v1/device/poll", { method: "POST", headers: pollHeaders });
