@@ -7,7 +7,11 @@
     "setup": "node tools/setup-secret.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "start:ourtunnelself": "node runtime/ourtunnelself/broker.js",
+    "start:ourtunnelself-device": "node runtime/ourtunnelself/device-agent.js",
+    "enroll:ourtunnelself-device": "node tools/ourtunnelself/enroll-device.mjs",
+    "init:ourtunnelself-broker": "node tools/ourtunnelself/init-broker.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.20.0",
