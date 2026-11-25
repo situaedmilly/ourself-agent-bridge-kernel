@@ -1,12 +1,29 @@
 import crypto from "node:crypto";
 
-export const COMMAND_ENCODING = "OURSELF-CANONICAL-JSON-V1";
+export const COMMAND_ENCODING = "OURSELF-JCS-RFC8785-V1";
 const COMMAND_DOMAIN = Buffer.from("OURSELF-PIPE-PORTAL-COMMAND-V1\0", "utf8");
 
+function assertUnicodeScalarString(value) {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) throw new Error("JCS_INVALID_UNICODE");
+      i++;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      throw new Error("JCS_INVALID_UNICODE");
+    }
+  }
+}
+
 function normalize(value, path = "$") {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    assertUnicodeScalarString(value);
+    return value;
+  }
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new Error("CANONICAL_JSON_NONFINITE_NUMBER");
+    if (!Number.isFinite(value)) throw new Error("JCS_NONFINITE_NUMBER");
     return value;
   }
   if (Array.isArray(value)) {
@@ -20,6 +37,7 @@ function normalize(value, path = "$") {
     if (proto !== Object.prototype && proto !== null) throw new Error("CANONICAL_JSON_NON_PLAIN_OBJECT");
     const out = Object.create(null);
     for (const key of Object.keys(value).sort()) {
+      assertUnicodeScalarString(key);
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, "value")) {
         throw new Error("CANONICAL_JSON_ACCESSOR_REJECTED");
