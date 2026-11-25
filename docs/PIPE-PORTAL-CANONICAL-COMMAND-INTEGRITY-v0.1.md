@@ -44,12 +44,12 @@ The canonical-integrity module and its four focused tests were copied from the c
 
 Result: **4 passed, 0 failed**.
 
-This validates the canonical-integrity utility tests only. It does not substitute for running the broker integration test or device-agent runtime.
+An additional local Ed25519 check generated an ephemeral test-only keypair, signed canonical command bytes, verified the signature and digest, and rejected a modified payload. The ephemeral keypair was not persisted or used as production trust material.\n\nThese checks validate the canonical-integrity utility and Ed25519 primitive behavior only. They do not substitute for running the broker integration test or device-agent runtime.
 
 ### GitHub Actions
 The repository workflow was updated to syntax-check the new module and execute both command-integrity and broker integration tests.
 
-The latest observed workflow run for commit `c4fb09e52bc74145761cc113e3b3f72866d495f9` failed before job execution:
+The latest observed workflow run for commit `81b485b9317603fb13397c654128eed34c91c127` failed before job execution:
 - Job status: completed / failure.
 - Runner ID: `0`.
 - Runner name: empty.
