@@ -77,6 +77,11 @@ export function parseCanonicalJson(rawBytes) {
   return value;
 }
 
+export function commandSigningBytes(bytes) {
+  const body = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+  return Buffer.concat([COMMAND_DOMAIN, body]);
+}
+
 export function commandDigest(bytes) {
   const body = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
   return crypto.createHash("sha256").update(COMMAND_DOMAIN).update(body).digest("hex");
