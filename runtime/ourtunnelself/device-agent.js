@@ -18,7 +18,7 @@ function verifyBrokerEnvelope(envelope, publicKey, portalPublicKey) {
     byteLength: envelope.payload_byte_length,
     digest: envelope.payload_digest
   });
-  if (!crypto.verify("RSA-SHA256", body, publicKey, Buffer.from(envelope.signature, "base64url"))) throw new Error("BROKER_SIGNATURE_INVALID");
+  if (!crypto.verify(null, body, publicKey, Buffer.from(envelope.signature, "base64url"))) throw new Error("BROKER_SIGNATURE_INVALID");
   const p = envelope.payload;
   if (!p.portal_admission) throw new Error("PORTAL_ADMISSION_MISSING");
   if (!process.env.OURTUNNELSELF_PORTAL_ISSUER) throw new Error("PORTAL_ISSUER_NOT_CONFIGURED");
