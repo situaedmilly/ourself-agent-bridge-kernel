@@ -71,6 +71,12 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
     exp: Math.floor(Date.now() / 1000) + 120
   }, portalKeys.privateKey);
 
+  const duplicateMember = await fetch(base + "/v1/seat/requests", {
+    method: "POST", headers: { authorization: "Bearer " + seatToken, "content-type": "application/json" },
+    body: '{"device_id":"' + deviceId + '","device_id":"ATTACKER","capability":"repo.status","operation":"git_status","purpose":"duplicate member"}'
+  });
+  assert.equal(duplicateMember.status, 400);
+
   const denied = await fetch(base + "/v1/seat/requests", {
     method: "POST", headers: { authorization: "Bearer " + seatToken, "content-type": "application/json" },
     body: canonicalJsonStringify({ device_id: deviceId, capability: "repo.status", operation: "git_status", purpose: "test without admission" })
