@@ -45,21 +45,21 @@ This is a narrow read-only repository-status path. It is not a general remote sh
 
 ## 3. Blocking findings
 
-### B1 — No byte-for-byte payload commitment
+### B1 — Canonical payload-byte commitment
 
-The broker signs a JSON serialization of a JavaScript object. The device verifies a serialization of the parsed object. The current envelope does not carry and verify a separately specified canonical payload byte string and its SHA-256 digest.
+**Source implementation added:** `runtime/ourtunnelself/command-integrity.js` defines `OURSELF-CANONICAL-JSON-V1`, strict canonical ingress parsing, duplicate-member rejection, byte-length binding, and a domain-separated SHA-256 digest. Broker signatures bind the canonical payload bytes; the device agent verifies encoding, length, digest, and signature before processing.
 
-**Consequence:** The implementation demonstrates signed semantic JSON payload handling, not a complete byte-for-byte command commitment across all serialization boundaries.
+**Verification boundary:** Four focused utility tests and a local Ed25519 signing/tamper check pass. Broker integration and full CI remain unverified because GitHub Actions jobs are failing before runner assignment. See `docs/PIPE-PORTAL-CANONICAL-COMMAND-INTEGRITY-v0.1.md`.
 
-**Required correction:** Define one canonical encoding and domain-separated digest for the exact command bytes. Include the digest, encoding identifier, and byte length in the signed envelope. Verify the received bytes before parsing or execution. Reject duplicate JSON member names and noncanonical encodings.
+**Consequence:** B1 has a source-level implementation, but is not yet production-verified or proven over a live PIPE|PORTAL route.
 
-### B2 — Cryptographic algorithm profile is not reconciled with OSOS trust contract
+### B2 — Trust-chain binding remains incomplete
 
-The OSOS bounded trust specification selects Ed25519 for root/subordinate authority signatures. The current broker and PORTAL integration use RSA/RS256.
+Broker delivery-envelope signatures now use Ed25519, aligned with the OSOS trust profile's algorithm family. Seat and PORTAL JWT verification still uses RS256. More importantly, the broker Ed25519 public key is not certified/pinned through the OSOS trust chain, and seat/PORTAL issuer keys are not bound to an approved OSOS trust policy.
 
-**Consequence:** The inspected source does not establish a verified chain from the OSOS Ed25519 trust root to the broker's RSA signing identity or the PORTAL RSA issuer.
+**Consequence:** Algorithm alignment alone does not establish authority lineage or key authenticity.
 
-**Required correction:** Either implement the agreed Ed25519 profile end-to-end, or document and cryptographically bind an explicitly approved algorithm-transition/cross-signing policy. No silent algorithm substitution.
+**Required correction:** Complete the OSOS-controlled key certification/pinning ceremony, define the approved seat/PORTAL issuer trust profile, and verify the complete chain against pinned trust material. Do not silently substitute keys or create production authority.
 
 ### B3 — Independent witness absent
 
