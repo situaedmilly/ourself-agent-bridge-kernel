@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createOURTUNNELSELFServer } from "../runtime/ourtunnelself/broker.js";
-import { canonicalJsonBytes, canonicalJsonStringify, COMMAND_ENCODING, commandDigest } from "../runtime/ourtunnelself/command-integrity.js";
+import { canonicalJsonBytes, canonicalJsonStringify, COMMAND_ENCODING, commandDigest, commandSigningBytes } from "../runtime/ourtunnelself/command-integrity.js";
 
 const b64u = value => Buffer.from(JSON.stringify(value)).toString("base64url");
 function signJwt(claims, privateKey) {
@@ -115,9 +115,9 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   assert.equal(envelope.payload_encoding, COMMAND_ENCODING);
   assert.equal(envelope.payload_byte_length, signedBody.length);
   assert.equal(envelope.payload_digest, commandDigest(signedBody));
-  assert.equal(crypto.verify(null, signedBody, brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), true);
+  assert.equal(crypto.verify(null, commandSigningBytes(signedBody), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), true);
   const tamperedPayload = { ...envelope.payload, purpose: "tampered after signing" };
-  assert.equal(crypto.verify(null, canonicalJsonBytes(tamperedPayload), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), false);
+  assert.equal(crypto.verify(null, commandSigningBytes(canonicalJsonBytes(tamperedPayload)), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), false);
 
   await app.stop();
   const restarted = createOURTUNNELSELFServer({
