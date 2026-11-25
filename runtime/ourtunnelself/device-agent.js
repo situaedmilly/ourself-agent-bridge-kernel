@@ -3,7 +3,7 @@ import https from "node:https";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { COMMAND_ENCODING, canonicalJsonBytes, canonicalJsonStringify, commandDigest, verifyCommandBytes } from "./command-integrity.js";
+import { canonicalJsonBytes, canonicalJsonStringify, verifyCommandBytes } from "./command-integrity.js";
 
 const b64u = v => Buffer.from(v).toString("base64url");
 const sha256 = v => crypto.createHash("sha256").update(v).digest("hex");
