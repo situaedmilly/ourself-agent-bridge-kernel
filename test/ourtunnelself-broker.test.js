@@ -111,6 +111,7 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   assert.equal(envelope.payload.job_id, jobId);
   assert.equal(envelope.payload.portal_admission, portalToken);
   const signedBody = canonicalJsonBytes(envelope.payload);
+  assert.equal(envelope.algorithm, "Ed25519");
   assert.equal(envelope.payload_encoding, COMMAND_ENCODING);
   assert.equal(envelope.payload_byte_length, signedBody.length);
   assert.equal(envelope.payload_digest, commandDigest(signedBody));
