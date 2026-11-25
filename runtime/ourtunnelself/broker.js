@@ -52,7 +52,7 @@ function signEnvelope(payload, privateKey) {
     payload_byte_length: bytes.length,
     payload_digest: commandDigest(bytes),
     signature,
-    algorithm: "RS256"
+    algorithm: "Ed25519"
   };
 }
 
