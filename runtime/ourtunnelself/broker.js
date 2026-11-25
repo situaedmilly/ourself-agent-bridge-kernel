@@ -2,7 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { COMMAND_ENCODING, canonicalJsonBytes, parseCanonicalJson, commandDigest, commandSigningBytes } from "./command-integrity.js";
+import { COMMAND_ENCODING, canonicalJsonBytes, parseCanonicalJson, parseJsonRejectDuplicateMembers, commandDigest, commandSigningBytes } from "./command-integrity.js";
 
 const b64u = (v) => Buffer.from(v).toString("base64url");
 const decode = (v) => Buffer.from(v, "base64url");
@@ -185,7 +185,7 @@ export function createOURTUNNELSELFServer({
     try {
       const url = new URL(req.url, "http://127.0.0.1");
       if (req.method === "POST" && url.pathname === "/mcp") {
-        const rpc = JSON.parse((await readBody(req)).toString("utf8"));
+        const rpc = parseJsonRejectDuplicateMembers(await readBody(req));
         const reply = result => send(res, 200, { jsonrpc: "2.0", id: rpc.id ?? null, result });
         const rpcError = (code, message) => send(res, 200, { jsonrpc: "2.0", id: rpc.id ?? null, error: { code, message } });
         if (rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string") return rpcError(-32600, "Invalid JSON-RPC request");
