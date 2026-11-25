@@ -16,6 +16,7 @@ jobs:
           node-version: 22
       - run: node --check runtime/ourtunnelself/broker.js
       - run: node --check runtime/ourtunnelself/device-agent.js
+      - run: node --check runtime/ourtunnelself/command-integrity.js
       - run: node --check tools/ourtunnelself/enroll-device.mjs
       - run: node --check tools/ourtunnelself/init-broker.mjs
-      - run: node --test test/ourtunnelself-broker.test.js
+      - run: node --test test/ourtunnelself-command-integrity.test.js test/ourtunnelself-broker.test.js
