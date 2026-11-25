@@ -58,6 +58,50 @@ export function canonicalJsonBytes(value) {
   return Buffer.from(canonicalJsonStringify(value), "utf8");
 }
 
+function rejectDuplicateJsonMembers(source) {
+  const stack = [];
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '"') {
+      const start = i;
+      let escaped = false;
+      for (i = i + 1; i < source.length; i++) {
+        const current = source[i];
+        if (escaped) { escaped = false; continue; }
+        if (current === "\\\\") { escaped = true; continue; }
+        if (current === '"') break;
+      }
+      const top = stack[stack.length - 1];
+      if (top?.type === "object" && top.expectingKey) {
+        let key;
+        try { key = JSON.parse(source.slice(start, i + 1)); }
+        catch { continue; }
+        if (top.keys.has(key)) throw new Error("JCS_DUPLICATE_MEMBER");
+        top.keys.add(key);
+        top.expectingKey = false;
+      }
+      continue;
+    }
+    if (ch === "{") stack.push({ type: "object", keys: new Set(), expectingKey: true });
+    else if (ch === "[") stack.push({ type: "array" });
+    else if (ch === "}" || ch === "]") stack.pop();
+    else if (ch === ",") {
+      const top = stack[stack.length - 1];
+      if (top?.type === "object") top.expectingKey = true;
+    }
+  }
+}
+
+export function parseJsonRejectDuplicateMembers(rawBytes) {
+  const bytes = Buffer.isBuffer(rawBytes) ? rawBytes : Buffer.from(rawBytes);
+  let source;
+  try { source = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { throw new Error("JCS_UTF8_INVALID"); }
+  rejectDuplicateJsonMembers(source);
+  try { return JSON.parse(source); }
+  catch { throw new Error("JCS_PARSE_INVALID"); }
+}
+
 export function parseCanonicalJson(rawBytes) {
   const bytes = Buffer.isBuffer(rawBytes) ? rawBytes : Buffer.from(rawBytes);
   let source;
