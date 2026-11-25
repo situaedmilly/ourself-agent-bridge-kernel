@@ -10,7 +10,7 @@ const sha256 = v => crypto.createHash("sha256").update(v).digest("hex");
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function verifyBrokerEnvelope(envelope, publicKey, portalPublicKey) {
-  if (!envelope || envelope.algorithm !== "RS256" || !envelope.payload || !envelope.signature) throw new Error("BROKER_ENVELOPE_INVALID");
+  if (!envelope || envelope.algorithm !== "Ed25519" || !envelope.payload || !envelope.signature) throw new Error("BROKER_ENVELOPE_INVALID");
   const body = canonicalJsonBytes(envelope.payload);
   verifyCommandBytes({
     bytes: body,
