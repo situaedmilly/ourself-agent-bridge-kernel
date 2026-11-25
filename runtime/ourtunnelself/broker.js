@@ -2,7 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { COMMAND_ENCODING, canonicalJsonBytes, parseCanonicalJson, commandDigest } from "./command-integrity.js";
+import { COMMAND_ENCODING, canonicalJsonBytes, parseCanonicalJson, commandDigest, commandSigningBytes } from "./command-integrity.js";
 
 const b64u = (v) => Buffer.from(v).toString("base64url");
 const decode = (v) => Buffer.from(v, "base64url");
@@ -45,7 +45,7 @@ function send(res, status, body) {
 
 function signEnvelope(payload, privateKey) {
   const bytes = canonicalJsonBytes(payload);
-  const signature = crypto.sign(null, bytes, privateKey).toString("base64url");
+  const signature = crypto.sign(null, commandSigningBytes(bytes), privateKey).toString("base64url");
   return {
     payload,
     payload_encoding: COMMAND_ENCODING,
