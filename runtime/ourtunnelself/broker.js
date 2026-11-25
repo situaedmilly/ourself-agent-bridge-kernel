@@ -2,6 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { COMMAND_ENCODING, canonicalJsonBytes, parseCanonicalJson, commandDigest } from "./command-integrity.js";
 
 const b64u = (v) => Buffer.from(v).toString("base64url");
 const decode = (v) => Buffer.from(v, "base64url");
@@ -43,9 +44,16 @@ function send(res, status, body) {
 }
 
 function signEnvelope(payload, privateKey) {
-  const body = b64u(json(payload));
-  const signature = crypto.sign("RSA-SHA256", Buffer.from(body), privateKey).toString("base64url");
-  return { payload, signature, algorithm: "RS256" };
+  const bytes = canonicalJsonBytes(payload);
+  const signature = crypto.sign("RSA-SHA256", bytes, privateKey).toString("base64url");
+  return {
+    payload,
+    payload_encoding: COMMAND_ENCODING,
+    payload_byte_length: bytes.length,
+    payload_digest: commandDigest(bytes),
+    signature,
+    algorithm: "RS256"
+  };
 }
 
 async function verifyDeviceRequest(req, rawBody, device, replay, pendingReplay, appendEvent) {
@@ -249,7 +257,7 @@ export function createOURTUNNELSELFServer({
 
       if (req.method === "POST" && url.pathname === "/v1/seat/requests") {
         const caller = authenticateSeat(req, "ourself:repo:status");
-        const body = JSON.parse((await readBody(req)).toString("utf8"));
+        const body = parseCanonicalJson(await readBody(req));
         if (body.capability !== "repo.status" || body.operation !== "git_status") throw new Error("CAPABILITY_NOT_IMPLEMENTED");
         if (body.target !== undefined && body.target !== ".") throw new Error("TARGET_NOT_ADMITTED");
         if (!devices.has(body.device_id)) throw new Error("DEVICE_NOT_ADMITTED");
@@ -297,7 +305,7 @@ export function createOURTUNNELSELFServer({
           job.status = "DELIVERY_UNKNOWN";
           return send(res, 200, job.envelope);
         }
-        const result = JSON.parse(raw.toString("utf8"));
+        const result = parseCanonicalJson(raw);
         const job = jobs.get(result.job_id);
         if (!job || job.device_id !== deviceId || job.status !== "DELIVERY_UNKNOWN") throw new Error("JOB_STATE_INVALID");
         if (job.expires_at <= now()) throw new Error("JOB_EXPIRED");
