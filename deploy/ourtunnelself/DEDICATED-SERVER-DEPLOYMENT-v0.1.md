@@ -18,7 +18,7 @@ A public IP is not inherently required if OURSELF controls another ingress path,
 ## Trust material — do not generate substitute authority
 
 The gateway requires:
-- broker RSA private key: generated on the gateway; signs broker delivery envelopes
+- broker Ed25519 private key: generated on the gateway; signs broker delivery envelopes
 - seat public key: supplied by OSOS seat-identity authority
 - PORTAL public key: supplied by the independent PORTAL signing authority
 - device Ed25519 public keys: admitted through the OURSELF device enrollment ceremony
@@ -90,7 +90,7 @@ Do not expose internal device routes as browser-facing user interfaces. The reve
 
 Implemented in this branch:
 - broker process with append-only event journal
-- RS256 seat JWT verification and independent RS256 PORTAL JWT verification
+- RS256 seat JWT verification and independent RS256 PORTAL JWT verification; Ed25519 broker delivery-envelope signatures
 - target-device registry with manual enablement
 - Ed25519 device request authentication and replay nonce cache
 - signed broker delivery envelopes; target agent independently verifies PORTAL signature
