@@ -19,9 +19,9 @@
 - Command digest is SHA-256 over the domain prefix `OURSELF-PIPE-PORTAL-COMMAND-V1\0` followed by the exact canonical payload bytes.
 
 ### Broker enforcement
-- The broker serializes each job payload using RFC 8785 JCS before signing with Ed25519.
+- The broker serializes each job payload using RFC 8785 JCS before signing with a domain-separated Ed25519 signature.
 - The broker envelope includes encoding identifier, canonical byte length, domain-separated digest, and signature.
-- The broker requires canonical JSON bytes for HTTP seat command requests and device result submissions.
+- The broker requires canonical JCS bytes for HTTP seat command requests and device result submissions. MCP ingress accepts ordinary JSON whitespace/key order but rejects duplicate decoded member names before interpreting the JSON-RPC command.
 - Duplicate JSON members and noncanonical command bytes are rejected before the command is accepted or a result is recorded.
 
 ### Device-agent enforcement
@@ -42,7 +42,7 @@
 ### Local test execution
 The canonical-integrity module and its four focused tests were copied from the committed source into an isolated Node.js 22.16.0 scratch directory and executed with `node --test`.
 
-Result: **6 passed, 0 failed**.
+Result: **7 passed, 0 failed**.
 
 An additional local Ed25519 check generated an ephemeral test-only keypair, signed canonical command bytes, verified the signature and digest, and rejected a modified payload. The ephemeral keypair was not persisted or used as production trust material.\n\nThese checks validate the canonical-integrity utility and Ed25519 primitive behavior only. They do not substitute for running the broker integration test or device-agent runtime.
 
