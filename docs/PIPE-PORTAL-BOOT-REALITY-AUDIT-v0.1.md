@@ -47,7 +47,7 @@ This is a narrow read-only repository-status path. It is not a general remote sh
 
 ### B1 — Canonical payload-byte commitment
 
-**Source implementation added:** `runtime/ourtunnelself/command-integrity.js` implements the OSOS-required RFC 8785 JSON Canonicalization Scheme (JCS) as `OURSELF-JCS-RFC8785-V1`, strict canonical ingress parsing, duplicate-member rejection, byte-length binding, and a domain-separated SHA-256 digest. Broker signatures bind the canonical payload bytes; the device agent verifies encoding, length, digest, and signature before processing.
+**Source implementation added:** `runtime/ourtunnelself/command-integrity.js` implements the OSOS-required RFC 8785 JSON Canonicalization Scheme (JCS) as `OURSELF-JCS-RFC8785-V1`, strict canonical ingress parsing, duplicate-member rejection, byte-length binding, and a domain-separated SHA-256 digest and domain-separated Ed25519 signature preimage. Broker signatures bind the domain separator plus canonical payload bytes; the device agent verifies encoding, length, digest, and signature before processing.
 
 **Verification boundary:** Four focused utility tests and a local Ed25519 signing/tamper check pass. Broker integration and full CI remain unverified because GitHub Actions jobs are failing before runner assignment. See `docs/PIPE-PORTAL-CANONICAL-COMMAND-INTEGRITY-v0.1.md`.
 
