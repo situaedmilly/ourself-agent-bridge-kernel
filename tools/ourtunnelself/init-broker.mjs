@@ -6,7 +6,7 @@ const keyDir = process.env.OURTUNNELSELF_KEY_DIR || "/etc/ourtunnelself";
 await fs.mkdir(keyDir, { recursive: true, mode: 0o700 });
 const privatePath = path.join(keyDir, "broker-private.pem");
 const publicPath = path.join(keyDir, "broker-public.pem");
-const pair = crypto.generateKeyPairSync("rsa", { modulusLength: 3072, publicExponent: 0x10001 });
+const pair = crypto.generateKeyPairSync("ed25519");
 await fs.writeFile(privatePath, pair.privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600, flag: "wx" });
 await fs.writeFile(publicPath, pair.publicKey.export({ type: "spki", format: "pem" }), { mode: 0o644, flag: "wx" });
 process.stdout.write(JSON.stringify({
