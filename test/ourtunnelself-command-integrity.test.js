@@ -5,16 +5,16 @@ import {
   parseCanonicalJson, commandDigest, verifyCommandBytes
 } from "../runtime/ourtunnelself/command-integrity.js";
 
-test("canonical JSON sorts object keys and preserves array order", () => {
+test("RFC 8785 JCS sorts object keys and preserves array order", () => {
   assert.equal(canonicalJsonStringify({ z: 1, a: { y: 2, b: 3 } }), '{"a":{"b":3,"y":2},"z":1}');
   assert.notEqual(canonicalJsonStringify([1, 2]), canonicalJsonStringify([2, 1]));
 });
 
-test("canonical parser rejects whitespace, key-order variants, and duplicate members", () => {
+test("JCS parser rejects whitespace, key-order variants, and duplicate members", () => {
   assert.deepEqual(parseCanonicalJson(Buffer.from('{"a":1,"b":2}')), { a: 1, b: 2 });
-  assert.throws(() => parseCanonicalJson(Buffer.from('{ "a":1,"b":2}')), /CANONICAL_JSON_BYTES_MISMATCH/);
-  assert.throws(() => parseCanonicalJson(Buffer.from('{"b":2,"a":1}')), /CANONICAL_JSON_BYTES_MISMATCH/);
-  assert.throws(() => parseCanonicalJson(Buffer.from('{"a":1,"a":1}')), /CANONICAL_JSON_BYTES_MISMATCH/);
+  assert.throws(() => parseCanonicalJson(Buffer.from('{ "a":1,"b":2}')), /JCS_BYTES_MISMATCH/);
+  assert.throws(() => parseCanonicalJson(Buffer.from('{"b":2,"a":1}')), /JCS_BYTES_MISMATCH/);
+  assert.throws(() => parseCanonicalJson(Buffer.from('{"a":1,"a":1}')), /JCS_BYTES_MISMATCH/);
 });
 
 test("command digest is domain-separated and length-bound", () => {
@@ -33,10 +33,15 @@ test("command digest is domain-separated and length-bound", () => {
   }), /COMMAND_DIGEST_MISMATCH/);
 });
 
-test("canonical serializer rejects ambiguous or unsupported JavaScript values", () => {
-  assert.throws(() => canonicalJsonStringify({ value: undefined }), /CANONICAL_JSON_UNDEFINED_REJECTED/);
-  assert.throws(() => canonicalJsonStringify({ value: Number.NaN }), /CANONICAL_JSON_NONFINITE_NUMBER/);
-  assert.throws(() => canonicalJsonStringify(new Date()), /CANONICAL_JSON_NON_PLAIN_OBJECT/);
+test("JCS serializer rejects ambiguous or unsupported JavaScript values", () => {
+  assert.throws(() => canonicalJsonStringify({ value: undefined }), /JCS_UNDEFINED_REJECTED/);
+  assert.throws(() => canonicalJsonStringify({ value: Number.NaN }), /JCS_NONFINITE_NUMBER/);
+  assert.throws(() => canonicalJsonStringify(new Date()), /JCS_NON_PLAIN_OBJECT/);
   const sparse = new Array(2);
-  assert.throws(() => canonicalJsonStringify(sparse), /CANONICAL_JSON_SPARSE_ARRAY/);
+  assert.throws(() => canonicalJsonStringify(sparse), /JCS_SPARSE_ARRAY/);
+});
+
+test("RFC 8785 number serialization uses ECMAScript shortest representations", () => {
+  const value = { numbers: [333333333.33333329, 1e30, 4.50, 2e-3, 1e-27] };
+  assert.equal(canonicalJsonStringify(value), '{"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27]}');
 });
