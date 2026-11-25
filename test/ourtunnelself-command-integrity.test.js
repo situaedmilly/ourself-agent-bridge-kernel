@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import {
   COMMAND_ENCODING, canonicalJsonBytes, canonicalJsonStringify,
-  parseCanonicalJson, commandDigest, verifyCommandBytes, commandSigningBytes
+  parseCanonicalJson, parseJsonRejectDuplicateMembers, commandDigest, verifyCommandBytes, commandSigningBytes
 } from "../runtime/ourtunnelself/command-integrity.js";
 
 test("RFC 8785 JCS sorts object keys and preserves array order", () => {
@@ -54,4 +54,11 @@ test("Ed25519 signatures bind the PIPE PORTAL command domain", () => {
   assert.equal(crypto.verify(null, commandSigningBytes(bytes), pair.publicKey, signature), true);
   assert.equal(crypto.verify(null, bytes, pair.publicKey, signature), false);
   assert.equal(crypto.verify(null, commandSigningBytes(canonicalJsonBytes({ action: "repo.status", target: "/other" })), pair.publicKey, signature), false);
+});
+
+test("MCP ingress accepts ordinary JSON but rejects duplicate decoded member names", () => {
+  assert.deepEqual(parseJsonRejectDuplicateMembers(Buffer.from('{ "z": 1, "a": {"x": "escaped \\" quote"} }')), { z: 1, a: { x: 'escaped " quote' } });
+  assert.throws(() => parseJsonRejectDuplicateMembers(Buffer.from('{"a":1,"a":2}')), /JCS_DUPLICATE_MEMBER/);
+  assert.throws(() => parseJsonRejectDuplicateMembers(Buffer.from('{"outer":{"x":1,"x":2}}')), /JCS_DUPLICATE_MEMBER/);
+  assert.throws(() => parseJsonRejectDuplicateMembers(Buffer.from('{"ab":1,"a\\u0062":2}')), /JCS_DUPLICATE_MEMBER/);
 });
