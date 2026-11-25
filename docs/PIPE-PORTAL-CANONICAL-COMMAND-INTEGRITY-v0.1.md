@@ -19,13 +19,13 @@
 - Command digest is SHA-256 over the domain prefix `OURSELF-PIPE-PORTAL-COMMAND-V1\0` followed by the exact canonical payload bytes.
 
 ### Broker enforcement
-- The broker canonicalizes each job payload before signing.
+- The broker canonicalizes each job payload before signing with Ed25519.
 - The broker envelope includes encoding identifier, canonical byte length, domain-separated digest, and signature.
 - The broker requires canonical JSON bytes for HTTP seat command requests and device result submissions.
 - Duplicate JSON members and noncanonical command bytes are rejected before the command is accepted or a result is recorded.
 
 ### Device-agent enforcement
-- The device agent reconstructs the canonical payload bytes.
+- The device agent reconstructs the canonical payload bytes and verifies the broker Ed25519 signature.
 - It checks encoding identifier, byte length, and digest.
 - It verifies the broker signature over those exact canonical bytes before validating PORTAL admission and the narrow capability.
 - Device result submissions use canonical JSON serialization.
@@ -60,7 +60,7 @@ The same pre-runner failure pattern occurred on earlier pushes. This is an execu
 
 ## Remaining blockers
 
-1. **Trust-profile reconciliation:** broker envelope signing and seat/PORTAL JWT verification still use RSA/RS256. The OSOS production trust specification selects Ed25519. No approved algorithm-transition certificate or OSOS-bound broker key exists. Do not silently change algorithms or generate production keys.
+1. **Trust-profile reconciliation:** seat and PORTAL JWT verification still use RSA/RS256, while broker delivery envelopes now use Ed25519. The OSOS production trust specification selects Ed25519 for its root/subordinate authority signatures. The broker public key is not yet certified or pinned through that OSOS trust chain, and seat/PORTAL issuer keys are not yet bound to an approved OSOS trust policy. Do not silently substitute issuer keys or generate production authority.
 2. **Independent witness:** no separate witness service currently signs the command digest, authority decision digest, target receipt, and readback digest.
 3. **Independent effect readback:** broker completion still records a submitted device result; it does not independently re-contact the target and verify resulting state.
 4. **Live route:** no fresh PIPE|PORTAL challenge/response, broker identity readback, or Pi device handshake was captured in this execution.
