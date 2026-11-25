@@ -23,7 +23,7 @@ function deviceHeaders(body, deviceId, privateKey) {
 test("broker requires signed seat and PORTAL authority, binds device, and does not replay uncertain delivery", async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ourtunnelself-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const brokerKeys = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const brokerKeys = crypto.generateKeyPairSync("ed25519");
   const seatKeys = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   const portalKeys = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   const deviceKeys = crypto.generateKeyPairSync("ed25519");
@@ -114,9 +114,9 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   assert.equal(envelope.payload_encoding, COMMAND_ENCODING);
   assert.equal(envelope.payload_byte_length, signedBody.length);
   assert.equal(envelope.payload_digest, commandDigest(signedBody));
-  assert.equal(crypto.verify("RSA-SHA256", signedBody, brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), true);
+  assert.equal(crypto.verify(null, signedBody, brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), true);
   const tamperedPayload = { ...envelope.payload, purpose: "tampered after signing" };
-  assert.equal(crypto.verify("RSA-SHA256", canonicalJsonBytes(tamperedPayload), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), false);
+  assert.equal(crypto.verify(null, canonicalJsonBytes(tamperedPayload), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), false);
 
   await app.stop();
   const restarted = createOURTUNNELSELFServer({
