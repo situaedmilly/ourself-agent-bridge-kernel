@@ -3,6 +3,7 @@ import https from "node:https";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { COMMAND_ENCODING, canonicalJsonBytes, canonicalJsonStringify, commandDigest, verifyCommandBytes } from "./command-integrity.js";
 
 const b64u = v => Buffer.from(v).toString("base64url");
 const sha256 = v => crypto.createHash("sha256").update(v).digest("hex");
@@ -10,8 +11,14 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function verifyBrokerEnvelope(envelope, publicKey, portalPublicKey) {
   if (!envelope || envelope.algorithm !== "RS256" || !envelope.payload || !envelope.signature) throw new Error("BROKER_ENVELOPE_INVALID");
-  const body = b64u(JSON.stringify(envelope.payload));
-  if (!crypto.verify("RSA-SHA256", Buffer.from(body), publicKey, Buffer.from(envelope.signature, "base64url"))) throw new Error("BROKER_SIGNATURE_INVALID");
+  const body = canonicalJsonBytes(envelope.payload);
+  verifyCommandBytes({
+    bytes: body,
+    encoding: envelope.payload_encoding,
+    byteLength: envelope.payload_byte_length,
+    digest: envelope.payload_digest
+  });
+  if (!crypto.verify("RSA-SHA256", body, publicKey, Buffer.from(envelope.signature, "base64url"))) throw new Error("BROKER_SIGNATURE_INVALID");
   const p = envelope.payload;
   if (!p.portal_admission) throw new Error("PORTAL_ADMISSION_MISSING");
   if (!process.env.OURTUNNELSELF_PORTAL_ISSUER) throw new Error("PORTAL_ISSUER_NOT_CONFIGURED");
@@ -147,7 +154,7 @@ export async function runOURTUNNELSELFDeviceAgent({
       }
       await append({ job_id: job.job_id, state: result.state, local_receipt_id: result.local_receipt?.receipt_id || null });
       seen.add(job.job_id);
-      const raw = JSON.stringify(result);
+      const raw = canonicalJsonStringify(result);
       await brokerRequest(brokerUrl, "/v1/device/result", raw, signedHeaders(raw, deviceId, privateKey));
     } catch (error) {
       if (stopping) break;
