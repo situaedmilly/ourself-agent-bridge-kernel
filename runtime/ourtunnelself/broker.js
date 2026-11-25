@@ -45,7 +45,7 @@ function send(res, status, body) {
 
 function signEnvelope(payload, privateKey) {
   const bytes = canonicalJsonBytes(payload);
-  const signature = crypto.sign("RSA-SHA256", bytes, privateKey).toString("base64url");
+  const signature = crypto.sign(null, bytes, privateKey).toString("base64url");
   return {
     payload,
     payload_encoding: COMMAND_ENCODING,
