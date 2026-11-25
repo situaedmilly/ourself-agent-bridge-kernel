@@ -8,18 +8,18 @@
 ## Implemented
 
 ### Canonical command representation
-`runtime/ourtunnelself/command-integrity.js` defines `OURSELF-CANONICAL-JSON-V1`:
-- UTF-8 JSON bytes.
-- Object keys recursively sorted using JavaScript's deterministic string ordering.
+`runtime/ourtunnelself/command-integrity.js` implements the OSOS-required RFC 8785 JSON Canonicalization Scheme (JCS) as `OURSELF-JCS-RFC8785-V1`:
+- UTF-8 JCS bytes.
+- Object keys recursively sorted by UTF-16 code units as required by RFC 8785.
 - Array order preserved.
-- JSON number/string encoding follows the Node.js ECMAScript JSON serializer.
+- String and number serialization follows ECMAScript JSON serialization required by JCS; invalid Unicode scalar sequences and non-finite numbers are rejected.
 - Rejects non-finite numbers, undefined values, sparse arrays, accessors, non-plain objects, and unsupported values.
 - Strict UTF-8 decoding.
 - Ingress parser compares the received byte string with the canonical serialization. This rejects whitespace/key-order variants and duplicate object member names because their raw representation cannot equal the normalized canonical representation.
 - Command digest is SHA-256 over the domain prefix `OURSELF-PIPE-PORTAL-COMMAND-V1\0` followed by the exact canonical payload bytes.
 
 ### Broker enforcement
-- The broker canonicalizes each job payload before signing with Ed25519.
+- The broker serializes each job payload using RFC 8785 JCS before signing with Ed25519.
 - The broker envelope includes encoding identifier, canonical byte length, domain-separated digest, and signature.
 - The broker requires canonical JSON bytes for HTTP seat command requests and device result submissions.
 - Duplicate JSON members and noncanonical command bytes are rejected before the command is accepted or a result is recorded.
