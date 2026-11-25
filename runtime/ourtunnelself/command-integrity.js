@@ -68,7 +68,7 @@ function rejectDuplicateJsonMembers(source) {
       for (i = i + 1; i < source.length; i++) {
         const current = source[i];
         if (escaped) { escaped = false; continue; }
-        if (current === "\\\\") { escaped = true; continue; }
+        if (current === "\\") { escaped = true; continue; }
         if (current === '"') break;
       }
       const top = stack[stack.length - 1];
