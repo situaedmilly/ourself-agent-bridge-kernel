@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 export const COMMAND_ENCODING = "OURSELF-JCS-RFC8785-V1";
-const COMMAND_DOMAIN = Buffer.from("OURSELF-PIPE-PORTAL-COMMAND-V1\0", "utf8");
+const COMMAND_DOMAIN = Buffer.from("OURSELF-PIPE-PORTAL-COMMAND-JCS-RFC8785-V1\0", "utf8");
 
 function assertUnicodeScalarString(value) {
   for (let i = 0; i < value.length; i++) {
