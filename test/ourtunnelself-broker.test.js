@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createOURTUNNELSELFServer } from "../runtime/ourtunnelself/broker.js";
+import { canonicalJsonBytes, canonicalJsonStringify, COMMAND_ENCODING, commandDigest } from "../runtime/ourtunnelself/command-integrity.js";
 
 const b64u = value => Buffer.from(JSON.stringify(value)).toString("base64url");
 function signJwt(claims, privateKey) {
@@ -72,7 +73,7 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
 
   const denied = await fetch(base + "/v1/seat/requests", {
     method: "POST", headers: { authorization: "Bearer " + seatToken, "content-type": "application/json" },
-    body: JSON.stringify({ device_id: deviceId, capability: "repo.status", operation: "git_status", purpose: "test without admission" })
+    body: canonicalJsonStringify({ device_id: deviceId, capability: "repo.status", operation: "git_status", purpose: "test without admission" })
   });
   assert.equal(denied.status, 403);
 
@@ -103,8 +104,13 @@ test("broker requires signed seat and PORTAL authority, binds device, and does n
   const envelope = await delivered.json();
   assert.equal(envelope.payload.job_id, jobId);
   assert.equal(envelope.payload.portal_admission, portalToken);
-  const signedBody = Buffer.from(JSON.stringify(envelope.payload)).toString("base64url");
-  assert.equal(crypto.verify("RSA-SHA256", Buffer.from(signedBody), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), true);
+  const signedBody = canonicalJsonBytes(envelope.payload);
+  assert.equal(envelope.payload_encoding, COMMAND_ENCODING);
+  assert.equal(envelope.payload_byte_length, signedBody.length);
+  assert.equal(envelope.payload_digest, commandDigest(signedBody));
+  assert.equal(crypto.verify("RSA-SHA256", signedBody, brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), true);
+  const tamperedPayload = { ...envelope.payload, purpose: "tampered after signing" };
+  assert.equal(crypto.verify("RSA-SHA256", canonicalJsonBytes(tamperedPayload), brokerKeys.publicKey, Buffer.from(envelope.signature, "base64url")), false);
 
   await app.stop();
   const restarted = createOURTUNNELSELFServer({
