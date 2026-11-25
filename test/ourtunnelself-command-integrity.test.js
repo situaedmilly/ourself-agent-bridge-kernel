@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import {
   COMMAND_ENCODING, canonicalJsonBytes, canonicalJsonStringify,
-  parseCanonicalJson, commandDigest, verifyCommandBytes
+  parseCanonicalJson, commandDigest, verifyCommandBytes, commandSigningBytes
 } from "../runtime/ourtunnelself/command-integrity.js";
 
 test("RFC 8785 JCS sorts object keys and preserves array order", () => {
@@ -44,4 +45,13 @@ test("JCS serializer rejects ambiguous or unsupported JavaScript values", () => 
 test("RFC 8785 number serialization uses ECMAScript shortest representations", () => {
   const value = { numbers: [333333333.33333329, 1e30, 4.50, 2e-3, 1e-27] };
   assert.equal(canonicalJsonStringify(value), '{"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27]}');
+});
+
+test("Ed25519 signatures bind the PIPE PORTAL command domain", () => {
+  const pair = crypto.generateKeyPairSync("ed25519");
+  const bytes = canonicalJsonBytes({ action: "repo.status", target: "." });
+  const signature = crypto.sign(null, commandSigningBytes(bytes), pair.privateKey);
+  assert.equal(crypto.verify(null, commandSigningBytes(bytes), pair.publicKey, signature), true);
+  assert.equal(crypto.verify(null, bytes, pair.publicKey, signature), false);
+  assert.equal(crypto.verify(null, commandSigningBytes(canonicalJsonBytes({ action: "repo.status", target: "/other" })), pair.publicKey, signature), false);
 });
