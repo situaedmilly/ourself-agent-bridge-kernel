@@ -28,26 +28,26 @@ function normalize(value, path = "$") {
   }
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      if (!Object.prototype.hasOwnProperty.call(value, i)) throw new Error("CANONICAL_JSON_SPARSE_ARRAY");
+      if (!Object.prototype.hasOwnProperty.call(value, i)) throw new Error("JCS_SPARSE_ARRAY");
     }
     return value.map((item, i) => normalize(item, path + "[" + i + "]"));
   }
   if (typeof value === "object") {
     const proto = Object.getPrototypeOf(value);
-    if (proto !== Object.prototype && proto !== null) throw new Error("CANONICAL_JSON_NON_PLAIN_OBJECT");
+    if (proto !== Object.prototype && proto !== null) throw new Error("JCS_NON_PLAIN_OBJECT");
     const out = Object.create(null);
     for (const key of Object.keys(value).sort()) {
       assertUnicodeScalarString(key);
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, "value")) {
-        throw new Error("CANONICAL_JSON_ACCESSOR_REJECTED");
+        throw new Error("JCS_ACCESSOR_REJECTED");
       }
-      if (descriptor.value === undefined) throw new Error("CANONICAL_JSON_UNDEFINED_REJECTED");
+      if (descriptor.value === undefined) throw new Error("JCS_UNDEFINED_REJECTED");
       out[key] = normalize(descriptor.value, path + "." + key);
     }
     return out;
   }
-  throw new Error("CANONICAL_JSON_TYPE_REJECTED");
+  throw new Error("JCS_TYPE_REJECTED");
 }
 
 export function canonicalJsonStringify(value) {
@@ -64,16 +64,16 @@ export function parseCanonicalJson(rawBytes) {
   try {
     source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    throw new Error("CANONICAL_JSON_UTF8_INVALID");
+    throw new Error("JCS_UTF8_INVALID");
   }
   let value;
   try {
     value = JSON.parse(source);
   } catch {
-    throw new Error("CANONICAL_JSON_PARSE_INVALID");
+    throw new Error("JCS_PARSE_INVALID");
   }
   const canonical = canonicalJsonStringify(value);
-  if (canonical !== source) throw new Error("CANONICAL_JSON_BYTES_MISMATCH");
+  if (canonical !== source) throw new Error("JCS_BYTES_MISMATCH");
   return value;
 }
 
