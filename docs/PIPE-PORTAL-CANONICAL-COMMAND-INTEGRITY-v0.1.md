@@ -49,14 +49,14 @@ An additional local Ed25519 check generated an ephemeral test-only keypair, sign
 ### GitHub Actions
 The repository workflow was updated to syntax-check the new module and execute both command-integrity and broker integration tests.
 
-The latest observed workflow run for commit `89caf3004bbdbf5a29e95afb49312f113c2e77d5` failed before job execution:
+The latest observed workflow run for commit `7104aa18d8f333d39ca7541116adcb56503c338c` failed before job execution:
 - Job status: completed / failure.
 - Runner ID: `0`.
 - Runner name: empty.
 - Steps: empty.
 - Logs: unavailable.
 
-The same pre-runner failure pattern occurred on earlier pushes. This is an execution-environment/runner availability blocker; it is not evidence that the tests passed or failed in a runner.
+The same pre-runner failure pattern occurred on earlier pushes, including the most recent run: runner ID `0`, empty runner name, and no executed steps. This is an execution-environment/runner availability blocker; it is not evidence that the tests passed or failed in a runner.
 
 ## Remaining blockers
 
