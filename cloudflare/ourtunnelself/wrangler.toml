@@ -1,0 +1,18 @@
+name = "ourhostself-ourtunnelself"
+main = "src/worker.js"
+compatibility_date = "2026-11-26"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[durable_objects.bindings]]
+name = "OURHOSTSELF_STATE"
+class_name = "OURHOSTSELFState"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OURHOSTSELFState"]
+
+# Canonical secret: TRUST_CONFIGURATION_OURSELFECOSYSTEM (see TRUST-CONFIGURATION-OURSELFECOSYSTEM.md).
+# Transitional legacy secrets are documented in that contract. Never commit populated trust material.
