@@ -48,6 +48,8 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") return json({
       service: "OURHOSTSELF", state: "READY", authority: "NONE_BY_TRANSPORT", persistence: "DURABLE_OBJECT_SQLITE"
     });
+    const supported = request.method === "GET" && (url.pathname === "/v1/seat/devices" || url.pathname.startsWith("/v1/seat/requests/")) || request.method === "POST" && url.pathname === "/v1/seat/requests";
+    if (!supported) return json({ error: "NOT_FOUND" }, 404);
     try {
       if (!env.OSOS_SEAT_PUBLIC_KEY_PEM || !env.OSOS_PORTAL_PUBLIC_KEY_PEM || !env.OURHOSTSELF_SEAT_ISSUER || !env.OURHOSTSELF_PORTAL_ISSUER) return json({ error: "TRUST_CONFIGURATION_REQUIRED" }, 503);
       if (request.method === "GET" && url.pathname === "/v1/seat/devices") {
