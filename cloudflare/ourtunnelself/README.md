@@ -12,9 +12,9 @@ From the repository root, run:
 bash cloudflare/ourtunnelself/scripts/verify-local.sh
 ```
 
-The script uses the local Node.js runtime to syntax-check the Worker, run its contract tests, and run the existing OURTUNNELSELF regression tests. If Wrangler is installed locally, it also performs a Wrangler dry-run build. If Wrangler is absent, the script reports that build validation was skipped; it does not deploy.
+The script uses the local Node.js runtime to syntax-check the Worker, run its contract tests, run the existing OURTUNNELSELF regression tests, and invoke Wrangler 4 through the local binary or `npx` for a dry-run build. It does not deploy.
 
-This script can be invoked by a macOS Shortcut or another OURSELF-controlled local orchestrator. Its result is local execution evidence, not production admission.
+This script can be invoked by a macOS Shortcut or another OURSELF-controlled local orchestrator. The guarded Shortcut entrypoint is `cloudflare/ourtunnelself/scripts/shortcut-verify.command`; see `ARCHMORPHS-001-004.md` for the one-action Shortcut setup. Its result is local execution evidence, not production admission.
 
 ## Deploy configuration
 
