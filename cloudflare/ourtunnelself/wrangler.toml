@@ -14,10 +14,5 @@ class_name = "OURHOSTSELFState"
 tag = "v1"
 new_sqlite_classes = ["OURHOSTSELFState"]
 
-# Configure secrets with Wrangler; never commit private keys.
-# OSOS_SEAT_PUBLIC_KEY_PEM
-# OSOS_PORTAL_PUBLIC_KEY_PEM
-# OURHOSTSELF_SEAT_ISSUER
-# OURHOSTSELF_PORTAL_ISSUER
-# OURHOSTSELF_SEAT_AUDIENCE (optional)
-# OURHOSTSELF_PORTAL_AUDIENCE (optional)
+# Canonical secret: TRUST_CONFIGURATION_OURSELFECOSYSTEM (see TRUST-CONFIGURATION-OURSELFECOSYSTEM.md).
+# Transitional legacy secrets are documented in that contract. Never commit populated trust material.

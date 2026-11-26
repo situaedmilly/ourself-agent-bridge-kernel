@@ -10,7 +10,9 @@ echo "Repository: $ROOT"
 
 node --check cloudflare/ourtunnelself/src/worker.js
 node --check cloudflare/ourtunnelself/src/state.js
-node --test cloudflare/ourtunnelself/test/worker.test.js
+node --check cloudflare/ourtunnelself/src/witness.js
+node --check runtime/ourtunnelself/device-agent.js
+node --test cloudflare/ourtunnelself/test/*.test.js
 node --test test/ourtunnelself-command-integrity.test.js test/ourtunnelself-broker.test.js
 
 OUT_DIR="${TMPDIR:-/tmp}/ourhostself-wrangler-dry-run"

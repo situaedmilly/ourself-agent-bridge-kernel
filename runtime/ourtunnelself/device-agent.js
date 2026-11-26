@@ -114,9 +114,16 @@ export async function runOURTUNNELSELFDeviceAgent({
   if (!portalPublicKeyPath) throw new Error("PORTAL_VERIFIER_NOT_CONFIGURED");
   const portalPublicKey = await fs.readFile(portalPublicKeyPath, "utf8");
   const seen = new Set();
+  const pendingResults = new Map();
   try {
     const lines = (await fs.readFile(journalPath, "utf8")).split("\n").filter(Boolean);
-    for (const line of lines) { const e = JSON.parse(line); if (e.job_id) seen.add(e.job_id); }
+    for (const line of lines) {
+      const e = JSON.parse(line);
+      if (!e.job_id) continue;
+      if (e.pending_result) { seen.add(e.job_id); pendingResults.set(e.job_id, e.pending_result); }
+      if (e.result_delivered === true) pendingResults.delete(e.job_id);
+      if (e.state === "DUPLICATE_SUPPRESSED" || e.state === "EXECUTED" || e.state === "FAILED") seen.add(e.job_id);
+    }
   } catch (e) { if (e.code !== "ENOENT") throw e; }
 
   async function append(record) {
@@ -133,6 +140,15 @@ export async function runOURTUNNELSELFDeviceAgent({
 
   while (!stopping) {
     try {
+      if (pendingResults.size) {
+        for (const [jobId, pending] of pendingResults) {
+          const rawPending = canonicalJsonStringify(pending);
+          await brokerRequest(brokerUrl, "/v1/device/result", rawPending, signedHeaders(rawPending, deviceId, privateKey));
+          await append({ job_id: jobId, result_delivered: true });
+          pendingResults.delete(jobId);
+        }
+        continue;
+      }
       const empty = "";
       const headers = signedHeaders(empty, deviceId, privateKey);
       const envelope = await brokerRequest(brokerUrl, "/v1/device/poll", empty, headers);
@@ -152,10 +168,9 @@ export async function runOURTUNNELSELFDeviceAgent({
       } catch (error) {
         result = { job_id: job.job_id, state: "FAILED", error: String(error.message || error).slice(0, 256) };
       }
-      await append({ job_id: job.job_id, state: result.state, local_receipt_id: result.local_receipt?.receipt_id || null });
+      await append({ job_id: job.job_id, state: result.state, local_receipt_id: result.local_receipt?.receipt_id || null, pending_result: result });
       seen.add(job.job_id);
-      const raw = canonicalJsonStringify(result);
-      await brokerRequest(brokerUrl, "/v1/device/result", raw, signedHeaders(raw, deviceId, privateKey));
+      pendingResults.set(job.job_id, result);
     } catch (error) {
       if (stopping) break;
       process.stderr.write(JSON.stringify({ service: "OURTUNNELSELF-device-agent", error: String(error.message || error) }) + "\n");

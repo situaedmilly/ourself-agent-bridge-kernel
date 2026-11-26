@@ -58,3 +58,11 @@ Optional audience values default to `ourtunnelself`.
 - Worker runtime integration tests, staging deployment, custom-domain binding, and real-device end-to-end validation.
 
 The registry starts empty, so requests are denied until a separately governed enrollment mechanism is implemented. No device command can execute through this slice. A 200 response from `/health` proves transport liveness only, not authority, admission, or production readiness.
+
+
+## Trust, device, and witness contracts
+
+- [TRUST_CONFIGURATION_OURSELFECOSYSTEM](./TRUST-CONFIGURATION-OURSELFECOSYSTEM.md) defines the versioned Seat/PORTAL trust root and staging procedure.
+- [DEVICESELF + WITNESSSELF](./DEVICE-WITNESS-CONTRACT.md) defines enrollment, revocation, signed polling, delivery envelopes, result outbox, and DATASELF evidence receipts.
+
+- [HOSTSELF independence status](./HOSTSELF-INDEPENDENCE-STATUS-2026-11-26.md) records what is and is not independent of RAWMAC.
