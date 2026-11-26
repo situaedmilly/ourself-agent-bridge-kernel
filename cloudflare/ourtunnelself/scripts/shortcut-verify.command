@@ -16,4 +16,4 @@ if [[ "$REMOTE" != "$EXPECTED_REMOTE" ]]; then
   exit 21
 fi
 
-exec "$REPO_ROOT/cloudflare/ourtunnelself/scripts/verify-local.sh"
+exec /bin/bash "$REPO_ROOT/cloudflare/ourtunnelself/scripts/verify-local.sh"
