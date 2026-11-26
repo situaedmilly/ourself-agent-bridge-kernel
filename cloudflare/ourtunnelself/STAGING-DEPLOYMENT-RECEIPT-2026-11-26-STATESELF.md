@@ -4,9 +4,9 @@ Date: 2026-11-26 UTC
 Environment: isolated Cloudflare Workers staging
 Worker: ourhostself-ourtunnelself-staging
 URL: https://ourhostself-ourtunnelself-staging.situatedsolutions.workers.dev
-Cloudflare version: c0df1fb2-4803-4be9-9871-0335e258b630
+Cloudflare version: e8946bc3-9634-474d-a19f-47644c07c90c
 Source branch: architecture/ourhostself-cloudflare-workers-do-v0.1
-Source commit at deployment: pending final source commit readback
+Source commit at deployment: 193dc7446a60f7476c9845e2f4cee59d70a6a1a1
 Wrangler: 4.168.0
 
 ## Deployment and live readback
@@ -22,6 +22,7 @@ Wrangler: 4.168.0
 - POST /v1/device/poll returned HTTP 503 TRUST_CONFIGURATION_REQUIRED.
 - A temporary staging-only structural trust document was accepted by Wrangler. After propagation, health reported PRESENT_UNVERIFIED and the protected Seat route returned HTTP 503 OSOS_TRUST_CHAIN_UNVERIFIED.
 - The temporary secret was deleted. Post-cleanup health returned MISSING and Wrangler secret list returned an empty array. No staging trust secret or delivery signer remains installed.
+- The accessible OURSYSTEMSELFOPERATIN repository contains only README.md; no OSOS root/subordinate certificate-chain schema was found. The existing PIPE|PORTAL audit records that issuer keys and the delivery key are not certified/pinned through an approved OSOS trust chain.
 
 ## Local verification
 
