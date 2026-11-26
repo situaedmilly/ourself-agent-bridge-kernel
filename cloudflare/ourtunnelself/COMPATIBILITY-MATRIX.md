@@ -2,19 +2,30 @@
 
 | Existing Node component | Cloudflare target | Status |
 |---|---|---|
-| Node HTTP router | Workers fetch handler | Initial REST slice implemented |
-| RS256 seat JWT verification | Workers Web Crypto | Implemented; crypto-vector tests pending |
-| RS256 PORTAL verification | Workers Web Crypto | Implemented; crypto-vector tests pending |
+| Node HTTP router | Workers fetch handler | Implemented for scoped REST lifecycle |
+| RS256 Seat JWT verification | Workers Web Crypto | Implemented; local contract path tested |
+| RS256 PORTAL verification | Workers Web Crypto | Implemented; local contract path tested |
 | PORTAL caller/device/capability binding | Worker policy layer | Implemented |
-| Local JSONL fsync journal | Durable Object SQLite | Initial event table implemented; replay/recovery pending |
-| Static devices.json | Durable Object SQLite | Read path implemented; registry starts empty; enrollment/revocation pending |
-| In-memory job map | Durable Object SQLite | Admission and caller-bound readback implemented |
-| Replay nonce cache | Durable Object SQLite | Table provisioned; device authentication route pending |
-| Ed25519 broker envelope | Workers Web Crypto | Not implemented |
-| Outbound HTTPS device agent | Mac/Pi local agent | Remains device-side; protocol adapter pending |
+| Static device registry | Durable Object SQLite | Enrollment, listing, revocation implemented; production admission not configured |
+| In-memory job map | Durable Object SQLite | Queue, claim, caller-bound readback, result state implemented |
+| Replay nonce cache | Durable Object SQLite | Atomic device nonce consumption implemented |
+| Portal JTI replay prevention | Durable Object SQLite | Globally consumed across enrollment, revocation, and job requests |
+| Ed25519 broker delivery envelope | Workers Web Crypto | Implemented; local crypto-vector tests pass |
+| Device request authentication | Workers Web Crypto + DO nonce store | Implemented; end-to-end device test pending |
+| Outbound HTTPS device agent | Mac/Pi local agent | Existing agent adapted with durable pending-result outbox retry |
+| DATASELF evidence receipt | Durable Object SQLite | Signed receipt and event transaction implemented; Cloudflare runtime verification pending |
 | MCP Streamable HTTP | Worker route | Not implemented |
 | Evidence archive | R2 | Not configured |
-| Containerized Node broker | Cloudflare Containers | Fallback only; not selected as authority |
+| Containerized Node broker | Cloudflare Containers | Not selected; separate compute substrate still required |
+
+## Validation boundaries
+
+- Node SQLite test: SQL lifecycle and close/reopen persistence passed.
+- Node crypto tests: Ed25519 envelope and device request signature vectors passed.
+- Wrangler dry-run: passed; Worker + Durable Object binding recognized.
+- Staging Worker: deployed; trust secret and delivery signer intentionally absent.
+- Cloudflare workerd/remote DO integration and real device end-to-end: not yet proven.
+- Production domain, independent connector, and RAWMAC power-off test: not yet established.
 
 ## Safety invariants
 

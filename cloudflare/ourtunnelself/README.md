@@ -1,68 +1,65 @@
-# OURHOSTSELF · Cloudflare Workers + Durable Objects prototype
+# OURHOSTSELF · Cloudflare Workers + Durable Objects
 
-This isolated migration slice does not replace the Node broker, change existing tunnel configurations, or claim production admission.
+This isolated migration slice adds an independent Cloudflare serverless control plane. It does not replace the existing Node broker, modify production tunnels, admit production devices, or claim that the full ecosystem survives RAWMAC power-off.
 
 ## Verification without paid GitHub Actions
 
-GitHub is source custody and review—not our compute plane. No GitHub Actions workflow is required or included.
+GitHub is source custody and review—not compute. No GitHub Actions workflow is required or included.
 
-From the repository root, run:
+From the repository root:
 
-```sh
-bash cloudflare/ourtunnelself/scripts/verify-local.sh
-```
+    bash cloudflare/ourtunnelself/scripts/verify-local.sh
 
-The script uses the local Node.js runtime to syntax-check the Worker, run its contract tests, run the existing OURTUNNELSELF regression tests, and invoke Wrangler 4 through the local binary or `npx` for a dry-run build. It does not deploy.
+The verifier runs Node syntax checks, Worker/trust/witness contracts, a Node SQLite lifecycle test, existing OURTUNNELSELF broker regressions, and Wrangler dry-run. It does not deploy.
 
-This script can be invoked by a macOS Shortcut or another OURSELF-controlled local orchestrator. The guarded Shortcut entrypoint is `cloudflare/ourtunnelself/scripts/shortcut-verify.command`; see `ARCHMORPHS-001-004.md` for the one-action Shortcut setup. Its result is local execution evidence, not production admission.
+The guarded macOS Shortcut entrypoint is scripts/shortcut-verify.command. It invokes the same verifier and grants no authority or deployment permission.
 
-## Deploy configuration
+## Deployment
 
-Deployment is a separate, explicitly authorized operation. From this directory, use Wrangler with the authorized Cloudflare account:
+Deployment is separate and requires explicit authorization. From this directory:
 
-```sh
-npx wrangler deploy
-```
+    npx wrangler deploy
 
-Configure trust values as Wrangler secrets; never commit private keys or tokens:
+The staging Worker is deployed at:
+https://ourhostself-ourtunnelself-staging.situatedsolutions.workers.dev
 
-```sh
-npx wrangler secret put OSOS_SEAT_PUBLIC_KEY_PEM
-npx wrangler secret put OSOS_PORTAL_PUBLIC_KEY_PEM
-npx wrangler secret put OURHOSTSELF_SEAT_ISSUER
-npx wrangler secret put OURHOSTSELF_PORTAL_ISSUER
-```
+No production hostname is bound. The staging Worker has no trust or delivery-signing secrets after the temporary configuration-path probe was cleaned up. Its protected routes therefore fail closed.
 
-Optional audience values default to `ourtunnelself`.
+## Configuration
+
+Canonical Seat/PORTAL trust is one versioned Wrangler secret:
+
+    npx wrangler secret put TRUST_CONFIGURATION_OURSELFECOSYSTEM
+
+See TRUST-CONFIGURATION-OURSELFECOSYSTEM.md for the exact JSON schema, staging procedure, legacy compatibility, and trust invariants.
+
+Device delivery and DATASELF receipt signing use a separate secret:
+
+    npx wrangler secret put OURHOSTSELF_DELIVERY_PRIVATE_KEY_PEM
+
+This is an Ed25519 PKCS#8 private key. Its matching public key must be provisioned to authorized device agents. Never commit populated trust or signing material.
 
 ## Implemented in this slice
 
-- Worker ingress and a transport-only `/health` endpoint.
-- RS256 seat and PORTAL JWT verification using Web Crypto.
-- Issuer, audience, expiry, subject, scope, caller, target-device, and capability checks.
-- SQLite-backed Durable Object tables for devices, events, jobs, and replay nonces.
-- Atomic one-time PORTAL decision consumption when admitting a job.
-- Caller-bound job readback.
-- Restriction to the existing read-only `repo.status/git_status` capability.
+- Cloudflare Worker ingress and transport-only health diagnostics.
+- Canonical TRUST_CONFIGURATION_OURSELFECOSYSTEM resolution, with temporary legacy binding compatibility and fail-closed diagnostics.
+- RS256 Seat and PORTAL JWT verification; issuer, audience, expiry, subject, scope, caller, target, and capability checks.
+- SQLite-backed Durable Object state for devices, jobs, events, nonces, short-lived Portal admissions, and evidence receipts.
+- Seat + Portal bounded device enrollment and revocation.
+- Authenticated Ed25519 device poll/result routes; 60-second timestamp tolerance and atomic nonce consumption.
+- Domain-separated Ed25519 delivery envelopes.
+- Durable job claim state, result outbox retry in the device agent, and idempotent result acceptance.
+- Signed DATASELF evidence receipts, atomically committed with result state and append-only events.
+- Caller-bound job readback, restricted to repo.status / git_status.
+- Local SQLite lifecycle test covering enrollment, nonce replay, job delivery, result/evidence, revocation, and close/reopen persistence.
 
-## Explicitly not implemented
+## Not yet established
 
-- Device registry enrollment and revocation administration.
-- Device polling/result routes and Ed25519 device request authentication.
-- Ed25519 broker delivery-envelope signing.
-- Nonce consumption on device requests.
-- Job delivery state machine, uncertain-delivery recovery, and event replay.
-- MCP Streamable HTTP adapter.
-- R2 evidence archive integration.
-- OSOS signer/key rotation, PORTAL issuance, independent witness, and DATASELF receipts.
-- Worker runtime integration tests, staging deployment, custom-domain binding, and real-device end-to-end validation.
+- Cloudflare workerd/remote Durable Object end-to-end integration with signed Seat, PORTAL, and device identities.
+- Production OSOS/PORTAL issuer identities, signing key custody, rotation, and authority.
+- Production device enrollment or command execution.
+- MCP Streamable HTTP adapter and R2 evidence archive.
+- Production hostname binding, production tunnel migration, and independent compute host.
+- Existing tunnel/origin continuity when RAWMAC is powered off.
 
-The registry starts empty, so requests are denied until a separately governed enrollment mechanism is implemented. No device command can execute through this slice. A 200 response from `/health` proves transport liveness only, not authority, admission, or production readiness.
-
-
-## Trust, device, and witness contracts
-
-- [TRUST_CONFIGURATION_OURSELFECOSYSTEM](./TRUST-CONFIGURATION-OURSELFECOSYSTEM.md) defines the versioned Seat/PORTAL trust root and staging procedure.
-- [DEVICESELF + WITNESSSELF](./DEVICE-WITNESS-CONTRACT.md) defines enrollment, revocation, signed polling, delivery envelopes, result outbox, and DATASELF evidence receipts.
-
-- [HOSTSELF independence status](./HOSTSELF-INDEPENDENCE-STATUS-2026-11-26.md) records what is and is not independent of RAWMAC.
+The local SQLite test exercises the Durable Object class SQL against Node's SQLite implementation; it is not proof of Cloudflare's remote runtime. A 200 from /health proves transport liveness only, never authority, admission, or execution.

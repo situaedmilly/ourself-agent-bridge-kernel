@@ -25,7 +25,7 @@ Status: implementation contract; not production admission.
 - No command in the verification path deploys.
 - Output labels distinguish test pass, dry-run pass, and deployment state.
 
-**Acceptance evidence:** `scripts/verify-local.sh` completes with 3 Worker tests, 8 existing broker regression tests, and Wrangler dry-run.
+**Acceptance evidence:** local verifier completes with 15 Worker/trust/witness/SQLite tests, 8 existing broker regression tests, Node syntax checks, and Wrangler dry-run.
 
 ## ARCHMORPH-03 · SHORTCUTSELF — Shortcuts as operator surface
 
@@ -47,10 +47,13 @@ Status: implementation contract; not production admission.
 - Worker ingress + SQLite Durable Object state are the selected control-plane target.
 - Device compute remains on independently admitted nodes; Cloudflare does not magically keep Mac-only compute running.
 - Existing Cloudflare tunnels and Pipe|Portals are not modified during migration.
-- Staging deployment is blocked until authorized Wrangler authentication, trust configuration, device enrollment/revocation, delivery/result protocol, and independent end-to-end evidence exist.
+- A workers.dev staging Worker and SQLite Durable Object binding are deployed.
+- TRUST_CONFIGURATION_OURSELFECOSYSTEM is implemented as a versioned secret contract; a temporary staging-only configuration probe reached READY and was then deleted.
+- Device enrollment/revocation, authenticated poll/result, signed delivery envelopes, nonce replay protection, durable result outbox, and signed DATASELF receipts are implemented in the migration branch.
+- Production hostname and tunnel migration remain prohibited until actual OSOS/PORTAL trust material and end-to-end runtime evidence exist.
 - Production hostname and tunnel migration remain prohibited until staging proves independent availability and rollback.
 
-**Current evidence:** Wrangler dry-run passed; `wrangler whoami` reports the existing auth token expired and non-interactive execution cannot refresh it. No deployment occurred. This is an authorization blocker, not a reason to fall back to GitHub Actions.
+**Current evidence:** staging health returns HTTP 200 independently of RAWMAC; after cleanup, trust configuration reports INVALID and device routes fail closed. Node SQLite close/reopen tests pass. Cloudflare workerd/remote DO end-to-end and RAWMAC power-off independence are not yet proven.
 
 ## Cross-morph invariants
 
