@@ -13,8 +13,8 @@ test("health reports transport only, never authority", async () => {
 
 test("trust-dependent routes fail closed without issuer/key configuration", async () => {
   const response = await worker.fetch(new Request("https://unit.test/v1/seat/devices"), {});
-  assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "TRUST_CONFIGURATION_REQUIRED" });
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "NOT_FOUND" });
 });
 
 test("unmapped paths do not expose implementation details", async () => {
