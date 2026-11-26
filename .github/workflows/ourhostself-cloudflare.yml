@@ -1,0 +1,26 @@
+name: OURHOSTSELF Cloudflare prototype checks
+on:
+  push:
+    branches:
+      - architecture/ourhostself-cloudflare-workers-do-v0.1
+  pull_request:
+    branches:
+      - main
+      - architecture/ourself-desktop-commander-tunnel-v0.1
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax-check Worker modules
+        run: |
+          node --check cloudflare/ourtunnelself/src/worker.js
+          node --check cloudflare/ourtunnelself/src/state.js
+      - name: Validate Wrangler configuration and build
+        working-directory: cloudflare/ourtunnelself
+        run: npx --yes wrangler@4 deploy --dry-run --outdir .wrangler-dry-run
+      - name: Preserve existing broker regression coverage
+        run: node --test test/ourtunnelself-command-integrity.test.js test/ourtunnelself-broker.test.js
