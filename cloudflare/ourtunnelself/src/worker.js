@@ -6,7 +6,7 @@ const decode = (s) => {
   const raw = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4));
   return Uint8Array.from(raw, c => c.charCodeAt(0));
 };
-const pem = (s) => decode(btoa(atob(s.replace(/-----[^-]+-----/g, "").replace(/\s/g, ""))));
+const pem = (s) => Uint8Array.from(atob(s.replace(/-----[^-]+-----/g, "").replace(/\s/g, "")), c => c.charCodeAt(0));
 const now = () => Math.floor(Date.now() / 1000);
 
 async function verifyJwt(token, publicPem, expected) {
