@@ -55,7 +55,7 @@ This is an Ed25519 PKCS#8 private key. Its matching public key must be provision
 
 ## Not yet established
 
-- Cloudflare workerd/remote Durable Object end-to-end integration with signed Seat, PORTAL, and device identities.
+- Full authority-bearing end-to-end integration with signed Seat, PORTAL, and device identities (remote SQLite persistence itself is now verified).
 - Independent WITNESSSELF service/trust domain and independent effect readback.
 - Canonical DATASELF custody/replication adapter.
 - OSOS root/subordinate certificate-chain verification, approved Seat/PORTAL issuer profile, signing-key certification/pinning, and rotation.

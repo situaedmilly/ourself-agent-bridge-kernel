@@ -30,7 +30,9 @@ Wrangler: 4.168.0
 - 8 existing OURTUNNELSELF broker regression tests passed.
 - Wrangler dry-run passed and recognized the Durable Object binding.
 - The local SQLite close/reopen test now also proves that the persisted probe record survives while the in-memory instance boot ID changes.
-- A token-gated staging-only `/__staging/state-self-check` route was added for remote Durable Object SQLite read/write and instance-boot-ID verification. It is inaccessible unless a temporary staging-only secret is present; the token must be deleted immediately after the probe.
+- Remote Cloudflare Durable Object SQLite probe succeeded against the deployed Worker. A temporary random token enabled the staging-only `/__staging/state-self-check` route; the route performed a SQLite write and subsequent reads returned the exact payload and SHA-256 digest.
+- The same persisted probe row was read under three distinct in-memory instance boot IDs: `b0129ee5-4fbd-44eb-a32b-2ff11c5ee6fd`, `1f28871a-bdd0-4b8f-9fe2-bfcf29dae62a`, and `d9e7f384-34ad-4e2c-93ce-7835c05e7860`. The boot ID is generated in the Durable Object constructor and is not persisted; its change with the probe payload surviving demonstrates instance restart/eviction persistence on Cloudflare's SQLite-backed Durable Object.
+- The temporary token was deleted. Wrangler secret inventory is empty. After cleanup, the probe endpoint returned 404 and the Seat route returned HTTP 503 `TRUST_CONFIGURATION_REQUIRED`.
 - Cloudflare Containers discovery returned an account entitlement error: deploying containers requires the Workers Paid plan. No plan upgrade or charge was authorized.
 
 ## Local verification (prior receipt)
