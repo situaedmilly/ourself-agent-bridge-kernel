@@ -18,6 +18,10 @@
 - Existing Cloudflare Tunnel connectors and their configured origins still include RAWMAC localhost services. They are not independent of RAWMAC power.
 - OURHOSTSELF-INGRESS still has no active connector.
 - No separate VM/container compute host or independent tunnel connector has been provisioned.
+- Cloudflare Containers capability check returned Unauthorized: this account does not have access; deployment requires the Workers Paid plan. Official base plan is USD $5/month plus metered container memory/CPU/disk/egress. No plan upgrade or paid deployment was authorized.
+- Docker CLI is installed on RAWMAC, but the configured Colima daemon is stopped; Docker cannot currently build a container image.
+- Cloudflare Containers are not a guaranteed never-stop process: Cloudflare documents that host events can stop active containers without a fixed runtime guarantee, and container disk is ephemeral by default. Durable Object alarms/state would be required for recovery; this still remains inside the Cloudflare provider.
+- Independent-provider candidate identified: Hetzner Cloud US-East / Ashburn, VA. The location supports Cloud Shared AMD and Dedicated AMD instances; Hetzner states a 99.9% monthly availability target for Cloud Servers. No Hetzner account, project, server, or billing authorization is present.
 - The OURSELFCLOUDSERVERNETWORK repository's runtime specification is marked INITIAL_DRAFT / NOT_IMPLEMENTED / NOT_DEPLOYED. Its OURSELF-INSTANCE-0001 endpoint is GitHub Raw Content; runtime_status is LAUNCH_DECLARED_NOT_LIVE, with MCP and Ollama runtime endpoints null. This is source serving, not independent compute.
 - No end-to-end signed Seat/PORTAL/device execution has been admitted.
 - No RAWMAC power-off test has been performed.
@@ -34,3 +38,7 @@ Do not shut down RAWMAC to test independence until:
 5. rollback and recovery have been tested.
 
 The power-off test is intentionally blocked until those conditions hold.
+
+Cloudflare Containers documentation: https://developers.cloudflare.com/containers/faq/ and https://developers.cloudflare.com/containers/platform/pricing/
+Hetzner US-East location: https://docs.hetzner.com/cloud/general/locations/
+Hetzner Cloud SLA: https://docs.hetzner.com/general/company-and-policy/slas-cloud/
