@@ -9,8 +9,10 @@ test("health reports transport only, never authority", async () => {
   assert.equal(body.service, "OURHOSTSELF");
   assert.equal(body.authority, "NONE_BY_TRANSPORT");
   assert.equal(body.persistence, "DURABLE_OBJECT_SQLITE");
-  assert.equal(body.trust_configuration, "INVALID");
+  assert.equal(body.trust_configuration, "MISSING");
   assert.equal(body.delivery_signing_key, "MISSING");
+  assert.equal(body.trust_chain_validation, "NOT_IMPLEMENTED");
+  assert.equal(body.delivery_key_certification, "NOT_IMPLEMENTED");
   assert.equal(body.authority, "NONE_BY_TRANSPORT");
 });
 
@@ -41,11 +43,12 @@ test("canonical trust secret is visible as readiness only", async () => {
     TRUST_CONFIGURATION_OURSELFECOSYSTEM: JSON.stringify(config)
   });
   const body = await response.json();
-  assert.equal(body.trust_configuration, "READY");
+  assert.equal(body.trust_configuration, "PRESENT_UNVERIFIED");
+  assert.equal(body.trust_chain_validation, "NOT_IMPLEMENTED");
   assert.equal(JSON.stringify(body).includes("Zm9v"), false);
 });
 
-test("device transport fails closed until delivery signer is configured", async () => {
+test("syntactically configured trust cannot bypass OSOS chain verification", async () => {
   const key = "-----BEGIN PUBLIC KEY-----\\nZm9v\\n-----END PUBLIC KEY-----";
   const config = {
     schema: "TRUST_CONFIGURATION_OURSELFECOSYSTEM/v1",
@@ -56,5 +59,9 @@ test("device transport fails closed until delivery signer is configured", async 
     TRUST_CONFIGURATION_OURSELFECOSYSTEM: JSON.stringify(config)
   });
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "DELIVERY_SIGNING_KEY_REQUIRED" });
+  assert.deepEqual(await response.json(), {
+    error: "OSOS_TRUST_CHAIN_UNVERIFIED",
+    configuration_state: "PRESENT_UNVERIFIED",
+    trust_chain_validation: "NOT_IMPLEMENTED"
+  });
 });

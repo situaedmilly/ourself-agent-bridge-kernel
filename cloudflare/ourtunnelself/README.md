@@ -42,7 +42,7 @@ This is an Ed25519 PKCS#8 private key. Its matching public key must be provision
 ## Implemented in this slice
 
 - Cloudflare Worker ingress and transport-only health diagnostics.
-- Canonical TRUST_CONFIGURATION_OURSELFECOSYSTEM resolution, with temporary legacy binding compatibility and fail-closed diagnostics.
+- Canonical TRUST_CONFIGURATION_OURSELFECOSYSTEM schema resolution, with temporary legacy binding compatibility and fail-closed diagnostics. A complete OSOS trust-chain validator is not yet implemented; structurally valid config remains PRESENT_UNVERIFIED and authority routes stay blocked.
 - RS256 Seat and PORTAL JWT verification; issuer, audience, expiry, subject, scope, caller, target, and capability checks.
 - SQLite-backed Durable Object state for devices, jobs, events, nonces, short-lived Portal admissions, and evidence receipts.
 - Seat + Portal bounded device enrollment and revocation.
@@ -56,7 +56,7 @@ This is an Ed25519 PKCS#8 private key. Its matching public key must be provision
 ## Not yet established
 
 - Cloudflare workerd/remote Durable Object end-to-end integration with signed Seat, PORTAL, and device identities.
-- Production OSOS/PORTAL issuer identities, signing key custody, rotation, and authority.
+- OSOS root/subordinate certificate-chain verification, approved Seat/PORTAL issuer profile, signing-key certification/pinning, and rotation.
 - Production device enrollment or command execution.
 - MCP Streamable HTTP adapter and R2 evidence archive.
 - Production hostname binding, production tunnel migration, and independent compute host.

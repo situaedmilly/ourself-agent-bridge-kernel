@@ -48,12 +48,11 @@ Status: implementation contract; not production admission.
 - Device compute remains on independently admitted nodes; Cloudflare does not magically keep Mac-only compute running.
 - Existing Cloudflare tunnels and Pipe|Portals are not modified during migration.
 - A workers.dev staging Worker and SQLite Durable Object binding are deployed.
-- TRUST_CONFIGURATION_OURSELFECOSYSTEM is implemented as a versioned secret contract; a temporary staging-only configuration probe reached READY and was then deleted.
+- TRUST_CONFIGURATION_OURSELFECOSYSTEM is implemented as a versioned configuration envelope; a staging-only probe reached PRESENT_UNVERIFIED, and protected routes correctly returned OSOS_TRUST_CHAIN_UNVERIFIED. The secret was then deleted.
 - Device enrollment/revocation, authenticated poll/result, signed delivery envelopes, nonce replay protection, durable result outbox, and signed DATASELF receipts are implemented in the migration branch.
 - Production hostname and tunnel migration remain prohibited until actual OSOS/PORTAL trust material and end-to-end runtime evidence exist.
-- Production hostname and tunnel migration remain prohibited until staging proves independent availability and rollback.
 
-**Current evidence:** staging health returns HTTP 200 independently of RAWMAC; after cleanup, trust configuration reports INVALID and device routes fail closed. Node SQLite close/reopen tests pass. Cloudflare workerd/remote DO end-to-end and RAWMAC power-off independence are not yet proven.
+**Current evidence:** staging health returns HTTP 200 independently of RAWMAC; current trust state is MISSING and chain validation is NOT_IMPLEMENTED. A temporary structural configuration probe reached PRESENT_UNVERIFIED but could not open authority routes; cleanup returned the secret inventory to empty. Node SQLite close/reopen tests pass. Cloudflare workerd/remote DO end-to-end and RAWMAC power-off independence are not yet proven.
 
 ## Cross-morph invariants
 

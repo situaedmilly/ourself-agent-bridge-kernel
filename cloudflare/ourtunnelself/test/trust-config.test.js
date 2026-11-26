@@ -9,12 +9,12 @@ const canonical = {
 };
 test("canonical OURSELF ecosystem trust config resolves", () => {
   const r = resolveTrustConfiguration({ TRUST_CONFIGURATION_OURSELFECOSYSTEM: JSON.stringify(canonical) });
-  assert.equal(r.state, "READY"); assert.equal(r.source, "TRUST_CONFIGURATION_OURSELFECOSYSTEM");
-  assert.deepEqual(r.missing, []); assert.deepEqual(r.invalid, []);
+  assert.equal(r.state, "PRESENT_UNVERIFIED"); assert.equal(r.source, "TRUST_CONFIGURATION_OURSELFECOSYSTEM");
+  assert.deepEqual(r.missing, []); assert.deepEqual(r.invalid, []); assert.equal(r.trust_chain_validation, "NOT_IMPLEMENTED");
 });
 test("missing trust fields are enumerated", () => {
   const r = resolveTrustConfiguration({});
-  assert.equal(r.state, "INVALID"); assert.equal(r.source, "LEGACY_WRANGLER_BINDINGS");
+  assert.equal(r.state, "MISSING"); assert.equal(r.source, "LEGACY_WRANGLER_BINDINGS");
   assert.deepEqual(r.missing, ["seat.public_key_pem","seat.issuer","portal.public_key_pem","portal.issuer"]);
 });
 test("malformed JSON and schema fail closed", () => {
@@ -23,7 +23,7 @@ test("malformed JSON and schema fail closed", () => {
 });
 test("legacy bindings remain supported during migration", () => {
   const r = resolveTrustConfiguration({ OSOS_SEAT_PUBLIC_KEY_PEM:key, OURHOSTSELF_SEAT_ISSUER:"seat", OSOS_PORTAL_PUBLIC_KEY_PEM:key, OURHOSTSELF_PORTAL_ISSUER:"portal" });
-  assert.equal(r.state, "READY"); assert.equal(r.source, "LEGACY_WRANGLER_BINDINGS");
+  assert.equal(r.state, "PRESENT_UNVERIFIED"); assert.equal(r.source, "LEGACY_WRANGLER_BINDINGS");
 });
 test("malformed key diagnostics never echo key material", () => {
   const bad = "not-a-pem";

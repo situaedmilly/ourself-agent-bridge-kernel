@@ -28,6 +28,15 @@ export function resolveTrustConfiguration(env = {}) {
   for (const [section, key, max] of [["seat","issuer",512],["portal","issuer",512],["seat","audience",256],["portal","audience",256]]) {
     if (nonblank(config?.[section]?.[key]) && config[section][key].length > max) invalid.push(section + "." + key);
   }
-  return { state: missing.length || invalid.length ? "INVALID" : "READY", source, missing, invalid, config: missing.length || invalid.length ? null : config };
+  if (missing.length || invalid.length) {
+    return { state: invalid.length ? "INVALID" : "MISSING", source, missing, invalid, config: null };
+  }
+  // Shape validation is deliberately not authority validation. The OSOS root/subordinate
+  // certification format and issuer trust profile are not yet available in this repository.
+  return {
+    state: "PRESENT_UNVERIFIED", source, missing: [], invalid: [],
+    trust_chain_validation: "NOT_IMPLEMENTED",
+    config
+  };
 }
 export const TRUST_CONFIGURATION_SCHEMA = SCHEMA;

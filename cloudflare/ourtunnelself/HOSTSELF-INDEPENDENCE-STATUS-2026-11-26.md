@@ -6,7 +6,8 @@
 - The staging Worker is deployed at https://ourhostself-ourtunnelself-staging.situatedsolutions.workers.dev.
 - GET /health returns HTTP 200 independently of RAWMAC.
 - The Worker has a Durable Object SQLite binding.
-- The canonical TRUST_CONFIGURATION_OURSELFECOSYSTEM secret name was accepted by Wrangler. A staging-only temporary document changed health to trust_configuration READY; the secret was then deleted and the secret inventory returned empty.
+- The canonical TRUST_CONFIGURATION_OURSELFECOSYSTEM secret name was accepted by Wrangler. A staging-only temporary document changed health to PRESENT_UNVERIFIED; the protected route returned HTTP 503 OSOS_TRUST_CHAIN_UNVERIFIED. The secret was deleted and the inventory returned empty.
+- Source audit found the OURSYSTEMSELFOPERATIN repository contains only README.md and no root/subordinate certificate-chain schema. The existing PIPE|PORTAL audit explicitly records missing OSOS key certification and issuer-policy binding.
 - Local verification covers Worker contracts, trust configuration, Ed25519 envelope/request signatures, broker regressions, SQLite state lifecycle, and local SQLite close/reopen persistence.
 - The current staging deployment intentionally has no trust secret and no delivery-signing private key. Device routes therefore remain fail-closed.
 

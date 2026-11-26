@@ -53,7 +53,9 @@ export default {
       return json({
         service: "OURHOSTSELF", state: "READY", authority: "NONE_BY_TRANSPORT",
         persistence: "DURABLE_OBJECT_SQLITE", trust_configuration: resolved.state,
-        delivery_signing_key: env.OURHOSTSELF_DELIVERY_PRIVATE_KEY_PEM ? "READY" : "MISSING",
+        trust_chain_validation: "NOT_IMPLEMENTED",
+        delivery_signing_key: env.OURHOSTSELF_DELIVERY_PRIVATE_KEY_PEM ? "PRESENT_UNVERIFIED" : "MISSING",
+        delivery_key_certification: "NOT_IMPLEMENTED",
         trust_configuration_source: resolved.source,
         ...(resolved.state === "READY" ? {} : { trust_configuration_missing: resolved.missing, trust_configuration_invalid: resolved.invalid })
       });
@@ -65,9 +67,17 @@ export default {
     if (!supported) return json({ error: "NOT_FOUND" }, 404);
     try {
       const resolved = resolveTrustConfiguration(env);
-      if (resolved.state !== "READY") return json({
+      if (resolved.state === "MISSING" || resolved.state === "INVALID") return json({
         error: "TRUST_CONFIGURATION_REQUIRED", missing: resolved.missing,
         invalid: resolved.invalid, source: resolved.source
+      }, 503);
+      // A syntactically valid secret is not an OSOS-certified trust chain. Keep all
+      // authority-bearing routes blocked until the root/subordinate issuer profile
+      // and key certification format are implemented and independently verified.
+      if (resolved.state !== "VERIFIED") return json({
+        error: "OSOS_TRUST_CHAIN_UNVERIFIED",
+        configuration_state: resolved.state,
+        trust_chain_validation: "NOT_IMPLEMENTED"
       }, 503);
       const trust = resolved.config;
       if (request.method === "GET" && url.pathname === "/v1/seat/devices") {

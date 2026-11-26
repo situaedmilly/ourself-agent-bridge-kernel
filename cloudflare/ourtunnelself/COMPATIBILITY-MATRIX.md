@@ -3,14 +3,14 @@
 | Existing Node component | Cloudflare target | Status |
 |---|---|---|
 | Node HTTP router | Workers fetch handler | Implemented for scoped REST lifecycle |
-| RS256 Seat JWT verification | Workers Web Crypto | Implemented; local contract path tested |
-| RS256 PORTAL verification | Workers Web Crypto | Implemented; local contract path tested |
+| RS256 Seat JWT verification | Workers Web Crypto | Implemented; local crypto/contract path tested; OSOS issuer chain not validated |
+| RS256 PORTAL verification | Workers Web Crypto | Implemented; local crypto/contract path tested; OSOS issuer chain not validated |
 | PORTAL caller/device/capability binding | Worker policy layer | Implemented |
-| Static device registry | Durable Object SQLite | Enrollment, listing, revocation implemented; production admission not configured |
+| Static device registry | Durable Object SQLite | Source routes and SQLite transitions implemented; Worker gate blocks until OSOS chain verification |
 | In-memory job map | Durable Object SQLite | Queue, claim, caller-bound readback, result state implemented |
 | Replay nonce cache | Durable Object SQLite | Atomic device nonce consumption implemented |
 | Portal JTI replay prevention | Durable Object SQLite | Globally consumed across enrollment, revocation, and job requests |
-| Ed25519 broker delivery envelope | Workers Web Crypto | Implemented; local crypto-vector tests pass |
+| Ed25519 broker delivery envelope | Workers Web Crypto | Implemented; local crypto-vector tests pass; broker key certification pending |
 | Device request authentication | Workers Web Crypto + DO nonce store | Implemented; end-to-end device test pending |
 | Outbound HTTPS device agent | Mac/Pi local agent | Existing agent adapted with durable pending-result outbox retry |
 | DATASELF evidence receipt | Durable Object SQLite | Signed receipt and event transaction implemented; Cloudflare runtime verification pending |
