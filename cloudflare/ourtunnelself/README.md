@@ -31,7 +31,7 @@ Canonical Seat/PORTAL trust is one versioned Wrangler secret:
 
     npx wrangler secret put TRUST_CONFIGURATION_OURSELFECOSYSTEM
 
-See TRUST-CONFIGURATION-OURSELFECOSYSTEM.md for the exact JSON schema, staging procedure, legacy compatibility, and trust invariants.
+See TRUST-CONFIGURATION-OURSELFECOSYSTEM.md for the exact JSON schema, staging procedure, legacy compatibility, and trust invariants. See STAGING-DEPLOYMENT-RECEIPT-2026-11-26-STATESELF.md for the latest deployed version and live readbacks.
 
 Device delivery and DATASELF receipt signing use a separate secret:
 
