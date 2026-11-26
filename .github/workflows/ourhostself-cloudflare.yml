@@ -19,6 +19,7 @@ jobs:
         run: |
           node --check cloudflare/ourtunnelself/src/worker.js
           node --check cloudflare/ourtunnelself/src/state.js
+          node --test cloudflare/ourtunnelself/test/worker.test.js
       - name: Validate Wrangler configuration and build
         working-directory: cloudflare/ourtunnelself
         run: npx --yes wrangler@4 deploy --dry-run --outdir .wrangler-dry-run
