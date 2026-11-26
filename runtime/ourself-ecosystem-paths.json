@@ -47,5 +47,18 @@
     "situaedmilly/SELFVEREIGN-ADDRESSELF",
     "situaedmilly/FLOWACTIONSELFWORK",
     "situaedmilly/Cognitive-Transmutation-Core"
-  ]
+  ],
+  "protocolself_registry": {
+    "registry_id": "OURSELFCOMM-PROTOCOLSELF-18",
+    "schema": "ourself.protocolself-registry.v0.1",
+    "source_repository": "situaedmilly/self-communication",
+    "source_branch": "feat/protocolself-18-registry-v0.1",
+    "source_registry_sha256": "76a2a14c9bab0d0ded7ff05c80991141df53e9f1f15ec948443e0b950017508c",
+    "projection_path": "protocols/protocolself-18.v0.1.json",
+    "boot_manifest_path": "protocols/protocolself-ecosystem-boot.v0.1.json",
+    "status": "REGISTRY_PRESENT_LISTENERS_DISABLED",
+    "protocol_count": 18,
+    "listener_activation": "DISABLED",
+    "network_transport_authority": "NOT_GRANTED"
+  }
 }
