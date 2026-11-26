@@ -1,0 +1,271 @@
+{
+  "schema": "ourself.protocolself-registry.v0.1",
+  "registry_id": "OURSELFCOMM-PROTOCOLSELF-18",
+  "status": "CANDIDATE_REGISTRY",
+  "source": "user_supplied_networking_protocols_and_ports_image_2026-11-26",
+  "scope": "protocol identity, conventional port reference, transport classification, and host admission policy",
+  "boot_policy": {
+    "mode": "REGISTRY_ONLY",
+    "default_listener": "DISABLED",
+    "default_bind": "127.0.0.1",
+    "external_bind": "PROHIBITED",
+    "network_transport_authority": "NOT_GRANTED_BY_REGISTRY_BOOT",
+    "multi_node_exchange": "NOT_AUTHORIZED",
+    "credential_material": "NEVER_EMBEDDED"
+  },
+  "protocols": [
+    {
+      "id": "HTTP",
+      "label": "HTTP",
+      "transport": "TCP",
+      "ports": [
+        80
+      ],
+      "description": "Web traffic",
+      "security_profile": "PLAINTEXT_LEGACY",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "HTTPS",
+      "label": "HTTPS",
+      "transport": "TCP",
+      "ports": [
+        443
+      ],
+      "description": "Secure web traffic",
+      "security_profile": "TLS_REQUIRED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "FTP_DATA",
+      "label": "FTP_DATA",
+      "transport": "TCP",
+      "ports": [
+        20
+      ],
+      "description": "FTP active-mode data channel; passive mode uses negotiated ports",
+      "security_profile": "PLAINTEXT_LEGACY",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "FTP_CONTROL",
+      "label": "FTP_CONTROL",
+      "transport": "TCP",
+      "ports": [
+        21
+      ],
+      "description": "FTP control channel",
+      "security_profile": "PLAINTEXT_LEGACY",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "SFTP",
+      "label": "SFTP",
+      "transport": "TCP",
+      "ports": [
+        22
+      ],
+      "description": "SSH File Transfer Protocol",
+      "security_profile": "SSH_AUTHENTICATED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "SSH",
+      "label": "SSH",
+      "transport": "TCP",
+      "ports": [
+        22
+      ],
+      "description": "Secure remote login and command transport",
+      "security_profile": "SSH_AUTHENTICATED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "TELNET",
+      "label": "TELNET",
+      "transport": "TCP",
+      "ports": [
+        23
+      ],
+      "description": "Unencrypted remote login",
+      "security_profile": "PROHIBITED_INSECURE",
+      "activation": "PROHIBITED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "SMTP",
+      "label": "SMTP",
+      "transport": "TCP",
+      "ports": [
+        25
+      ],
+      "description": "Mail transfer reference",
+      "security_profile": "TLS_AND_AUTH_REQUIRED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "POP3",
+      "label": "POP3",
+      "transport": "TCP",
+      "ports": [
+        110
+      ],
+      "description": "Email retrieval",
+      "security_profile": "TLS_REQUIRED_FOR_USE",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "IMAP",
+      "label": "IMAP",
+      "transport": "TCP",
+      "ports": [
+        143
+      ],
+      "description": "Email retrieval and mailbox synchronization",
+      "security_profile": "TLS_REQUIRED_FOR_USE",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "LDAP",
+      "label": "LDAP",
+      "transport": "TCP_UDP",
+      "ports": [
+        389
+      ],
+      "description": "Directory services",
+      "security_profile": "STARTTLS_OR_SIGNED_CHANNEL_REQUIRED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "LDAPS",
+      "label": "LDAPS",
+      "transport": "TCP",
+      "ports": [
+        636
+      ],
+      "description": "LDAP over TLS",
+      "security_profile": "TLS_REQUIRED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "DNS",
+      "label": "DNS",
+      "transport": "TCP_UDP",
+      "ports": [
+        53
+      ],
+      "description": "Domain name resolution",
+      "security_profile": "RESTRICTED_RESOLVER_ONLY",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "DHCP",
+      "label": "DHCP",
+      "transport": "UDP",
+      "ports": [
+        67,
+        68
+      ],
+      "description": "Server port 67 and client port 68",
+      "security_profile": "LINK_LOCAL_ONLY",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "TFTP",
+      "label": "TFTP",
+      "transport": "UDP",
+      "ports": [
+        69
+      ],
+      "description": "Trivial file transfer",
+      "security_profile": "PROHIBITED_INSECURE",
+      "activation": "PROHIBITED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "SNMP",
+      "label": "SNMP",
+      "transport": "UDP",
+      "ports": [
+        161
+      ],
+      "description": "Network management request port",
+      "security_profile": "SNMPV3_AUTH_PRIV_ONLY",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "MSSQL",
+      "label": "MSSQL",
+      "transport": "TCP",
+      "ports": [
+        1433
+      ],
+      "description": "SQL Server database service reference",
+      "security_profile": "PRIVATE_NETWORK_AND_TLS_REQUIRED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    },
+    {
+      "id": "ORACLE_DB",
+      "label": "ORACLE_DB",
+      "transport": "TCP",
+      "ports": [
+        1521
+      ],
+      "description": "Oracle database service reference",
+      "security_profile": "PRIVATE_NETWORK_AND_TLS_REQUIRED",
+      "activation": "DISABLED",
+      "listener_enabled": false,
+      "external_exposure": false,
+      "admission_required": true
+    }
+  ]
+}

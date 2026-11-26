@@ -13,8 +13,10 @@ import { classifyCommand, evaluateApproval, evaluateDataPlaneApproval, EXECUTION
 import { createRealmGate } from './tools/realm-gate.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from './tools/reverse-engineer.js';
 import { reverseEngineerGitHubBlob, compareLocalFileToBlob } from './runtime/blobself.js';
+import { bootProtocolSelfRegistry } from './runtime/protocolself-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROTOCOLSELF_BOOT = bootProtocolSelfRegistry();
 const PORT = process.env.PORT || 3001;
 // ── Pass 15: localhost-only binding ─────────────────────────────────────────
 // The operator chamber is never exposed to the public network. Bind to the
@@ -912,6 +914,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'alive',
     name: 'ÆTHERNET Agent Bridge',
+    protocolself_registry: PROTOCOLSELF_BOOT,
     pending_count: [...pending.values()].filter(c => c.status === 'pending').length,
     timestamp: new Date().toISOString(),
   });
@@ -1682,6 +1685,7 @@ await rehydratePendingQueue();
 app.listen(PORT, BIND_HOST, () => {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('⚡ ÆTHERNET AGENT BRIDGE — ALIVE  (authenticated · Pass 18 · chamber Pass 19)');
+  console.log(`   ProtocolSELF: ${PROTOCOLSELF_BOOT.protocol_count} identities loaded; listeners disabled; transport authority not granted`);
   console.log(`   Bound:     ${BIND_HOST}:${PORT}  (localhost-only unless BIND_HOST overridden)`);
   console.log(`   OURSELF:   http://localhost:${PORT}/ourself          (command chamber)`);
   console.log(`   Transmit:  POST http://localhost:${PORT}/transmit   [x-ourself-token]`);
