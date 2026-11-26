@@ -40,6 +40,10 @@ The Worker constructs a signed evidence receipt binding:
 
 Result state, result digest, signed receipt, and DATASELF_EVIDENCE_RECEIPT event are committed in one Durable Object SQLite transaction. The caller's job readback includes the receipt when present.
 
+**Witness boundary:** the current receipt is signed by the same Worker key that signs delivery envelopes and stored by the same Durable Object. This is a provenance receipt, not an independent witness. It cannot independently attest to the Worker, device, or claimed effect. No WITNESSED or REALISELF state is emitted. A separate witness service/trust domain and independent effect readback remain unimplemented.
+
+**DATASELF boundary:** the Durable Object stores a receipt record and append-only event; it is not yet connected to the canonical DATASELF custody/adapter contract. Do not treat this as canonical DATASELF replication or independent custody.
+
 ## Required secrets and provisioning
 
 - TRUST_CONFIGURATION_OURSELFECOSYSTEM: canonical Seat and PORTAL public-key/issuer/audience configuration.
@@ -47,6 +51,7 @@ Result state, result digest, signed receipt, and DATASELF_EVIDENCE_RECEIPT event
 - The matching delivery public key must be installed on each authorized device as OURTUNNELSELF_BROKER_PUBLIC_KEY.
 - Never use staging keys or issuer identifiers as production trust.
 - Device enrollment is not production-ready until actual OSOS and PORTAL issuer authority and key custody are established.
+- A Worker-signed receipt is not independent WITNESSSELF; a separate witness trust domain and effect readback remain required.
 
 ## Limits / non-claims
 

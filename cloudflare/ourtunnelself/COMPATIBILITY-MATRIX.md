@@ -13,7 +13,7 @@
 | Ed25519 broker delivery envelope | Workers Web Crypto | Implemented; local crypto-vector tests pass; broker key certification pending |
 | Device request authentication | Workers Web Crypto + DO nonce store | Implemented; end-to-end device test pending |
 | Outbound HTTPS device agent | Mac/Pi local agent | Existing agent adapted with durable pending-result outbox retry |
-| DATASELF evidence receipt | Durable Object SQLite | Signed receipt and event transaction implemented; Cloudflare runtime verification pending |
+| Evidence receipt record | Durable Object SQLite | Worker-signed provenance record implemented; independent witness and canonical DATASELF adapter absent |
 | MCP Streamable HTTP | Worker route | Not implemented |
 | Evidence archive | R2 | Not configured |
 | Containerized Node broker | Cloudflare Containers | Not selected; separate compute substrate still required |

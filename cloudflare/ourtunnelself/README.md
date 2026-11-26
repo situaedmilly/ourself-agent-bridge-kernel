@@ -49,13 +49,15 @@ This is an Ed25519 PKCS#8 private key. Its matching public key must be provision
 - Authenticated Ed25519 device poll/result routes; 60-second timestamp tolerance and atomic nonce consumption.
 - Domain-separated Ed25519 delivery envelopes.
 - Durable job claim state, result outbox retry in the device agent, and idempotent result acceptance.
-- Signed DATASELF evidence receipts, atomically committed with result state and append-only events.
+- Worker-signed evidence receipt records, atomically committed with result state and append-only events. These are not independent witness attestations or canonical DATASELF custody.
 - Caller-bound job readback, restricted to repo.status / git_status.
 - Local SQLite lifecycle test covering enrollment, nonce replay, job delivery, result/evidence, revocation, and close/reopen persistence.
 
 ## Not yet established
 
 - Cloudflare workerd/remote Durable Object end-to-end integration with signed Seat, PORTAL, and device identities.
+- Independent WITNESSSELF service/trust domain and independent effect readback.
+- Canonical DATASELF custody/replication adapter.
 - OSOS root/subordinate certificate-chain verification, approved Seat/PORTAL issuer profile, signing-key certification/pinning, and rotation.
 - Production device enrollment or command execution.
 - MCP Streamable HTTP adapter and R2 evidence archive.

@@ -18,6 +18,7 @@
 - Existing Cloudflare Tunnel connectors and their configured origins still include RAWMAC localhost services. They are not independent of RAWMAC power.
 - OURHOSTSELF-INGRESS still has no active connector.
 - No separate VM/container compute host or independent tunnel connector has been provisioned.
+- The OURSELFCLOUDSERVERNETWORK repository's runtime specification is marked INITIAL_DRAFT / NOT_IMPLEMENTED / NOT_DEPLOYED. Its OURSELF-INSTANCE-0001 endpoint is GitHub Raw Content; runtime_status is LAUNCH_DECLARED_NOT_LIVE, with MCP and Ollama runtime endpoints null. This is source serving, not independent compute.
 - No end-to-end signed Seat/PORTAL/device execution has been admitted.
 - No RAWMAC power-off test has been performed.
 
