@@ -12,3 +12,7 @@ This repository-local correction supersedes legacy marker-based blanket holds.
 7. Missing evidence blocks the dependent claim, not investigation. Report observed effects and remaining gaps; a file update does not establish adoption by existing sessions.
 
 Canonical signal contract: situaedmilly/self-protocol-suite/specifications/WORKFLOW-EXECUTION-SIGNAL-HIERARCHY-v1.md.
+
+## OURSELFCOMM ProtocolSELF-18
+
+This repository includes the additive `protocols/protocolself-18.v0.1.json` registry projection. See `PROTOCOLSELF-18-BOOT.md` for source identity, consumer role, boot boundary, and admission rules. Registry presence does not activate listeners or authorize transport.
