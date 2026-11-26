@@ -4,9 +4,9 @@ Date: 2026-11-26 UTC
 Environment: isolated Cloudflare Workers staging
 Worker: ourhostself-ourtunnelself-staging
 URL: https://ourhostself-ourtunnelself-staging.situatedsolutions.workers.dev
-Cloudflare version: e8946bc3-9634-474d-a19f-47644c07c90c
+Cloudflare version: 305f61b0-7c34-46cd-94f7-9958dfdd5844
 Source branch: architecture/ourhostself-cloudflare-workers-do-v0.1
-Source commit at deployment: 193dc7446a60f7476c9845e2f4cee59d70a6a1a1
+Source commit at deployment: 779cb8bc8613fbd5676f5ba5b381d14b441771bb
 Wrangler: 4.168.0
 
 ## Deployment and live readback
@@ -35,16 +35,8 @@ Wrangler: 4.168.0
 - The temporary token was deleted. Wrangler secret inventory is empty. After cleanup, the probe endpoint returned 404 and the Seat route returned HTTP 503 `TRUST_CONFIGURATION_REQUIRED`.
 - Cloudflare Containers discovery returned an account entitlement error: deploying containers requires the Workers Paid plan. No plan upgrade or charge was authorized.
 
-## Local verification (prior receipt)
-
-- 15 Worker/trust/witness/SQLite tests passed.
-- 8 existing OURTUNNELSELF broker regression tests passed.
-- Node syntax checks passed, including the device agent.
-- Wrangler dry-run passed and recognized the Durable Object binding.
-- Node SQLite lifecycle test passed: initial read, device enrollment write, nonce replay rejection, job claim, result/evidence commit, revocation, and close/reopen persistence.
-
 ## Boundaries
 
-The SQLite lifecycle test exercises the Durable Object class against Node's SQLite implementation; it is not a Cloudflare workerd or remote Durable Object runtime test. The staging deployment proves the current Worker version is live and fail-closed, not that signed Seat/PORTAL/device traffic is admitted or that the device agent completes an end-to-end job. A structurally valid secret remains PRESENT_UNVERIFIED until OSOS root/subordinate certification and issuer-policy binding are implemented. The inspected OSOS repository contains only README.md; the authoritative chain schema is not yet present in the accessible source.
+The local SQLite lifecycle test exercises the Durable Object class against Node's SQLite implementation. In addition, the staging-only probe has now exercised the actual Cloudflare Durable Object SQLite runtime and demonstrated persistence across instance boot-ID changes. The staging deployment does not prove that signed Seat/PORTAL/device traffic is admitted or that the device agent completes an end-to-end job. A structurally valid secret remains PRESENT_UNVERIFIED until OSOS root/subordinate certification and issuer-policy binding are implemented. The inspected OSOS repository contains only README.md; the authoritative chain schema is not yet present in the accessible source.
 
 No production hostname, production tunnel, existing Mac-side origin, or Pipe|Portal process was modified. No device was admitted. No command execution was enabled. The Worker-signed evidence receipt is not an independent witness and is not canonical DATASELF custody. RAWMAC power-off independence remains unproven.

@@ -25,7 +25,7 @@ Status: implementation contract; not production admission.
 - No command in the verification path deploys.
 - Output labels distinguish test pass, dry-run pass, and deployment state.
 
-**Acceptance evidence:** local verifier completes with 15 Worker/trust/witness/SQLite tests, 8 existing broker regression tests, Node syntax checks, and Wrangler dry-run.
+**Acceptance evidence:** local verifier completes with 16 Worker/trust/witness/SQLite tests, 8 existing broker regression tests, Node syntax checks, and Wrangler dry-run. Remote Cloudflare Durable Object SQLite write/read and persistence across three distinct instance boot IDs are recorded in the staging receipt.
 
 ## ARCHMORPH-03 · SHORTCUTSELF — Shortcuts as operator surface
 
@@ -53,7 +53,7 @@ Status: implementation contract; not production admission.
 - Worker-signed receipts are not independent witness attestations; separate WITNESSSELF and canonical DATASELF custody remain unimplemented.
 - Production hostname and tunnel migration remain prohibited until actual OSOS/PORTAL trust material and end-to-end runtime evidence exist.
 
-**Current evidence:** staging health returns HTTP 200 independently of RAWMAC; current trust state is MISSING and chain validation is NOT_IMPLEMENTED. A temporary structural configuration probe reached PRESENT_UNVERIFIED but could not open authority routes; cleanup returned the secret inventory to empty. Node SQLite close/reopen tests pass. Cloudflare workerd/remote DO end-to-end and RAWMAC power-off independence are not yet proven.
+**Current evidence:** staging health returns HTTP 200 independently of RAWMAC; current trust state is MISSING and chain validation is NOT_IMPLEMENTED. A temporary structural configuration probe reached PRESENT_UNVERIFIED but could not open authority routes; cleanup returned the secret inventory to empty. Node SQLite close/reopen and actual Cloudflare Durable Object SQLite read/write across three distinct in-memory instance boot IDs are verified. Signed Seat/PORTAL/device end-to-end and RAWMAC power-off independence remain unproven.
 
 ## Cross-morph invariants
 
