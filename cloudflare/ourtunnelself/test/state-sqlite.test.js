@@ -52,7 +52,18 @@ test("SQLite state enforces enrollment, nonce replay, delivery, evidence, revoca
   };
   try {
     let { state, close } = openState(file);
-    let r = await call(state, "GET", "/devices");
+    const firstInstanceBootId = state.instanceBootId;
+    let r = await call(state, "POST", "/selftest/write", {
+      probe_id: "sqlite_restart_probe_001", payload: "persist-through-close-reopen",
+      payload_digest: "a".repeat(64)
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.instance_boot_id, firstInstanceBootId);
+    let persistedProbe = await call(state, "GET", "/selftest/read/sqlite_restart_probe_001");
+    assert.equal(persistedProbe.status, 200);
+    assert.equal(persistedProbe.body.record.payload, "persist-through-close-reopen");
+    let r2 = await call(state, "GET", "/devices");
+    r = r2;
     assert.equal(r.status, 200); assert.deepEqual(r.body.devices, []);
 
     r = await call(state, "POST", "/devices", {
@@ -116,6 +127,11 @@ test("SQLite state enforces enrollment, nonce replay, delivery, evidence, revoca
     close();
 
     ({ state, close } = openState(file));
+    assert.notEqual(state.instanceBootId, firstInstanceBootId, "a new Durable Object instance must have a new in-memory boot identity");
+    persistedProbe = await call(state, "GET", "/selftest/read/sqlite_restart_probe_001");
+    assert.equal(persistedProbe.status, 200);
+    assert.equal(persistedProbe.body.record.payload, "persist-through-close-reopen");
+    assert.notEqual(persistedProbe.body.instance_boot_id, firstInstanceBootId);
     r = await call(state, "GET", "/devices");
     assert.equal(r.status, 200); assert.equal(r.body.devices[0].enabled, 0);
     assert.ok(r.body.devices[0].revoked_at);

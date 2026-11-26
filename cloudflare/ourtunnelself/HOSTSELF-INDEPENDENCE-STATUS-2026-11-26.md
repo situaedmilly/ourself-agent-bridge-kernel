@@ -18,6 +18,7 @@
 - Existing Cloudflare Tunnel connectors and their configured origins still include RAWMAC localhost services. They are not independent of RAWMAC power.
 - OURHOSTSELF-INGRESS still has no active connector.
 - No separate VM/container compute host or independent tunnel connector has been provisioned.
+- Wrangler `containers list` returned Cloudflare entitlement error: deploying Cloudflare Containers requires the Workers Paid plan. No plan upgrade or charge was authorized. The Mac Colima runtime is stopped, and no provider-specific credentials for Hetzner, DigitalOcean, AWS, Azure, GCP, Fly, Render, Vultr, or Linode were present in the checked environment (variable names only).
 - Cloudflare Containers capability check returned Unauthorized: this account does not have access; deployment requires the Workers Paid plan. Official base plan is USD $5/month plus metered container memory/CPU/disk/egress. No plan upgrade or paid deployment was authorized.
 - Docker CLI is installed on RAWMAC, but the configured Colima daemon is stopped; Docker cannot currently build a container image.
 - Cloudflare Containers are not a guaranteed never-stop process: Cloudflare documents that host events can stop active containers without a fixed runtime guarantee, and container disk is ephemeral by default. Durable Object alarms/state would be required for recovery; this still remains inside the Cloudflare provider.

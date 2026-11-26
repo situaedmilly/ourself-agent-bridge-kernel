@@ -6,6 +6,7 @@ export class OURHOSTSELFState {
   constructor(ctx) {
     this.ctx = ctx;
     this.sql = ctx.storage.sql;
+    this.instanceBootId = crypto.randomUUID();
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS devices (
         device_id TEXT PRIMARY KEY, label TEXT NOT NULL, public_key_pem TEXT NOT NULL,
@@ -35,6 +36,10 @@ export class OURHOSTSELFState {
         envelope_json TEXT NOT NULL, recorded_at TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS job_result_digests (job_id TEXT PRIMARY KEY, result_digest TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS state_self_probe (
+        probe_id TEXT PRIMARY KEY, payload TEXT NOT NULL, payload_digest TEXT NOT NULL,
+        written_at TEXT NOT NULL
+      );
     `);
   }
 
@@ -47,6 +52,24 @@ export class OURHOSTSELFState {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/selftest/write") {
+      const body = await request.json();
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(body.probe_id || "") || typeof body.payload !== "string" || body.payload.length > 2048 || !/^[a-f0-9]{64}$/.test(body.payload_digest || "")) {
+        return json({ error: "STATE_PROBE_FIELDS_INVALID" }, 400);
+      }
+      this.ctx.storage.transactionSync(() => {
+        this.sql.exec(
+          "INSERT INTO state_self_probe (probe_id,payload,payload_digest,written_at) VALUES (?,?,?,?) ON CONFLICT(probe_id) DO UPDATE SET payload=excluded.payload,payload_digest=excluded.payload_digest,written_at=excluded.written_at",
+          body.probe_id, body.payload, body.payload_digest, new Date().toISOString()
+        );
+      });
+      return json({ written: true, probe_id: body.probe_id, instance_boot_id: this.instanceBootId });
+    }
+    if (request.method === "GET" && url.pathname.startsWith("/selftest/read/")) {
+      const probeId = decodeURIComponent(url.pathname.split("/").pop() || "");
+      const record = this.sql.exec("SELECT probe_id,payload,payload_digest,written_at FROM state_self_probe WHERE probe_id = ?", probeId).toArray()[0];
+      return record ? json({ found: true, record, instance_boot_id: this.instanceBootId }) : json({ found: false, instance_boot_id: this.instanceBootId }, 404);
+    }
     if (request.method === "GET" && url.pathname === "/devices") {
       const devices = this.sql.exec("SELECT device_id,label,enabled,revoked_at FROM devices ORDER BY device_id").toArray();
       return json({ devices });

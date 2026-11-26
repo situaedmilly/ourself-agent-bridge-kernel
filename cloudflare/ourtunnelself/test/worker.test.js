@@ -65,3 +65,32 @@ test("syntactically configured trust cannot bypass OSOS chain verification", asy
     trust_chain_validation: "NOT_IMPLEMENTED"
   });
 });
+
+test("staging SQLite probe is hidden without a token and uses the bound Durable Object when authorized", async () => {
+  const hidden = await worker.fetch(new Request("https://unit.test/__staging/state-self-check", { method: "POST", body: JSON.stringify({ action: "read", probe_id: "probe_id_12345678" }) }), {});
+  assert.equal(hidden.status, 404);
+
+  const calls = [];
+  const env = {
+    OURHOSTSELF_STATESELF_PROBE_TOKEN: "probe-secret-token",
+    OURHOSTSELF_STATE: {
+      idFromName(name) { assert.equal(name, "global"); return "global-id"; },
+      get(id) {
+        assert.equal(id, "global-id");
+        return { fetch: async (input, init = {}) => {
+          calls.push({ url: String(input), method: init.method || "GET", body: init.body ? JSON.parse(init.body) : null });
+          return new Response(JSON.stringify({ written: true, probe_id: "probe_id_12345678" }), { status: 200 });
+        } };
+      }
+    }
+  };
+  const response = await worker.fetch(new Request("https://unit.test/__staging/state-self-check", {
+    method: "POST", headers: { "content-type": "application/json", "x-ourhostself-state-probe": "probe-secret-token" },
+    body: JSON.stringify({ action: "write", probe_id: "probe_id_12345678", payload: "sqlite-probe-payload" })
+  }), env);
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /selftest\/write$/);
+  assert.equal(calls[0].body.payload, "sqlite-probe-payload");
+  assert.match(calls[0].body.payload_digest, /^[a-f0-9]{64}$/);
+});

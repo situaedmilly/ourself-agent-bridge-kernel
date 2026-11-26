@@ -26,6 +26,15 @@ Wrangler: 4.168.0
 
 ## Local verification
 
+- 16 Worker/trust/witness/SQLite tests passed.
+- 8 existing OURTUNNELSELF broker regression tests passed.
+- Wrangler dry-run passed and recognized the Durable Object binding.
+- The local SQLite close/reopen test now also proves that the persisted probe record survives while the in-memory instance boot ID changes.
+- A token-gated staging-only `/__staging/state-self-check` route was added for remote Durable Object SQLite read/write and instance-boot-ID verification. It is inaccessible unless a temporary staging-only secret is present; the token must be deleted immediately after the probe.
+- Cloudflare Containers discovery returned an account entitlement error: deploying containers requires the Workers Paid plan. No plan upgrade or charge was authorized.
+
+## Local verification (prior receipt)
+
 - 15 Worker/trust/witness/SQLite tests passed.
 - 8 existing OURTUNNELSELF broker regression tests passed.
 - Node syntax checks passed, including the device agent.

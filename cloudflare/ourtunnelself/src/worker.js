@@ -48,6 +48,25 @@ const state = env => env.OURHOSTSELF_STATE.get(env.OURHOSTSELF_STATE.idFromName(
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/__staging/state-self-check") {
+      const expected = env.OURHOSTSELF_STATESELF_PROBE_TOKEN;
+      const supplied = request.headers.get("x-ourhostself-state-probe") || "";
+      if (!expected || !supplied || expected.length !== supplied.length) return json({ error: "NOT_FOUND" }, 404);
+      let mismatch = 0;
+      for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ supplied.charCodeAt(i);
+      if (mismatch !== 0) return json({ error: "NOT_FOUND" }, 404);
+      const raw = await request.text();
+      if (raw.length > 4096) return json({ error: "STATE_PROBE_BODY_TOO_LARGE" }, 413);
+      let body;
+      try { body = JSON.parse(raw); } catch { return json({ error: "STATE_PROBE_JSON_INVALID" }, 400); }
+      if (!body || !["write", "read"].includes(body.action) || !/^[A-Za-z0-9_-]{16,128}$/.test(body.probe_id || "")) return json({ error: "STATE_PROBE_FIELDS_INVALID" }, 400);
+      if (body.action === "write") {
+        if (typeof body.payload !== "string" || body.payload.length > 2048) return json({ error: "STATE_PROBE_FIELDS_INVALID" }, 400);
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(body.payload))), b => b.toString(16).padStart(2, "0")).join("");
+        return state(env).fetch("https://state.internal/selftest/write", { method: "POST", body: JSON.stringify({ probe_id: body.probe_id, payload: body.payload, payload_digest: digest }) });
+      }
+      return state(env).fetch("https://state.internal/selftest/read/" + encodeURIComponent(body.probe_id));
+    }
     if (request.method === "GET" && url.pathname === "/health") {
       const resolved = resolveTrustConfiguration(env);
       return json({
