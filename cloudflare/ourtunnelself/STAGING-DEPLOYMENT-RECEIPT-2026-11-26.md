@@ -48,3 +48,7 @@ Wrangler: `4.168.0`
 6. Establish independent host/connector and prove health with RAWMAC powered off.
 7. Only then consider production ingress migration with rollback.
 
+
+## Follow-up probe limitation
+
+A staging-only authenticated Durable Object read probe was attempted using a temporary generated RSA key and temporary issuer values. The deployed Worker continued returning `TRUST_CONFIGURATION_REQUIRED` (HTTP 503), so the probe did not reach the Durable Object. All four temporary staging secrets were deleted; a subsequent `wrangler secret list` returned an empty array. Health remained HTTP 200 and the protected route remained fail-closed. Therefore Durable Object initialization and persistence are explicitly **not yet runtime-verified**.
