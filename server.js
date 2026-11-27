@@ -13,6 +13,7 @@ import { classifyCommand, evaluateApproval, evaluateDataPlaneApproval, EXECUTION
 import { createRealmGate } from './tools/realm-gate.js';
 import { analyzeTarget, resolveTargetWithinBoundary } from './tools/reverse-engineer.js';
 import { reverseEngineerGitHubBlob, compareLocalFileToBlob } from './runtime/blobself.js';
+import { createOURSELFdRouter } from './adapters/ourselfd-router.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -140,6 +141,11 @@ app.use((req, res, next) => {
   res.set('Referrer-Policy', 'no-referrer');
   next();
 });
+
+// Authenticated AgentBridge → OURSELFd crossing. AgentBridge's accepted token is
+// forwarded only over the local Unix socket; OURSELFd independently authenticates it.
+const OURSELFD_SOCKET = process.env.OURSELFD_SOCKET || '/var/tmp/ourselfd.sock';
+app.use('/ourselfd', requireToken, createOURSELFdRouter({ socketPath: OURSELFD_SOCKET, token: BRIDGE_TOKEN }));
 
 // In-memory pending command queue — keyed by command ID
 const pending = new Map();

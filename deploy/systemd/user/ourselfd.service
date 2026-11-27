@@ -1,0 +1,22 @@
+[Unit]
+Description=OURSELFd bounded local realization runtime
+After=local-fs.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/ourself-agent-bridge-kernel
+Environment=OURSELF_REPO_ROOT=%h/ourself-agent-bridge-kernel
+Environment=OURSELFD_SOCKET=%t/ourselfd/ourselfd.sock
+Environment=OURSELFD_STATE_DIR=%h/.local/state/ourselfd
+ExecStartPre=/usr/bin/mkdir -p %h/.local/state/ourselfd %t/ourselfd
+ExecStart=%h/.nvm/versions/node/v22.23.3/bin/node runtime/ourselfd/daemon.js
+Restart=on-failure
+RestartSec=2
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=%h/.local/state/ourselfd %t/ourselfd
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,88 @@
+{
+  "version": "0.2",
+  "authority": "OURSELFd",
+  "principal_binding": {
+    "principal": "agentbridge",
+    "authentication": "shared-secret",
+    "secret_source": "OURSELFD_AGENTBRIDGE_TOKEN_OR_BRIDGE_TOKEN",
+    "client_supplied_identity": false
+  },
+  "reality_resolution": {
+    "required": [
+      "repository_realpath",
+      "git_root",
+      "git_head",
+      "git_branch",
+      "dirty_state_hash",
+      "runtime_source_hashes",
+      "capability_contract_hash",
+      "host",
+      "boot_id"
+    ],
+    "pre_state_hash_required": true,
+    "pre_state_drift": "DENY_AND_REQUIRE_NEW_INSTANCE"
+  },
+  "transition_endpoint": "POST /v1/transitions/request",
+  "capabilities": {
+    "repo.status": {
+      "mutability": "read",
+      "exposed": true,
+      "receipt_required": true,
+      "operation": "git_status",
+      "authorized_principals": ["agentbridge"],
+      "actuator": "execFile(git, [status flags])",
+      "target_scope": "repository_root_only"
+    },
+    "repo.read": {
+      "mutability": "read",
+      "exposed": false,
+      "status": "NOT_IMPLEMENTED"
+    },
+    "repo.diff": {
+      "mutability": "read",
+      "exposed": false,
+      "status": "NOT_IMPLEMENTED"
+    }
+  },
+  "explicitly_absent": [
+    "shell.execute",
+    "process.start",
+    "repo.write",
+    "file.write",
+    "arbitrary_filesystem_access"
+  ],
+  "persistence": {
+    "format": "append_only_jsonl",
+    "default_path": "~/.local/state/ourselfd/events.jsonl",
+    "fsync_each_event": true,
+    "hash_chain": "sha256",
+    "restart_replay": true,
+    "corruption_policy": "FAIL_CLOSED"
+  },
+  "recontact": [
+    "GET /v1/recontact/instances/:instance_id",
+    "GET /v1/recontact/receipts/:receipt_id",
+    "GET /v1/ledger"
+  ],
+  "state_machine": [
+    "REQUESTED",
+    "RESOLVED",
+    "AUTHENTICATED",
+    "AUTHORIZED",
+    "PRECONDITIONS_SATISFIED",
+    "ADMITTED",
+    "ACTUATED",
+    "OBSERVED",
+    "RECEIPTED"
+  ],
+  "non_collapse": [
+    "IDENTITY != PRINCIPAL_LABEL",
+    "PRINCIPAL_AUTHENTICATION != CAPABILITY_AUTHORITY",
+    "PRE_STATE != CURRENT_STATE",
+    "ADMISSION != ACTUATION",
+    "ACTUATION != OBSERVATION",
+    "OBSERVATION != RECEIPT",
+    "RECEIPT != MEMORY",
+    "PERSISTED != RECONTACTED"
+  ]
+}
