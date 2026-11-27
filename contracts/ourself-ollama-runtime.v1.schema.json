@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ourself-ollama-runtime.v1",
+  "title": "OURSELF Ollama Runtime Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runtime", "modelself", "cognition", "boundaries", "evidence"],
+  "properties": {
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "provider", "endpoint", "exposure"],
+      "properties": {
+        "id": { "const": "OLLAMA" },
+        "provider": { "const": "LOCAL_MODEL_RUNTIME" },
+        "endpoint": { "type": "string", "pattern": "^https?://.+" },
+        "exposure": { "enum": ["LOOPBACK_ONLY", "NETWORK", "UNKNOWN"] }
+      }
+    },
+    "modelself": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "runtime", "model"],
+      "properties": {
+        "id": { "const": "QWENSELF" },
+        "runtime": { "const": "OLLAMA" },
+        "model": { "type": "string", "minLength": 1 }
+      }
+    },
+    "cognition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["substrate", "mode"],
+      "properties": {
+        "substrate": { "const": "OURSELFLLM" },
+        "mode": { "const": "CONSTITUTIONAL_COGNITIVE_SUBSTRATE" }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["execution", "authority", "persistence"],
+      "properties": {
+        "execution": { "const": "NOT_IMPLIED_BY_MODEL_OUTPUT" },
+        "authority": { "const": "NOT_GRANTED_BY_MODEL_OUTPUT" },
+        "persistence": { "const": "NOT_CLAIMED_WITHOUT_EXTERNAL_RECEIPT" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_metrics_are", "world_effect_proof"],
+      "properties": {
+        "runtime_metrics_are": { "const": "COMPUTATIONAL_RUNTIME_EVIDENCE" },
+        "world_effect_proof": { "const": "REQUIRES_EXTERNAL_WITNESS" }
+      }
+    }
+  }
+}
