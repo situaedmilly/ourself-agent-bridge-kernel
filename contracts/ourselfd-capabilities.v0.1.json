@@ -5,19 +5,23 @@
   "capabilities": {
     "repo.read": {
       "mutability": "read",
-      "exposed": true,
-      "receipt_required": true
+      "exposed": false,
+      "receipt_required": true,
+      "implementation_status": "DECLARED_NOT_IMPLEMENTED"
     },
     "repo.status": {
       "mutability": "read",
       "exposed": true,
       "receipt_required": true,
-      "operation": "git_status"
+      "operation": "git_status",
+      "implemented": true,
+      "implementation_status": "IMPLEMENTED"
     },
     "repo.diff": {
       "mutability": "read",
-      "exposed": true,
-      "receipt_required": true
+      "exposed": false,
+      "receipt_required": true,
+      "implementation_status": "DECLARED_NOT_IMPLEMENTED"
     }
   },
   "explicitly_absent": [

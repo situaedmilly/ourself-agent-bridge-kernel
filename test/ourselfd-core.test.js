@@ -51,3 +51,54 @@ test("forbidden capabilities cannot cross the membrane", async () => {
     /CAPABILITY_FORBIDDEN/
   );
 });
+
+
+test("declared-but-unimplemented repository capabilities cannot cross the membrane", async () => {
+  const daemon = new OURSELFdCore({ repoRoot });
+  const instance = daemon.createInstance();
+
+  assert.deepEqual(
+    daemon.capabilities().map(({ id, exposed, implementation_status }) => ({
+      id,
+      exposed,
+      implementation_status
+    })),
+    [
+      {
+        id: "repo.read",
+        exposed: false,
+        implementation_status: "DECLARED_NOT_IMPLEMENTED"
+      },
+      {
+        id: "repo.status",
+        exposed: true,
+        implementation_status: "IMPLEMENTED"
+      },
+      {
+        id: "repo.diff",
+        exposed: false,
+        implementation_status: "DECLARED_NOT_IMPLEMENTED"
+      }
+    ]
+  );
+
+  await assert.rejects(
+    daemon.requestTransition({
+      instance_id: instance.instance_id,
+      capability: "repo.read",
+      operation: "read_file",
+      target: "OURSELFEREIGNTY"
+    }),
+    /OPERATION_NOT_IMPLEMENTED|CAPABILITY_NOT_FOUND/
+  );
+
+  await assert.rejects(
+    daemon.requestTransition({
+      instance_id: instance.instance_id,
+      capability: "repo.diff",
+      operation: "git_diff",
+      target: "OURSELFEREIGNTY"
+    }),
+    /OPERATION_NOT_IMPLEMENTED|CAPABILITY_NOT_FOUND/
+  );
+});

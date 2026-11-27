@@ -53,7 +53,7 @@ export function createOURSELFdServer({
 
       const receiptMatch = req.url?.match(/^\/v1\/receipts\/([^/]+)$/);
       if (req.method === "GET" && receiptMatch) {
-        return send(res, 200, core.getReceipt(receiptMatch[1]));
+        return send(res, 200, await core.recontactReceipt(receiptMatch[1]));
       }
 
       const instanceMatch = req.url?.match(/^\/v1\/instances\/([^/]+)$/);

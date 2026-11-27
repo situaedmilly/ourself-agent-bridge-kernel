@@ -19,9 +19,24 @@ export const TRANSITION_STATES = Object.freeze([
 ]);
 
 export const CAPABILITIES = Object.freeze({
-  "repo.read": Object.freeze({ id: "repo.read", mutability: "read", exposed: true }),
-  "repo.status": Object.freeze({ id: "repo.status", mutability: "read", exposed: true }),
-  "repo.diff": Object.freeze({ id: "repo.diff", mutability: "read", exposed: true })
+  "repo.read": Object.freeze({
+    id: "repo.read",
+    mutability: "read",
+    exposed: false,
+    implementation_status: "DECLARED_NOT_IMPLEMENTED"
+  }),
+  "repo.status": Object.freeze({
+    id: "repo.status",
+    mutability: "read",
+    exposed: true,
+    implementation_status: "IMPLEMENTED"
+  }),
+  "repo.diff": Object.freeze({
+    id: "repo.diff",
+    mutability: "read",
+    exposed: false,
+    implementation_status: "DECLARED_NOT_IMPLEMENTED"
+  })
 });
 
 const FORBIDDEN_CAPABILITIES = new Set([
@@ -194,6 +209,22 @@ export class OURSELFdCore {
     }
 
     return structuredClone(receipt);
+  }
+
+  async recontactReceipt(receiptId) {
+    const inMemory = this.receipts.get(receiptId);
+    if (inMemory) return structuredClone(inMemory);
+    if (!this.receiptDir) throw new Error("RECEIPT_NOT_FOUND");
+    const file = path.join(this.receiptDir, `${receiptId}.json`);
+    try {
+      const raw = await fs.readFile(file, "utf8");
+      const receipt = JSON.parse(raw);
+      this.receipts.set(receiptId, receipt);
+      return structuredClone(receipt);
+    } catch (error) {
+      if (error.code === "ENOENT") throw new Error("RECEIPT_NOT_FOUND");
+      throw error;
+    }
   }
 
   getReceipt(receiptId) {
