@@ -9,10 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { mkdtemp, rm, mkdir, writeFile, symlink } from 'node:fs/promises';
-import { unlinkSync, symlinkSync, mkdirSync, rmSync } from 'node:fs';
+import { unlinkSync, symlinkSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { persistPendingProposal, getPendingProposal } from '../persistence/pending-proposals.js';
 import { createStaticHumanTurnTokenVerifier, createHumanTurnDecisionService, DECISION_VERSION } from '../persistence/human-turn-decisions.js';
 import { createBoundedProposalExecutor } from '../persistence/proposal-execution.js';
@@ -20,6 +20,47 @@ import { RECONCILIATION_STATUSES, OUTCOME_CLASSES } from '../persistence/executi
 import { createProofPathDriver } from '../tools/proof-path-driver.js';
 
 const TOKEN = 'human-turn-sl008a-test-token-do-not-reuse';
+
+test('reviewed target bytes and expiry discriminate current from stale execution preimages', async () => {
+  for (const species of ['exact', 'stale', 'late-drift', 'expired', 'missing']) {
+    await withTempStore(async dir => withTempWorkspace(async ws => {
+      await writeFile(join(ws, 'file.txt'), 'reviewed\n');
+      const proposalId = await authorizeGitAddProposal(dir, 'file.txt');
+      const spawnImpl = makeSpawnRecorder(gitAddSuccess);
+      let clockCalls = 0;
+      const executor = createBoundedProposalExecutor({
+        authorizedExecutionRoot: ws, spawnImpl, requireExecutionPreimage: true,
+        ...(species === 'missing' ? {} : { executionPreimage: {
+          target: 'file.txt', sha256: createHash('sha256').update('reviewed\n').digest('hex'),
+          ...(species === 'expired' ? { expiresAt: '2000-01-01T00:00:00Z' } : {}),
+        } }),
+        now: () => {
+          clockCalls++;
+          if (species === 'late-drift' && clockCalls === 3) writeFileSync(join(ws, 'file.txt'), 'changed after claim\n');
+          return new Date().toISOString();
+        },
+      });
+      if (species === 'stale') await writeFile(join(ws, 'file.txt'), 'changed before dispatch\n');
+      const result = await executor.executeAuthorizedProposal({ storageRoot: dir, proposalId });
+      assert.equal(result.ok, species === 'exact', species);
+      assert.equal(spawnImpl.calls.length, species === 'exact' ? 1 : 0, species);
+      if (species !== 'exact') assert.equal(result.error, 'EXECUTION_PREIMAGE_MISMATCH', species);
+      const got = await getPendingProposal(dir, proposalId);
+      if (species === 'late-drift') {
+        assert.equal(got.record.state, 'EXECUTION_FAILED');
+        assert.equal(got.record.execution.result.actuation_attempted, false);
+        assert.equal(got.record.execution.result.classification, 'preimage_refused');
+        assert.equal(result.executed, false);
+        const retry = await executor.executeAuthorizedProposal({ storageRoot: dir, proposalId });
+        assert.equal(retry.idempotent, true);
+        assert.equal(retry.record.execution.result.actuation_attempted, false);
+        assert.equal(spawnImpl.calls.length, 0, 'late refusal must never auto-retry');
+      } else if (species !== 'exact') {
+        assert.equal(got.record.state, 'AUTHORIZED_PENDING_EXECUTION');
+      }
+    }));
+  }
+});
 
 async function withTempStore(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'ourself-sl008a-store-'));
