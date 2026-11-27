@@ -7,7 +7,8 @@
     "setup": "node tools/setup-secret.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "ourselfd:m1": "node runtime/ourselfd/m1.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.20.0",
